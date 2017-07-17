@@ -141,4 +141,3 @@ LOG_ADD(LOG_FLOAT, fPitch, &PitchForce)
 LOG_ADD(LOG_FLOAT, fYaw, &YawForce)
 LOG_ADD(LOG_FLOAT, fThrust, &ThrustForce)
 LOG_GROUP_STOP(motorpwm)
-
