@@ -173,7 +173,11 @@ static inline bool stateEstimatorHasTOFPacket(tofMeasurement_t *tof) {
 #define CRAZYFLIE_WEIGHT_grams (27.0f)
 
 //thrust is thrust mapped for 65536 <==> 60 GRAMS!
+#ifdef CONTROLLER_TYPE_new
+#define CONTROL_TO_ACC (1.0f)
+#else
 #define CONTROL_TO_ACC (GRAVITY_MAGNITUDE*60.0f/CRAZYFLIE_WEIGHT_grams/65536.0f)
+#endif
 
 #define SPEED_OF_LIGHT (299792458)
 
@@ -218,6 +222,10 @@ static float procNoiseAtt = 0;
 static float measNoiseBaro = 2.0f; // meters
 static float measNoiseGyro_rollpitch = 0.1f; // radians per second
 static float measNoiseGyro_yaw = 0.1f; // radians per second
+
+
+static float dragXY = 0.19f;
+static float dragZ = 0.05f;
 
 // We track a TDOA skew as part of the Kalman filter
 static const float stdDevInitialSkew = 0.1;
@@ -596,17 +604,17 @@ static void stateEstimatorPredict(float cmdThrust, Axis3f *acc, Axis3f *gyro, fl
   A[STATE_Z][STATE_D2] = (S[STATE_PX]*R[2][1] - S[STATE_PY]*R[2][0])*dt;
 
   // body-frame velocity from body-frame velocity
-  A[STATE_PX][STATE_PX] = 1; //drag negligible
+  A[STATE_PX][STATE_PX] = 1 - 2*dragXY*S[STATE_PX]*dt; //drag term for new controller
   A[STATE_PY][STATE_PX] =-gyro->z*dt;
   A[STATE_PZ][STATE_PX] = gyro->y*dt;
 
   A[STATE_PX][STATE_PY] = gyro->z*dt;
-  A[STATE_PY][STATE_PY] = 1; //drag negligible
+  A[STATE_PY][STATE_PY] = 1 - 2*dragXY*S[STATE_PY]*dt; //drag term for new controller
   A[STATE_PZ][STATE_PY] =-gyro->x*dt;
 
   A[STATE_PX][STATE_PZ] =-gyro->y*dt;
   A[STATE_PY][STATE_PZ] = gyro->x*dt;
-  A[STATE_PZ][STATE_PZ] = 1; //drag negligible
+  A[STATE_PZ][STATE_PZ] = 1 - 2*dragZ*S[STATE_PZ]*dt; //drag term for new controller
 
   // body-frame velocity from attitude error
   A[STATE_PX][STATE_D0] =  0;
@@ -702,9 +710,14 @@ static void stateEstimatorPredict(float cmdThrust, Axis3f *acc, Axis3f *gyro, fl
     tmpSPZ = S[STATE_PZ];
 
     // body-velocity update: accelerometers - gyros cross velocity - gravity in body frame
-    S[STATE_PX] += dt * (gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * R[2][0]);
-    S[STATE_PY] += dt * (-gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]);
-    S[STATE_PZ] += dt * (zacc + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]);
+    // S[STATE_PX] += dt * (gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * R[2][0]);
+    // S[STATE_PY] += dt * (-gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]);
+    // S[STATE_PZ] += dt * (zacc + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]);
+
+    //drag term for new controller
+    S[STATE_PX] += dt * (gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * R[2][0]) + dragXY*tmpSPX*tmpSPX*dt*(tmpSPX<0?1:-1);
+    S[STATE_PY] += dt * (-gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]) + dragXY*tmpSPY*tmpSPY*dt*(tmpSPY<0?1:-1);
+    S[STATE_PZ] += dt * (zacc + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]) + dragZ*tmpSPZ*tmpSPZ*dt*(tmpSPZ<0?1:-1);
   }
   else // Acceleration can be in any direction, as measured by the accelerometer. This occurs, eg. in freefall or while being carried.
   {
@@ -1482,3 +1495,4 @@ PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_FLOAT, mNGyro_rollpitch, &measNoiseGyro_rollpitch)
   PARAM_ADD(PARAM_FLOAT, mNGyro_yaw, &measNoiseGyro_yaw)
 PARAM_GROUP_STOP(kalman)
+

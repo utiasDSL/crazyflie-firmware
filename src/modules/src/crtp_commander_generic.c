@@ -67,6 +67,7 @@ enum packet_type {
   cppmEmuType       = 3,
   altHoldType       = 4,
   hoverType         = 5,
+  newControllerType = 6,
 };
 
 /* ---===== 2 - Decoding functions =====--- */
@@ -292,6 +293,55 @@ static void hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, s
   setpoint->velocity_body = true;
 }
 
+/* newControllerDecoder
+ * Set the dynamic waypoints for mike hammer's nonlinear controller
+ */
+
+struct crtpControlPacketHeader_t{
+  uint16_t packetHasExternalReference:1;
+  uint16_t setEmergency:1;
+  uint16_t resetEmergency:1;
+  uint16_t controlModeX:3;
+  uint16_t controlModeY:3;
+  uint16_t controlModeZ:3;
+  uint16_t :4;
+} __attribute__((packed)); //size 2 bytes
+
+
+struct newControllerPacket_s {
+  struct crtpControlPacketHeader_t header; // size 2 bytes
+  uint16_t x[3];
+  uint16_t y[3];
+  uint16_t z[3];
+  uint16_t yaw[2];
+} __attribute__((packed));
+
+static void newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
+{
+  const struct newControllerPacket_s *values = data;
+
+  //cmd[0] =  half2single(values->x[0]);
+  //cmd[1] =  half2single(values->y[0]);
+  //cmd[2] =  half2single(values->z[0]);
+
+
+  ASSERT(datalen == sizeof(struct newControllerPacket_s));
+
+  setpoint->setEmergency = values->header.setEmergency;
+  setpoint->resetEmergency = values->header.resetEmergency;
+
+  setpoint->xmode = values->header.controlModeX;
+  setpoint->ymode = values->header.controlModeY;
+  setpoint->zmode = values->header.controlModeZ;
+
+  for(int i = 0; i<3; i++){setpoint->x[i] = half2single(values->x[i]);}
+  for(int i = 0; i<3; i++){setpoint->y[i] = half2single(values->y[i]);}
+  for(int i = 0; i<3; i++){setpoint->z[i] = half2single(values->z[i]);}
+  for(int i = 0; i<2; i++){setpoint->yaw[i] = half2single(values->yaw[i]);}
+
+}
+
+
  /* ---===== 3 - packetDecoders array =====--- */
 const static packetDecoder_t packetDecoders[] = {
   [stopType]          = stopDecoder,
@@ -300,6 +350,8 @@ const static packetDecoder_t packetDecoders[] = {
   [cppmEmuType]       = cppmEmuDecoder,
   [altHoldType]       = altHoldDecoder,
   [hoverType]         = hoverDecoder,
+  [newControllerType] = newControllerDecoder,
+
 };
 
 /* Decoder switch */
@@ -332,3 +384,4 @@ PARAM_ADD(PARAM_FLOAT, rateYaw, &s_CppmEmuYawMaxRateDps)
 PARAM_ADD(PARAM_FLOAT, angRoll, &s_CppmEmuRollMaxAngleDeg)
 PARAM_ADD(PARAM_FLOAT, angPitch, &s_CppmEmuPitchMaxAngleDeg)
 PARAM_GROUP_STOP(cmdrCPPM)
+

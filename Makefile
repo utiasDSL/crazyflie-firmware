@@ -174,7 +174,7 @@ PROJ_OBJ += estimator.o estimator_complementary.o
 PROJ_OBJ += controller_$(CONTROLLER).o
 PROJ_OBJ += power_distribution_$(POWER_DISTRIBUTION).o
 PROJ_OBJ_CF2 += estimator_kalman.o
-
+PROJ_OBJ_CF2 += physical_constants_cf2.o 
 
 # Deck Core
 PROJ_OBJ_CF2 += deck.o deck_info.o deck_drivers.o deck_test.o
@@ -216,7 +216,7 @@ PROJ_OBJ_CF2 += exptest.o
 PROJ_OBJ += filter.o cpuid.o cfassert.o  eprintf.o crc.o num.o debug.o
 PROJ_OBJ += version.o FreeRTOS-openocd.o
 PROJ_OBJ_CF1 += configblockflash.o
-PROJ_OBJ_CF2 += configblockeeprom.o crc_bosch.o
+PROJ_OBJ_CF2 += configblockeeprom.o crc_bosch.o cfmath.o 
 PROJ_OBJ_CF2 += sleepus.o
 
 # Libs

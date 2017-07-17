@@ -124,11 +124,7 @@ typedef struct sensorData_s {
   Axis3f mag;
   baro_t baro;
   zDistance_t zrange;
-  point_t position;
-#ifdef LOG_SEC_IMU
-  Axis3f accSec;
-  Axis3f gyroSec;
-#endif
+  point_t position; 
 } sensorData_t;
 
 typedef struct state_s {
@@ -140,9 +136,11 @@ typedef struct state_s {
 } state_t;
 
 typedef struct control_s {
-  int16_t roll;
-  int16_t pitch;
-  int16_t yaw;
+  bool enable;
+  int16_t roll, pitch, yaw;
+  float omega[3];
+  float torque[3];
+  float motorScale[4];
   float thrust;
 } control_t;
 
@@ -151,6 +149,10 @@ typedef enum mode_e {
   modeAbs,
   modeVelocity
 } stab_mode_t;
+
+#define CONTROLMODE_ACCELERATION(mode) ((0b001 & mode) != 0)
+#define CONTROLMODE_VELOCITY(mode)     ((0b010 & mode) != 0)
+#define CONTROLMODE_POSITION(mode)     ((0b100 & mode) != 0)
 
 typedef struct setpoint_s {
   uint32_t timestamp;
@@ -170,6 +172,16 @@ typedef struct setpoint_s {
     stab_mode_t pitch;
     stab_mode_t yaw;
   } mode;
+
+  // Data from and for the new controller
+  bool setEmergency;
+  bool resetEmergency;
+  uint8_t xmode, ymode, zmode;
+  float x[5];
+  float y[5];
+  float z[5];
+  float yaw[5];
+  float gamma[4][5];
 } setpoint_t;
 
 /** Estimate of position */
@@ -219,7 +231,9 @@ typedef struct tofMeasurement_s {
 #define RATE_MAIN_LOOP RATE_1000_HZ
 #define ATTITUDE_RATE RATE_500_HZ
 #define POSITION_RATE RATE_100_HZ
+#define CONTROL_RATE RATE_100_HZ
 
 #define RATE_DO_EXECUTE(RATE_HZ, TICK) ((TICK % (RATE_MAIN_LOOP / RATE_HZ)) == 0)
 
 #endif
+
