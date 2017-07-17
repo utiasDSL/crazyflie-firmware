@@ -36,7 +36,13 @@
 
 #include "sensors.h"
 #include "commander.h"
+
+#ifdef BROADCAST_ENABLE
+#include "crtp_broadcast_service.h"
+#else
 #include "crtp_localization_service.h"
+#endif
+
 #include "sitaw.h"
 #include "controller.h"
 #include "power_distribution.h"
@@ -122,8 +128,12 @@ static void stabilizerTask(void* param)
 
   while(1) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
-
+    #ifndef BROADCAST_ENABLE
     getExtPosition(&state);
+    #else
+    getExtPositionBC(&state);
+    #endif
+
     stateEstimator(&state, &sensorData, &control, tick);
 
     commanderGetSetpoint(&setpoint, &state);

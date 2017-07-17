@@ -149,7 +149,7 @@ bool getExtPosition(state_t *state)
 #ifndef PLATFORM_CF1
     estimatorKalmanEnqueuePosition(&ext_pos);
 #endif
-  
+
     return true;
   }
   return false;
