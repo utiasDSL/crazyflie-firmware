@@ -30,6 +30,7 @@
 #include <stdbool.h>
 #include "imu_types.h"
 
+
 /* Data structure used by the stabilizer subsystem.
  * All have a timestamp to be set when the data is calculated.
  */

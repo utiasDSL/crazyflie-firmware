@@ -82,15 +82,7 @@ static void stopDecoder(setpoint_t *setpoint, uint8_t type, const void *data, si
   return;
 }
 
-/* velocityDecoder
- * Set the Crazyflie velocity in the world coordinate system
- */
-struct velocityPacket_s {
-  float vx;        // m in the world frame of reference
-  float vy;        // ...
-  float vz;        // ...
-  float yawrate;  // deg/s
-} __attribute__((packed));
+
 static void velocityDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct velocityPacket_s *values = data;
@@ -110,15 +102,7 @@ static void velocityDecoder(setpoint_t *setpoint, uint8_t type, const void *data
   setpoint->attitudeRate.yaw = values->yawrate;
 }
 
-/* zDistanceDecoder
- * Set the Crazyflie absolute height and roll/pitch angles
- */
-struct zDistancePacket_s {
-  float roll;            // deg
-  float pitch;           // ...
-  float yawrate;         // deg/s
-  float zDistance;        // m in the world frame of reference
-} __attribute__((packed));
+
 static void zDistanceDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct zDistancePacket_s *values = data;
@@ -153,7 +137,6 @@ static void zDistanceDecoder(setpoint_t *setpoint, uint8_t type, const void *dat
  * Current aux channel assignments:
  * - AuxChannel0: set high to enable self-leveling, low to disable
  */
-#define MAX_AUX_RC_CHANNELS 10
 
 static float s_CppmEmuRollMaxRateDps = 720.0f; // For rate mode
 static float s_CppmEmuPitchMaxRateDps = 720.0f; // For rate mode
@@ -161,17 +144,7 @@ static float s_CppmEmuRollMaxAngleDeg = 50.0f; // For level mode
 static float s_CppmEmuPitchMaxAngleDeg = 50.0f; // For level mode
 static float s_CppmEmuYawMaxRateDps = 400.0f; // Used regardless of flight mode
 
-struct cppmEmuPacket_s {
-  struct {
-      uint8_t numAuxChannels : 4;   // Set to 0 through MAX_AUX_RC_CHANNELS
-      uint8_t reserved : 4;
-  } hdr;
-  uint16_t channelRoll;
-  uint16_t channelPitch;
-  uint16_t channelYaw;
-  uint16_t channelThrust;
-  uint16_t channelAux[MAX_AUX_RC_CHANNELS];
-} __attribute__((packed));
+
 
 static inline float getChannelUnitMultiplier(uint16_t channelValue, uint16_t channelMidpoint, uint16_t channelRange)
 {
@@ -228,15 +201,7 @@ static void cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
   }
 }
 
-/* altHoldDecoder
- * Set the Crazyflie vertical velocity and roll/pitch angle
- */
-struct altHoldPacket_s {
-  float roll;            // rad
-  float pitch;           // ...
-  float yawrate;         // deg/s
-  float zVelocity;       // m/s in the world frame of reference
-} __attribute__((packed));
+
 static void altHoldDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct altHoldPacket_s *values = data;
@@ -261,15 +226,7 @@ static void altHoldDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
   setpoint->attitude.pitch = values->pitch;
 }
 
-/* hoverDecoder
- * Set the Crazyflie absolute height and velocity in the body coordinate system
- */
-struct hoverPacket_s {
-  float vx;           // m/s in the body frame of reference
-  float vy;           // ...
-  float yawrate;      // deg/s
-  float zDistance;    // m in the world frame of reference
-} __attribute__((packed));
+
 static void hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct hoverPacket_s *values = data;

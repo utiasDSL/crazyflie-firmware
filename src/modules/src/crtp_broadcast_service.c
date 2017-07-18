@@ -8,11 +8,13 @@
 
 #include "crtp.h"
 #include "crtp_broadcast_service.h"
+#include "crtp_commander.h"
 #include "log.h"
 #include "param.h"
-
+#include "packetdef.h"
 #include "configblock.h"
 #include "estimator_kalman.h"
+#include "commander.h"
 
 /**
  * Position data cache
@@ -25,32 +27,48 @@ typedef struct
 } ExtPositionCache;
 
 static ExtPositionCache crtpExtPosCache;
-static bool isInit = false;
+static bool isInit_pos = false;
+static bool isInit_cmd = false;
+
 static uint8_t my_id;
 static uint8_t bc_id;
 static positionMeasurement_t broadcast_pos;
+static positionMeasurement_t broadcast_cmd;
 static uint16_t flag = 0;
+static uint16_t cmd_flag = 0;
 
 
+static void bcPosSrvCrtpCB(CRTPPacket* pk);
+static void bcCmdSrvCrtpCB(CRTPPacket* pk);
 
-
-static void broadcastSrvCrtpCB(CRTPPacket* pk);
-
-void broadcastSrvInit()
+void bcPosInit()
 {
-  if (isInit) {
+  if (isInit_pos) {
     return;
   }
 
-  crtpRegisterPortCB(CRTP_PORT_EXTPOS_BRINGUP, broadcastSrvCrtpCB);
-  isInit = true;
+  crtpInit();
+  crtpRegisterPortCB(CRTP_PORT_EXTPOS_BRINGUP, bcPosSrvCrtpCB);
+  isInit_pos = true;
 
   uint64_t address = configblockGetRadioAddress();
   my_id = address & 0xFF;
   flag = 1;
 }
 
-static void broadcastSrvCrtpCB(CRTPPacket* pk)
+void bcCmdInit(void)
+{
+  if(isInit_cmd) {
+    return;
+  }
+  crtpInit();
+  crtpRegisterPortCB(CRTP_PORT_SETPOINT, bcCmdSrvCrtpCB);
+  crtpRegisterPortCB(CRTP_PORT_SETPOINT_GENERIC, bcCmdSrvCrtpCB);
+  isInit_cmd = true;
+  cmd_flag = 1;
+}
+
+static void bcPosSrvCrtpCB(CRTPPacket* pk)
 {
   flag = 2;
   struct data_vicon* d = ((struct data_vicon*) pk->data);
@@ -88,14 +106,57 @@ bool getExtPositionBC(state_t *state)
   return false;
 }
 
+static void bcCmdSrvCrtpCB(CRTPPacket* pk)
+{
+  static setpoint_t setpoint;
+
+  if(pk->port == CRTP_PORT_SETPOINT && pk->channel == 0) {
+    struct data_setpoint* d = ((struct data_setpoint*) pk->data);
+    for (int i=0; i < 2; ++i) {
+      if (d->pose[i].id == my_id) {
+        cmd_flag = 2;
+
+        struct CommanderCrtpLegacyValues data;
+        data.roll = position_fix24_to_float(d->pose[i].x);
+        data.pitch = position_fix24_to_float(d->pose[i].y);
+        data.thrust = (int) (position_fix24_to_float(d->pose[i].z) * 1000.0f);
+        data.yaw = position_fix24_to_float(d->pose[i].yaw) / 3.1415926f * 180.0f;
+
+        //crtpCommanderRpytDecodeSetpoint(&setpoint, &pk);
+        crtpCommanderRpytDecodeSetpoint(&setpoint, pk, true, &data);
+        commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+        //broadcast_cmd.x = data.roll;
+        //broadcast_cmd.y = data.pitch;
+        //broadcast_cmd.z = data.yaw;
+        broadcast_cmd.stdDev = data.thrust;
+        broadcast_cmd.x = setpoint.position.x;
+        broadcast_cmd.y = setpoint.position.y;
+        broadcast_cmd.z = setpoint.position.z;
+
+        }
+      }
+  } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
+    //crtpCommanderGenericDecodeSetpoint(&setpoint, pk);
+    //commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+  }
+}
+
 LOG_GROUP_START(broadcast_pos)
 LOG_ADD(LOG_FLOAT, X, &broadcast_pos.x)
 LOG_ADD(LOG_FLOAT, Y, &broadcast_pos.y)
 LOG_ADD(LOG_FLOAT, Z, &broadcast_pos.z)
 LOG_GROUP_STOP(broadcast_pos)
 
-LOG_GROUP_START(broadcast)
-LOG_ADD(LOG_UINT16, Flag, &flag)
-LOG_ADD(LOG_UINT8, ID, &my_id)
-LOG_ADD(LOG_UINT8, IDInput, &bc_id)
-LOG_GROUP_STOP(broadcast)
+LOG_GROUP_START(broadcast_cmd)
+LOG_ADD(LOG_FLOAT, X, &broadcast_cmd.x)
+LOG_ADD(LOG_FLOAT, Y, &broadcast_cmd.y)
+LOG_ADD(LOG_FLOAT, Z, &broadcast_cmd.z)
+LOG_ADD(LOG_FLOAT, Thrust, &broadcast_cmd.stdDev)
+LOG_GROUP_STOP(broadcast_cmd)
+
+LOG_GROUP_START(broadcast_flag)
+LOG_ADD(LOG_UINT16, pos_Flag, &flag)
+LOG_ADD(LOG_UINT16, cmd_Flag, &cmd_flag)
+LOG_ADD(LOG_UINT8, pos_ID, &my_id)
+LOG_ADD(LOG_UINT8, pos_IDInput, &bc_id)
+LOG_GROUP_STOP(broadcast_flag)

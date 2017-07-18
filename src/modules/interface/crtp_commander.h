@@ -29,9 +29,10 @@
 #include <stdint.h>
 #include "stabilizer_types.h"
 #include "crtp.h"
+#include "commander_types.h"
 
 void crtpCommanderInit(void);
-void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk);
+void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool broadcast, struct CommanderCrtpLegacyValues* values);
 void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk);
 
 #endif /* CRTP_COMMANDER_H_ */

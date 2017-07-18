@@ -11,7 +11,9 @@ struct CrtpExtPosition
   float z; // in m
 } __attribute__((packed));
 
-void broadcastSrvInit(void);
+void bcPosInit(void);
+void bcCmdInit(void);
+
 // Get the current position from the cache
 bool getExtPositionBC(state_t *state);
 #endif /* _CRTP_BROADCAST_H_ */

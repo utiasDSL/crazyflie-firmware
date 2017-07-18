@@ -171,12 +171,20 @@ void stabilizerSetEmergencyStopTimeout(int timeout)
 }
 
 LOG_GROUP_START(ctrltarget)
+LOG_ADD(LOG_FLOAT, X, &setpoint.position.x)
+LOG_ADD(LOG_FLOAT, Y, &setpoint.position.y)
+LOG_ADD(LOG_FLOAT, Z, &setpoint.position.z)
+
 LOG_ADD(LOG_FLOAT, roll, &setpoint.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &setpoint.attitude.pitch)
 LOG_ADD(LOG_FLOAT, yaw, &setpoint.attitudeRate.yaw)
 LOG_GROUP_STOP(ctrltarget)
 
 LOG_GROUP_START(stabilizer)
+LOG_ADD(LOG_FLOAT, X, &state.position.x)
+LOG_ADD(LOG_FLOAT, Y, &state.position.y)
+LOG_ADD(LOG_FLOAT, Z, &state.position.z)
+
 LOG_ADD(LOG_FLOAT, roll, &state.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &state.attitude.pitch)
 LOG_ADD(LOG_FLOAT, yaw, &state.attitude.yaw)

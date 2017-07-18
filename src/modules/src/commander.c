@@ -30,7 +30,12 @@
 #include "queue.h"
 
 #include "commander.h"
+#ifdef BROADCAST_ENABLE
+#include "crtp_broadcast_service.h"
+#else
 #include "crtp_commander.h"
+#endif
+
 
 static bool isInit;
 const static setpoint_t nullSetpoint;
@@ -51,8 +56,11 @@ void commanderInit(void)
   priorityQueue = xQueueCreate(1, sizeof(int));
   ASSERT(priorityQueue);
   xQueueSend(priorityQueue, &priorityDisable, 0);
-
-  crtpCommanderInit();
+  #ifdef BROADCAST_ENABLE
+    bcCmdInit();
+  #else
+    crtpCommanderInit();
+  #endif
   lastUpdate = xTaskGetTickCount();
 
   isInit = true;

@@ -97,6 +97,16 @@ struct data_vicon {
   } __attribute__((packed)) pose[2];
 } __attribute__((packed));
 
+struct data_setpoint {
+  struct {
+    uint8_t id;
+    posFixed24_t x; // m
+    posFixed24_t y; // m
+    posFixed24_t yaw; // rad
+    posFixed24_t z; // m
+   } __attribute__((packed)) pose[2];
+} __attribute__((packed));
+
 struct data_packed_drops {
   uint64_t seq;
 } __attribute__((packed));

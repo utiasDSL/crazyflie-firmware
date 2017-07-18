@@ -88,7 +88,7 @@ void commInit(void)
 #ifndef BROADCAST_ENABLE
   locSrvInit();
 #else
-  broadcastSrvInit();
+  bcPosInit();
 #endif
 
   //setup CRTP communication channel
