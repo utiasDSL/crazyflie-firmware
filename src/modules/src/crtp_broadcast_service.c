@@ -36,6 +36,9 @@ static positionMeasurement_t broadcast_pos;
 static positionMeasurement_t broadcast_cmd;
 static uint16_t flag = 0;
 static uint16_t cmd_flag = 0;
+static uint16_t numPacketsReceived = 0;
+static uint16_t numPacketsAccepted = 0;
+
 
 
 static void bcPosSrvCrtpCB(CRTPPacket* pk);
@@ -70,10 +73,12 @@ void bcCmdInit(void)
 
 static void bcPosSrvCrtpCB(CRTPPacket* pk)
 {
+  numPacketsReceived++;
   flag = 2;
   struct data_vicon* d = ((struct data_vicon*) pk->data);
   for (int i=0; i < 2; ++i) {
     if (d->pose[i].id == my_id) {
+      numPacketsAccepted++;
       flag = 3;
       bc_id = d->pose[i].id;
       struct CrtpExtPosition data;
@@ -109,11 +114,13 @@ bool getExtPositionBC(state_t *state)
 static void bcCmdSrvCrtpCB(CRTPPacket* pk)
 {
   static setpoint_t setpoint;
+  numPacketsReceived++;
 
   if(pk->port == CRTP_PORT_SETPOINT && pk->channel == 0) {
     struct data_setpoint* d = ((struct data_setpoint*) pk->data);
     for (int i=0; i < 2; ++i) {
       if (d->pose[i].id == my_id) {
+        numPacketsAccepted++;
         cmd_flag = 2;
 
         struct CommanderCrtpLegacyValues data;
@@ -160,3 +167,8 @@ LOG_ADD(LOG_UINT16, cmd_Flag, &cmd_flag)
 LOG_ADD(LOG_UINT8, pos_ID, &my_id)
 LOG_ADD(LOG_UINT8, pos_IDInput, &bc_id)
 LOG_GROUP_STOP(broadcast_flag)
+
+LOG_GROUP_START(broadcast_pack_count)
+LOG_ADD(LOG_UINT16, Rx, &numPacketsReceived)
+LOG_ADD(LOG_UINT16, Acc, &numPacketsAccepted)
+LOG_GROUP_STOP(broadcast_pack_count)
