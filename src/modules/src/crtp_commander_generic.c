@@ -32,6 +32,7 @@
 #include "param.h"
 #include "crtp.h"
 #include "num.h"
+#include "log.h"
 #include "FreeRTOS.h"
 
 /* The generic commander format contains a packet type and data that has to be
@@ -316,13 +317,15 @@ struct newControllerPacket_s {
   uint16_t yaw[2];
 } __attribute__((packed));
 
+static float cmd[3] = {0};
+
 static void newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct newControllerPacket_s *values = data;
 
-  //cmd[0] =  half2single(values->x[0]);
-  //cmd[1] =  half2single(values->y[0]);
-  //cmd[2] =  half2single(values->z[0]);
+  cmd[0] =  half2single(values->x[0]);
+  cmd[1] =  half2single(values->y[0]);
+  cmd[2] =  half2single(values->z[0]);
 
 
   ASSERT(datalen == sizeof(struct newControllerPacket_s));
@@ -385,3 +388,8 @@ PARAM_ADD(PARAM_FLOAT, angRoll, &s_CppmEmuRollMaxAngleDeg)
 PARAM_ADD(PARAM_FLOAT, angPitch, &s_CppmEmuPitchMaxAngleDeg)
 PARAM_GROUP_STOP(cmdrCPPM)
 
+LOG_GROUP_START(crtpSetpoint)
+LOG_ADD(LOG_FLOAT, cmdX, &cmd[0])
+LOG_ADD(LOG_FLOAT, cmdY, &cmd[1])
+LOG_ADD(LOG_FLOAT, cmdZ, &cmd[2])
+LOG_GROUP_STOP(crtpSetpoint)
