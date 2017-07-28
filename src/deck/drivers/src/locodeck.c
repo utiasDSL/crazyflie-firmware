@@ -49,7 +49,10 @@
 #include "nvicconf.h"
 #include "estimator.h"
 
+#include "configblock.h"
+
 #include "locodeck.h"
+#include "lpsTdma.h"
 
 #if LPS_TDOA_ENABLE
   #include "lpsTdoaTag.h"
@@ -93,6 +96,11 @@ static lpsAlgoOptions_t algoOptions = {
   .rangingFailedThreshold = 6,
 
   .combinedAnchorPositionOk = false,
+
+#ifdef LPS_TDMA_ENABLE
+  .useTdma = true,
+  .tdmaSlot = TDMA_SLOT,
+#endif
 
   // To set a static anchor position from startup, uncomment and modify the
   // following code:
@@ -146,12 +154,26 @@ static void rxTimeoutCallback(dwDevice_t * dev) {
 //   timeout = algorithm->onEvent(dev, eventReceiveFailed);
 // }
 
+static void updateTagTdmaSlot(lpsAlgoOptions_t * options)
+{
+  if (options->tdmaSlot < 0) {
+    uint64_t radioAddress = configblockGetRadioAddress();
+    int nslot = 1;
+    for (int i=0; i<TDMA_NSLOTS_BITS; i++) {
+      nslot *= 2;
+    }
+    options->tdmaSlot = radioAddress % nslot;
+  }
+  options->tagAddress += options->tdmaSlot;
+}
 
 static void uwbTask(void* parameters)
 {
   lppShortQueue = xQueueCreate(10, sizeof(lpsLppShortPacket_t));
 
   systemWaitStart();
+
+  updateTagTdmaSlot(&algoOptions);
 
   algorithm->init(dwm, &algoOptions);
 
