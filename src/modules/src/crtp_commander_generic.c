@@ -337,11 +337,13 @@ static void newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void 
   setpoint->ymode = values->header.controlModeY;
   setpoint->zmode = values->header.controlModeZ;
 
-  for(int i = 0; i<3; i++){setpoint->x[i] = half2single(values->x[i]);}
-  for(int i = 0; i<3; i++){setpoint->y[i] = half2single(values->y[i]);}
-  for(int i = 0; i<3; i++){setpoint->z[i] = half2single(values->z[i]);}
-  for(int i = 0; i<2; i++){setpoint->yaw[i] = half2single(values->yaw[i]);}
-
+  for(int i = 0; i<3; i++){
+    setpoint->x[i] = half2single(values->x[i]);
+    setpoint->y[i] = half2single(values->y[i]);
+    setpoint->z[i] = half2single(values->z[i]);
+    if (i < 2)
+      setpoint->yaw[i] = half2single(values->yaw[i]);
+  }
 }
 
 

@@ -58,7 +58,7 @@ static float tau_z = 0.30;
 static float zeta_z = 0.85;
 
 // time constant of body angle (thrust direction) control
-static float tau_rp = 0.25;
+static float tau_rp = 0.15;
 // what percentage is yaw control speed in terms of roll/pitch control speed \in [0, 1], 0 means yaw not controlled
 static float mixing_factor = 1.0;
 
@@ -80,8 +80,8 @@ static float omega_yaw_max = 10;
 static float heuristic_rp = 12;
 static float heuristic_yaw = 5;
 
-// maximum tilt angle
-static float tilt_limit = 45.0;
+// maximum tilt angle in radians
+static float tilt_limit = 0.785398; //20 degrees
 //static uint32_t lastReferenceTimestamp;
 
 // Struct for logging position information
@@ -89,6 +89,8 @@ static positionMeasurement_t ext_pos;
 static uint32_t lastControlUpdate;
 static bool isInit = false;
 static float des_acc[3] = {0};
+static float tilt_angle_before = 0, tilt_angle_after = 0;
+static int8_t tiltLimitFlag = 0;
 
 void stateControllerInit(void)
 {
@@ -145,8 +147,8 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
     // desired thrust
     float collCmd = 0;
 
-    float attTilt[4] = {0};
-    arm_matrix_instance_f32 attTilt_m = {4, 1, attTilt};
+    //float attTilt[4] = {0};
+    //arm_matrix_instance_f32 attTilt_m = {4, 1, attTilt};
 
     // attitude error as computed by the reduced attitude controller
     float attErrorReduced[4] = {0};
@@ -310,44 +312,59 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
     float dotProd = vec_dot(&zI_m, &zI_des_m);
     dotProd = constrain(dotProd, -1, 1);
     float alpha_tilt = acosf(dotProd);
+    tilt_angle_before = degrees(alpha_tilt);
 
     float rotAxisI[3] = {0};
     arm_matrix_instance_f32 rotAxisI_m = {3, 1, rotAxisI};
 
-    tilt_limit = radians(tilt_limit);
-    if (fabsf(alpha_tilt) > tilt_limit){
-      alpha_tilt = (alpha_tilt >= 0) ? tilt_limit : -tilt_limit;
-      vec_cross(&zI_m, &zI_des_m, &rotAxisI_m);
-      vec_normalize(&rotAxisI_m);
-      attTilt[0] = cosf(alpha_tilt / 2.0f);
-      attTilt[1] = sinf(alpha_tilt / 2.0f) * rotAxisI[0];
-      attTilt[2] = sinf(alpha_tilt / 2.0f) * rotAxisI[1];
-      attTilt[3] = sinf(alpha_tilt / 2.0f) * rotAxisI[2];
-
-      // mathematical formula: p(r_rotated) = q * p(r)* q_adjoint, where
-      // q is the quaternion which represents desired rotation
-      // r is the vector you want to rotate
-      // p(r) means the vector expressed in quaternion form [0, r[0], r[1], r[2]]
-      // q = [w, x, y, z] ---> q_adjoint = [w, -x, -y, -z]
-
-      // We want to rotate the inertial vector by the maximum tilt angle, So
-      // p(zI_des_clamped) = quaternion_max_tilt * p(zI)  * quaternion_max_tilt_adjoint
-      float vec_in_quat[4] = {0, 0, 0, 1};
-      arm_matrix_instance_f32 vec_in_quat_m = {4, 1, vec_in_quat};
-      float temp_product[4] = {0};
-      arm_matrix_instance_f32 temp_product_m = {4, 1, temp_product};
-      quaternion_multiply(&attTilt_m, &vec_in_quat_m, &temp_product_m);
-      // compute q_adjoint
-      attTilt[1] = -attTilt[1];
-      attTilt[2] = -attTilt[2];
-      attTilt[3] = -attTilt[3];
-      quaternion_multiply(&temp_product_m, &attTilt_m, &vec_in_quat_m);
-      // compute new clamped zI_des from its representation in quaternion
-      zI_des[0] = vec_in_quat[1];
-      zI_des[1] = vec_in_quat[2];
-      zI_des[2] = vec_in_quat[3];
-    }
-    memcpy(&des_acc, &zI_des, sizeof(zI_des));
+    // if (fabsf(alpha_tilt) > tilt_limit){
+    //   DEBUG_PRINT("Exceed Tilt Limit!\n");
+    //   tiltLimitFlag = 1;
+    //   alpha_tilt = (alpha_tilt >= 0) ? tilt_limit : -tilt_limit;
+    //
+    //   if (fabsf(alpha_tilt) > 1 * ARCMINUTE)
+    //   {
+    //     vec_cross(&zI_m, &zI_des_m, &rotAxisI_m);
+    //     vec_normalize(&rotAxisI_m);
+    //   }
+    //   else
+    //   {
+    //     rotAxisI[0] = 1;
+    //     rotAxisI[1] = 1;
+    //     rotAxisI[2] = 0;
+    //   }
+    //
+    //   attTilt[0] = cosf(alpha_tilt / 2.0f);
+    //   attTilt[1] = sinf(alpha_tilt / 2.0f) * rotAxisI[0];
+    //   attTilt[2] = sinf(alpha_tilt / 2.0f) * rotAxisI[1];
+    //   attTilt[3] = sinf(alpha_tilt / 2.0f) * rotAxisI[2];
+    //
+    //   // mathematical formula: p(r_rotated) = q * p(r)* q_adjoint, where
+    //   // q is the quaternion which represents desired rotation
+    //   // r is the vector you want to rotate
+    //   // p(r) means the vector expressed in quaternion form [0, r[0], r[1], r[2]]
+    //   // q = [w, x, y, z] ---> q_adjoint = [w, -x, -y, -z]
+    //
+    //   // We want to rotate the inertial vector by the maximum tilt angle, So
+    //   // p(zI_des_clamped) = quaternion_max_tilt * p(zI)  * quaternion_max_tilt_adjoint
+    //   float vec_in_quat[4] = {0, 0, 0, 1}; //p(z)
+    //   arm_matrix_instance_f32 vec_in_quat_m = {4, 1, vec_in_quat};
+    //   float temp_product[4] = {0};
+    //   arm_matrix_instance_f32 temp_product_m = {4, 1, temp_product};
+    //   quaternion_multiply(&attTilt_m, &vec_in_quat_m, &temp_product_m);
+    //   // compute q_adjoint
+    //   attTilt[1] = -attTilt[1];
+    //   attTilt[2] = -attTilt[2];
+    //   attTilt[3] = -attTilt[3];
+    //   quaternion_multiply(&temp_product_m, &attTilt_m, &vec_in_quat_m);
+    //   // compute new clamped zI_des from its representation in quaternion
+    //   zI_des[0] = vec_in_quat[1];
+    //   zI_des[1] = vec_in_quat[2];
+    //   zI_des[2] = vec_in_quat[3];
+    // }
+    des_acc[0] = zI_des[0];
+    des_acc[1] = zI_des[1];
+    des_acc[2] = zI_des[2];
     // ====== REDUCED ATTITUDE CONTROL ======
 
     // compute the error angle between the current and the desired thrust directions
@@ -397,6 +414,11 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
     dotProd = vec_dot(&zI_m, &zI_des_m);
     dotProd = constrain(dotProd, -1, 1);
     alpha = acosf(dotProd);
+    if (fabsf(alpha) > tilt_limit){
+      DEBUG_PRINT("EXCEED TILT LIMIT!");
+      alpha = (alpha >= 0) ? tilt_limit : -tilt_limit;
+    }
+    tilt_angle_after = degrees(alpha);
 
     // the axis around which this rotation needs to occur in the inertial frame (ie. an axis orthogonal to the two)
     if (fabsf(alpha) > 1 * ARCMINUTE)
@@ -543,11 +565,17 @@ LOG_GROUP_START(emergency)
   LOG_ADD(LOG_INT16, setEmergency, &emergency_value)
 LOG_GROUP_STOP(emergency)
 
-LOG_GROUP_START(des_acc)
+LOG_GROUP_START(des_accG)
+  LOG_ADD(LOG_FLOAT, angle, &tilt_angle_before)
+  LOG_ADD(LOG_FLOAT, angleB, &tilt_angle_after)
   LOG_ADD(LOG_FLOAT, X, &des_acc[0])
-  LOG_ADD(LOG_FLOAT, X, &des_acc[1])
-  LOG_ADD(LOG_FLOAT, X, &des_acc[2])
-LOG_GROUP_STOP(des_acc)
+  LOG_ADD(LOG_FLOAT, Y, &des_acc[1])
+  LOG_ADD(LOG_FLOAT, Z, &des_acc[2])
+LOG_GROUP_STOP(des_accG)
+
+LOG_GROUP_START(tilt_flag)
+  LOG_ADD(LOG_INT8, flag, &tiltLimitFlag)
+LOG_GROUP_STOP(tilt_flag)
 
 
 PARAM_GROUP_START(ctrlr)
