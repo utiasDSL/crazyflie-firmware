@@ -110,6 +110,9 @@ struct data_setpoint {
 struct data_packed_drops {
   uint64_t seq;
 } __attribute__((packed));
+struct data_setpoint{
+  
+}
 
 
 

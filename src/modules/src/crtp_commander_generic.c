@@ -317,8 +317,9 @@ const static packetDecoder_t packetDecoders[] = {
 };
 
 /* Decoder switch */
-void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
+void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool broadcast, char* data)
 {
+  if (!broadcast) data = ((char*)pk->data);
   static int nTypes = -1;
 
   ASSERT(pk->size > 0);
