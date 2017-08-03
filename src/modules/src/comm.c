@@ -1,6 +1,6 @@
 /*
- *    ||          ____  _ __                           
- * +------+      / __ )(_) /_______________ _____  ___ 
+ *    ||          ____  _ __
+ * +------+      / __ )(_) /_______________ _____  ___
  * | 0xBC |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
@@ -41,7 +41,13 @@
 #include "usblink.h"
 #include "platformservice.h"
 #include "syslink.h"
+
+#ifdef BROADCAST_ENABLE
+#include "crtp_broadcast_service.h"
+#else
 #include "crtp_localization_service.h"
+#endif
+
 
 static bool isInit;
 
@@ -79,7 +85,11 @@ void commInit(void)
 #endif
   logInit();
   paramInit();
+#ifndef BROADCAST_ENABLE
   locSrvInit();
+#else
+  bcPosInit();
+#endif
 
   //setup CRTP communication channel
   //TODO: check for USB first and prefer USB over radio
@@ -87,14 +97,14 @@ void commInit(void)
   //  crtpSetLink(usbGetLink);
   //else if(radiolinkTest())
   //  crtpSetLink(radiolinkGetLink());
-  
+
   isInit = true;
 }
 
 bool commTest(void)
 {
   bool pass=isInit;
-  
+
 #ifdef PLATFORM_CF1
   #ifdef USE_ESKYLINK
     pass &= eskylinkTest();
@@ -104,7 +114,7 @@ bool commTest(void)
 #else
   pass &= radiolinkTest();
 #endif
-  
+
   pass &= crtpTest();
   pass &= crtpserviceTest();
 #ifdef PLATFORM_CF2
@@ -112,7 +122,6 @@ bool commTest(void)
 #endif
   pass &= consoleTest();
   pass &= paramTest();
-  
+
   return pass;
 }
-

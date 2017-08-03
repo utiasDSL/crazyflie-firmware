@@ -37,16 +37,6 @@
 #define MIN_THRUST  1000
 #define MAX_THRUST  60000
 
-/**
- * CRTP commander rpyt packet format
- */
-struct CommanderCrtpLegacyValues
-{
-  float roll;       // deg
-  float pitch;      // deg
-  float yaw;        // deg
-  uint16_t thrust;
-} __attribute__((packed));
 
 /**
  * Stabilization modes for Roll, Pitch, Yaw.
@@ -136,9 +126,11 @@ static void yawModeUpdate(setpoint_t *setpoint)
 }
 #endif
 
-void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
+void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool broadcast, struct CommanderCrtpLegacyValues *values )
 {
-  struct CommanderCrtpLegacyValues *values = (struct CommanderCrtpLegacyValues*)pk->data;
+  if(!broadcast){
+    values = (struct CommanderCrtpLegacyValues*)pk->data;
+  }
 
   if (commanderGetActivePriority() == COMMANDER_PRIORITY_DISABLE) {
     thrustLocked = true;

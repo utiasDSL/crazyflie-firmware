@@ -53,7 +53,8 @@ static void commanderCrtpCB(CRTPPacket* pk)
   static setpoint_t setpoint;
 
   if(pk->port == CRTP_PORT_SETPOINT && pk->channel == 0) {
-    crtpCommanderRpytDecodeSetpoint(&setpoint, pk);
+    struct CommanderCrtpLegacyValues values;
+    crtpCommanderRpytDecodeSetpoint(&setpoint, pk, false, &values);
     commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
   } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
     crtpCommanderGenericDecodeSetpoint(&setpoint, pk);
