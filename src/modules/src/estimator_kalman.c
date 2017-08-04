@@ -85,6 +85,7 @@
  *  - Predicting the current state forward */
 static void stateEstimatorPredict(float thrust, Axis3f *acc, Axis3f *gyro, float dt);
 static void stateEstimatorAddProcessNoise(float dt);
+static bool first_vicon = true;
 
 /*  - Measurement updates based on sensors */
 static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error, float stdMeasNoise);
@@ -488,7 +489,12 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
   positionMeasurement_t pos;
   while (stateEstimatorHasPositionMeasurement(&pos))
   {
+    if (first_vicon){
+      resetEstimation = true;
+      first_vicon = false;
+    }else{
     stateEstimatorUpdateWithPosition(&pos);
+    }
     doneUpdate = true;
   }
 
@@ -1495,4 +1501,3 @@ PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_FLOAT, mNGyro_rollpitch, &measNoiseGyro_rollpitch)
   PARAM_ADD(PARAM_FLOAT, mNGyro_yaw, &measNoiseGyro_yaw)
 PARAM_GROUP_STOP(kalman)
-

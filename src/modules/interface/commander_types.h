@@ -62,3 +62,24 @@ struct hoverPacket_s {
   float yawrate;      // deg/s
   float zDistance;    // m in the world frame of reference
 } __attribute__((packed));
+
+struct crtpControlPacketHeader_t{
+  uint16_t packetHasExternalReference:1;
+  uint16_t setEmergency:1;
+  uint16_t resetEmergency:1;
+  uint16_t controlModeX:3;
+  uint16_t controlModeY:3;
+  uint16_t controlModeZ:3;
+  uint16_t :4;
+} __attribute__((packed)); //size 2 bytes
+
+struct newControllerPacket_s {
+  struct crtpControlPacketHeader_t header; // size 2 bytes
+#ifdef BROADCAST_ENABLE
+  uint8_t id;
+#endif
+  uint16_t x[3];
+  uint16_t y[3];
+  uint16_t z[3];
+  uint16_t yaw[2];
+} __attribute__((packed));
