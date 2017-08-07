@@ -81,7 +81,7 @@ static float heuristic_rp = 12;
 static float heuristic_yaw = 5;
 
 // maximum tilt angle in radians
-static float tilt_limit = 0.785398; //20 degrees
+static float tilt_limit = 1.0472; //60 degrees
 //static uint32_t lastReferenceTimestamp;
 
 // Struct for logging position information
