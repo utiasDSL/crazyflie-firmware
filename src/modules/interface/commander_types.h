@@ -74,10 +74,7 @@ struct crtpControlPacketHeader_t{
 } __attribute__((packed)); //size 2 bytes
 
 struct newControllerPacket_s {
-  struct crtpControlPacketHeader_t header; // size 2 bytes
-#ifdef BROADCAST_ENABLE
-  uint8_t id;
-#endif
+  struct crtpControlPacketHeader_t header; // size 2 bytes 
   uint16_t x[3];
   uint16_t y[3];
   uint16_t z[3];

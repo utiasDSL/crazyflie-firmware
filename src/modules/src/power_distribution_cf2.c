@@ -114,10 +114,7 @@ void powerDistribution(const control_t *control)
     if (motor_forces[i] < 0) {
       motor_forces[i] = 0;
       motor_pwm[i] = 0;
-    } else {
-      if((PWM_TO_THRUST_b*PWM_TO_THRUST_b + 4.0f * PWM_TO_THRUST_a * motor_forces[i]) < 0){
-        DEBUG_PRINT("Neg Sqrt for motor!");
-      }
+    } else { 
       motor_pwm[i] = (-PWM_TO_THRUST_b + arm_sqrt(PWM_TO_THRUST_b*PWM_TO_THRUST_b + 4.0f * PWM_TO_THRUST_a * motor_forces[i])) /
                      (2.0f * PWM_TO_THRUST_a);
     }

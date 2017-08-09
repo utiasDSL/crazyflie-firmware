@@ -81,7 +81,7 @@ static float heuristic_rp = 12;
 static float heuristic_yaw = 5;
 
 // maximum tilt angle in radians
-static float tilt_limit = 1.0472; //60 degrees
+static float tilt_limit = 1.0472; //75 degrees
 //static uint32_t lastReferenceTimestamp;
 
 // Struct for logging position information
@@ -241,10 +241,7 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
 
     // ====== THRUST CONTROL ======
 
-    // compute commanded thrust required to achieve the z acceleration
-    if(R[2][2] == 0){
-      DEBUG_PRINT("DIVIDE by 0");
-    }
+    // compute commanded thrust required to achieve the z acceleration 
     configASSERT(R[2][2] != 0);
     collCmd = accDes[2] / R[2][2];
 
@@ -272,9 +269,6 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
         r = 0;
       } else {
         float sqrtterm = powf(b, 2) + 4.0f*a*c;
-        if(sqrtterm<0){
-          DEBUG_PRINT("Neg Sqrt!");
-        }
         configASSERT(sqrtterm>=0);
         r = (-b + arm_sqrt(sqrtterm))/(2.0f*a);
         r = constrain(r,0,1);
@@ -282,10 +276,7 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
       accDes[0] = r*x;
       accDes[1] = r*y;
       accDes[2] = (r*f+(1-f))*z + g;
-    }
-    if(R[2][2]==0){
-      DEBUG_PRINT("DIVIDED by 0!");
-    }
+    } 
     configASSERT(R[2][2]!=0);
     collCmd = constrain(accDes[2] / R[2][2], coll_min, coll_max);
 
@@ -415,7 +406,7 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
     dotProd = constrain(dotProd, -1, 1);
     alpha = acosf(dotProd);
     if (fabsf(alpha) > tilt_limit){
-      DEBUG_PRINT("EXCEED TILT LIMIT!");
+      //DEBUG_PRINT("EXCEED TILT LIMIT!");
       alpha = (alpha >= 0) ? tilt_limit : -tilt_limit;
     }
     tilt_angle_after = degrees(alpha);

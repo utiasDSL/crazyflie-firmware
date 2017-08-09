@@ -58,7 +58,7 @@
  *   5 - Pull-request your change :-)
  */
 
-typedef bool (*packetDecoder_t)(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id);
+typedef void (*packetDecoder_t)(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen);
 
 /* ---===== 1 - packetType_e enum =====--- */
 enum packet_type {
@@ -79,13 +79,13 @@ enum packet_type {
 /* stopDecoder
  * Keeps setpoint to 0: stops the motors and fall
  */
-static bool stopDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id)
+static void stopDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
-  return true;
+  return;
 }
 
 
-static bool velocityDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id)
+static void velocityDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct velocityPacket_s *values = data;
 
@@ -101,12 +101,11 @@ static bool velocityDecoder(setpoint_t *setpoint, uint8_t type, const void *data
 
   setpoint->mode.yaw = modeVelocity;
 
-  setpoint->attitudeRate.yaw = values->yawrate;
-  return true;
+  setpoint->attitudeRate.yaw = values->yawrate; 
 }
 
 
-static bool zDistanceDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id)
+static void zDistanceDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct zDistancePacket_s *values = data;
 
@@ -127,8 +126,7 @@ static bool zDistanceDecoder(setpoint_t *setpoint, uint8_t type, const void *dat
   setpoint->mode.pitch = modeAbs;
 
   setpoint->attitude.roll = values->roll;
-  setpoint->attitude.pitch = values->pitch;
-  return true;
+  setpoint->attitude.pitch = values->pitch; 
 }
 
 /* cppmEmuDecoder
@@ -156,7 +154,7 @@ static inline float getChannelUnitMultiplier(uint16_t channelValue, uint16_t cha
   return ((float)channelValue - (float)channelMidpoint) / (float)channelRange;
 }
 
-static bool cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id)
+static void cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   bool isSelfLevelEnabled = true;
 
@@ -202,12 +200,11 @@ static bool cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
   if(setpoint->thrust < 0)
   {
     setpoint->thrust = 0;
-  }
-  return true;
+  } 
 }
 
 
-static bool altHoldDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id)
+static void altHoldDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct altHoldPacket_s *values = data;
 
@@ -228,12 +225,11 @@ static bool altHoldDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
   setpoint->mode.pitch = modeAbs;
 
   setpoint->attitude.roll = values->roll;
-  setpoint->attitude.pitch = values->pitch;
-  return true;
+  setpoint->attitude.pitch = values->pitch; 
 }
 
 
-static bool hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id)
+static void hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct hoverPacket_s *values = data;
 
@@ -252,8 +248,7 @@ static bool hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, s
   setpoint->velocity.x = values->vx;
   setpoint->velocity.y = values->vy;
 
-  setpoint->velocity_body = true;
-  return true;
+  setpoint->velocity_body = true; 
 }
 
 /* newControllerDecoder
@@ -262,7 +257,7 @@ static bool hoverDecoder(setpoint_t *setpoint, uint8_t type, const void *data, s
 
 static float cmd[3] = {0};
 
-static bool newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen, uint8_t bc_id)
+static void newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct newControllerPacket_s *values = data;
   cmd[0] =  half2single(values->x[0]);
@@ -271,12 +266,7 @@ static bool newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void 
 
 
   ASSERT(datalen == sizeof(struct newControllerPacket_s));
-
-#ifdef BROADCAST_ENABLE
-    if (values->id != bc_id){
-      return false;
-    }
-#endif
+ 
   setpoint->setEmergency = values->header.setEmergency;
   setpoint->resetEmergency = values->header.resetEmergency;
 
@@ -290,8 +280,7 @@ static bool newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void 
     setpoint->z[i] = half2single(values->z[i]);
     if (i < 2)
       setpoint->yaw[i] = half2single(values->yaw[i]);
-  }
-  return true;
+  } 
 }
 
 
@@ -308,8 +297,10 @@ const static packetDecoder_t packetDecoders[] = {
 };
 
 /* Decoder switch */
-bool crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, uint8_t bc_id)
+void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
 {
+  // The first ybte in pk->data is the CF's address (aka. broadcast id)
+  // The second byte is the packet's type
   static int nTypes = -1;
 
   ASSERT(pk->size > 0);
@@ -318,15 +309,12 @@ bool crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, ui
     nTypes = sizeof(packetDecoders)/sizeof(packetDecoders[0]);
   }
 
-  uint8_t type = pk->data[0];
-
+  uint8_t type = pk->data[1]; 
   memset(setpoint, 0, sizeof(setpoint_t));
 
   if (type<nTypes && (packetDecoders[type] != NULL)) {
-    bool success = packetDecoders[type](setpoint, type, ((char*)pk->data)+1, pk->size-1, bc_id);
-    return success;
-  }
-  return false;
+    packetDecoders[type](setpoint, type, ((char*)pk->data)+2, pk->size-2);
+  } 
 }
 
 // Params for generic CRTP handlers

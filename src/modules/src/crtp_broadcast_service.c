@@ -143,11 +143,11 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
         }
       }
   } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
-    bool success = crtpCommanderGenericDecodeSetpoint(&setpoint, pk, my_id);
-    if (success){
-    numPacketsAccepted2++;
-    commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
-    }
+    if (pk->data[0] == my_id){
+      numPacketsAccepted2++; 
+      crtpCommanderGenericDecodeSetpoint(&setpoint, pk);
+      commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP); 
+    } 
   }
 }
 
