@@ -458,8 +458,60 @@ static void brightnessEffect(uint8_t buffer[][3], bool reset)
 
     brightness++;
   }
-}
+} 
 
+static void accEffect(uint8_t buffer[][3], bool reset)
+{
+  static int accYid, accZid, accXid =- 1;
+  static uint8_t brightness = 0;
+
+ if (accXid < 0)
+  {
+    //Init
+    accXid = logGetVarId("stabilizer", "pitch");
+    accYid = logGetVarId("stabilizer", "roll");
+    accZid = logGetVarId("acc", "z");
+  }
+  else
+  {
+    int i;
+    int decouple_constant = 100;
+    float faccX = logGetFloat(accXid);
+    float faccY = logGetFloat(accYid);
+    float faccZ = logGetFloat(accZid);
+    int accX = (int)(faccX * decouple_constant);
+    int accY = (int)(faccY * decouple_constant);
+    int accZ = (int)((faccZ - 1) * 800);
+
+   int deadband = 25;
+
+   // Adjust to interval
+    accX = (accX>MAX_RATE) ? MAX_RATE:(accX<-MAX_RATE) ? -MAX_RATE:accX;
+    accY = (accY>MAX_RATE) ? MAX_RATE:(accY<-MAX_RATE) ? -MAX_RATE:accY;
+    accZ = (accZ>MAX_RATE) ? MAX_RATE:(accZ<-MAX_RATE) ? -MAX_RATE:accZ;
+
+    accX = SIGN(accX) * accX / 2;
+    accY = SIGN(accY) * accY / 2;
+    accZ = SIGN(accZ) * accZ / 2;
+
+    accX = DEADBAND(accX, deadband * decouple_constant * 3.5 / 50);
+    accY = DEADBAND(accY, deadband * decouple_constant * 3.5 / 50);
+    accZ = DEADBAND(accZ, deadband);
+
+    accX = (accX > 0)?(accX - deadband * decouple_constant * 3 / 50):0;
+    accY = (accY > 0)?(accY - deadband * decouple_constant * 3 / 50):0;
+    accZ = (accZ > 0)?(accZ - deadband):0;
+
+   for (i=0; i < NBR_LEDS; i++)
+    {
+      buffer[i][2] = (uint8_t)(LIMIT(accZ));
+      buffer[i][1] = (uint8_t)(LIMIT(accY));
+      buffer[i][0] = (uint8_t)(LIMIT(accX));
+    }
+
+   brightness++;
+  }
+}
 
 static void setHeadlightsOn(bool on)
 {
@@ -581,6 +633,7 @@ Ledring12Effect effectsFct[] =
   siren,
   gravityLight,
   virtualMemEffect,
+  accEffect,
 }; //TODO Add more
 
 /********** Ring init and switching **********/
@@ -604,8 +657,8 @@ void ledring12Worker(void * data)
   } else {
     reset = false;
   }
-  current_effect = effect;
-
+  //current_effect = effect;
+  current_effect = 14;
   effectsFct[current_effect](buffer, reset);
   ws2812Send(buffer, NBR_LEDS);
 }

@@ -81,7 +81,7 @@ static float heuristic_rp = 12;
 static float heuristic_yaw = 5;
 
 // maximum tilt angle in radians
-static float tilt_limit = 1.0472; //75 degrees
+static float tilt_limit = 0.7854; //45 degrees
 //static uint32_t lastReferenceTimestamp;
 
 // Struct for logging position information
@@ -131,7 +131,7 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
     return;
   }
 
-  // define this here, since we do body-rate control at 1000Hz below the following if statement
+  // define this here, since we do body-rate control at 100Hz below the following if statement
   float omega[3] = {0};
   omega[0] = radians(sensors->gyro.x);
   omega[1] = radians(sensors->gyro.y);
@@ -406,6 +406,7 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
     dotProd = constrain(dotProd, -1, 1);
     alpha = acosf(dotProd);
     if (fabsf(alpha) > tilt_limit){
+      tiltLimitFlag = 1;
       //DEBUG_PRINT("EXCEED TILT LIMIT!");
       alpha = (alpha >= 0) ? tilt_limit : -tilt_limit;
     }

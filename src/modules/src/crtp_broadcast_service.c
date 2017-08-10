@@ -77,10 +77,10 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
   flag = 2;
   struct data_vicon* d = ((struct data_vicon*) pk->data);
   for (int i=0; i < 2; ++i) {
+    bc_id = d->pose[i].id;
     if (d->pose[i].id == my_id) {
       numPacketsAccepted++;
       flag = 3;
-      bc_id = d->pose[i].id;
       struct CrtpExtPosition data;
       data.x = position_fix24_to_float(d->pose[i].x);
       data.y = position_fix24_to_float(d->pose[i].y);
