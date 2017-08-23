@@ -513,6 +513,41 @@ static void accEffect(uint8_t buffer[][3], bool reset)
   }
 }
 
+static void heightEffect(uint8_t buffer[][3], bool reset)
+{
+
+ static int heightid =- 1;
+  static uint8_t brightness = 0;
+
+ if (heightid < 0)
+  {
+    //Init
+    heightid = logGetVarId("kalman", "stateZ");
+  }
+  else
+  {
+    int i;
+    float fheight = logGetFloat(heightid);
+    if (fheight > 0.0f){
+      int height = (int)((fheight) * 300);
+
+      // Adjust to interval
+      height = (height>MAX_RATE) ? MAX_RATE:(height<-MAX_RATE) ? -MAX_RATE:height;
+
+      height = DEADBAND(height, 15);
+
+      for (i=0; i < NBR_LEDS; i++)
+      {
+        buffer[i][0] = (uint8_t)(LIMIT(height));
+        buffer[i][1] = (uint8_t)(LIMIT(height));
+        buffer[i][2] = (uint8_t)(LIMIT(height));
+      }
+
+      brightness++;
+    }
+  }
+}
+
 static void setHeadlightsOn(bool on)
 {
   if (on)
@@ -634,6 +669,7 @@ Ledring12Effect effectsFct[] =
   gravityLight,
   virtualMemEffect,
   accEffect,
+  heightEffect,
 }; //TODO Add more
 
 /********** Ring init and switching **********/
@@ -658,7 +694,7 @@ void ledring12Worker(void * data)
     reset = false;
   }
   //current_effect = effect;
-  current_effect = 14;
+  current_effect = 0;
   effectsFct[current_effect](buffer, reset);
   ws2812Send(buffer, NBR_LEDS);
 }
