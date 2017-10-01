@@ -67,7 +67,7 @@ static bool carefreeResetFront;             // Reset what is front in carefree m
 static bool thrustLocked = true;
 static bool altHoldMode = false;
 static bool posHoldMode = false;
-static bool posSetMode = false;
+static bool posSetMode = true;
 
 /**
  * Rotate Yaw so that the Crazyflie will change what is considered front.

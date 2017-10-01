@@ -130,12 +130,6 @@ void stateController(control_t *control, setpoint_t *setpoint, const sensorData_
     control->thrust = 0;
     return;
   }
-  
-  if(setpoint->z[0]<=0.02f){
-      control->thrust = 0;
-      control->enable = false;
-      return;
-  }
 
   // define this here, since we do body-rate control at 100Hz below the following if statement
   float omega[3] = {0};
