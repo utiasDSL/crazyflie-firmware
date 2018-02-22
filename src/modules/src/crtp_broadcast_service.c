@@ -34,6 +34,7 @@ static uint8_t my_id;
 static uint8_t bc_id;
 static positionMeasurement_t broadcast_pos;
 static positionMeasurement_t broadcast_cmd;
+static setpoint_t decoded_cmd;
 static uint16_t flag = 0;
 static uint16_t cmd_flag = 0;
 static uint16_t numPacketsReceived = 0, numPacketsReceived2 = 0;
@@ -132,13 +133,14 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
         //crtpCommanderRpytDecodeSetpoint(&setpoint, &pk);
         crtpCommanderRpytDecodeSetpoint(&setpoint, pk, true, &data);
         commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
-        //broadcast_cmd.x = data.roll;
-        //broadcast_cmd.y = data.pitch;
-        //broadcast_cmd.z = data.yaw;
-        broadcast_cmd.stdDev = data.thrust;
-        broadcast_cmd.x = setpoint.position.x;
-        broadcast_cmd.y = setpoint.position.y;
-        broadcast_cmd.z = setpoint.position.z;
+        broadcast_cmd.x = data.roll;
+        broadcast_cmd.y = data.pitch;
+        broadcast_cmd.z = data.thrust;
+        broadcast_cmd.stdDev = data.yaw;
+        memcpy(&decoded_cmd, &setpoint, sizeof(setpoint));
+        //broadcast_cmd.x = setpoint.position.x;
+        //broadcast_cmd.y = setpoint.position.y;
+        //broadcast_cmd.z = setpoint.position.z;
 
         }
       }
@@ -177,3 +179,13 @@ LOG_ADD(LOG_UINT16, Acc, &numPacketsAccepted)
 LOG_ADD(LOG_UINT16, Rx2, &numPacketsReceived2)
 LOG_ADD(LOG_UINT16, Acc2, &numPacketsAccepted2)
 LOG_GROUP_STOP(broadcast_count)
+
+LOG_GROUP_START(broadcast_setpoint)
+LOG_ADD(LOG_FLOAT, X, &decoded_cmd.position.x)
+LOG_ADD(LOG_FLOAT, Y, &decoded_cmd.position.y)
+LOG_ADD(LOG_FLOAT, Z, &decoded_cmd.position.z)
+LOG_ADD(LOG_FLOAT, VZ, &decoded_cmd.velocity.z)
+LOG_ADD(LOG_FLOAT, Roll, &decoded_cmd.attitude.roll)
+LOG_ADD(LOG_FLOAT, Pitch, &decoded_cmd.attitude.pitch)
+LOG_ADD(LOG_FLOAT, Yaw, &decoded_cmd.attitude.yaw)
+LOG_GROUP_STOP(broadcast_setpoint)
