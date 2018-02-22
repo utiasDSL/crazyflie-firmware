@@ -151,8 +151,7 @@ void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool 
   if (altHoldMode) {
     setpoint->thrust = 0;
     setpoint->mode.z = modeVelocity;
-
-    setpoint->velocity.z = ((float) rawThrust - 32767.f) / 32767.f;
+    setpoint->velocity.z = (float) (((int16_t) rawThrust) / 1000.f);
   } else {
     setpoint->mode.z = modeDisable;
   }
@@ -195,7 +194,7 @@ void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool 
     } else {
       setpoint->mode.roll = modeAbs;
       setpoint->attitudeRate.roll = 0;
-      setpoint->attitude.roll = values->roll;
+      setpoint->attitude.roll = values->roll / 3.14f * 180.f;
     }
 
     if (stabilizationModePitch == RATE) {
@@ -205,7 +204,7 @@ void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool 
     } else {
       setpoint->mode.pitch = modeAbs;
       setpoint->attitudeRate.pitch = 0;
-      setpoint->attitude.pitch = values->pitch;
+      setpoint->attitude.pitch = values->pitch / 3.14f * 180.f;
     }
 
     setpoint->velocity.x = 0;
