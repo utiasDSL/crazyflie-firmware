@@ -26,6 +26,13 @@ typedef struct
   uint32_t timestamp; // FreeRTOS ticks
 } ExtPositionCache;
 
+typedef struct{
+	float data[500];
+	uint16_t index;
+	float avg;
+	uint32_t last_timestamp;
+}MovingAvg;
+
 static ExtPositionCache crtpExtPosCache;
 static bool isInit_pos = false;
 static bool isInit_cmd = false;
@@ -34,12 +41,9 @@ static uint8_t my_id;
 static uint8_t bc_id;
 static positionMeasurement_t broadcast_pos;
 static positionMeasurement_t broadcast_cmd;
-static uint16_t flag = 0;
-static uint16_t cmd_flag = 0;
-static uint16_t numPacketsReceived = 0, numPacketsReceived2 = 0;
-static uint16_t numPacketsAccepted = 0, numPacketsAccepted2 = 0;
+static uint32_t numPacketsReceivedPos = 0, numPacketsReceivedCmd = 0;
 
-
+static MovingAvg posRxFreq, cmdRxFreq;
 
 static void bcPosSrvCrtpCB(CRTPPacket* pk);
 static void bcCmdSrvCrtpCB(CRTPPacket* pk);
@@ -53,10 +57,11 @@ void bcPosInit()
   crtpInit();
   crtpRegisterPortCB(CRTP_PORT_EXTPOS_BRINGUP, bcPosSrvCrtpCB);
   isInit_pos = true;
+  posRxFreq.index = 0;
+  cmdRxFreq.index = 0;
 
   uint64_t address = configblockGetRadioAddress();
   my_id = address & 0xFF;
-  flag = 1;
 }
 
 void bcCmdInit(void)
@@ -68,23 +73,30 @@ void bcCmdInit(void)
   crtpRegisterPortCB(CRTP_PORT_SETPOINT, bcCmdSrvCrtpCB);
   crtpRegisterPortCB(CRTP_PORT_SETPOINT_GENERIC, bcCmdSrvCrtpCB);
   isInit_cmd = true;
-  cmd_flag = 1;
 }
 
 static void bcPosSrvCrtpCB(CRTPPacket* pk)
 {
-  numPacketsReceived++;
-  flag = 2;
+
   struct data_vicon* d = ((struct data_vicon*) pk->data);
   for (int i=0; i < 2; ++i) {
     bc_id = d->pose[i].id;
     if (d->pose[i].id == my_id) {
-      numPacketsAccepted++;
-      flag = 3;
+    	numPacketsReceivedPos++;
       struct CrtpExtPosition data;
       data.x = position_fix24_to_float(d->pose[i].x);
       data.y = position_fix24_to_float(d->pose[i].y);
       data.z = position_fix24_to_float(d->pose[i].z);
+
+      if(posRxFreq.last_timestamp!=0){
+    	  float interval = T2M(xTaskGetTickCount()- posRxFreq.last_timestamp);
+    	  float sum = posRxFreq.avg * 500 - posRxFreq.data[posRxFreq.index];
+    	  posRxFreq.data[posRxFreq.index] = 1000.f / interval;
+    	  posRxFreq.avg = (sum + posRxFreq.data[posRxFreq.index]) / 500.0f;
+      }
+
+      posRxFreq.index = (posRxFreq.index + 1)%500;
+      posRxFreq.last_timestamp = xTaskGetTickCount();
 
       crtpExtPosCache.currVal[!crtpExtPosCache.activeSide] = data;
       crtpExtPosCache.activeSide = !crtpExtPosCache.activeSide;
@@ -96,7 +108,7 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
 bool getExtPositionBC(state_t *state)
 {
   // Only use position information if it's valid and recent
-  if ((xTaskGetTickCount() - crtpExtPosCache.timestamp) < M2T(5)) {
+  if ((xTaskGetTickCount() - crtpExtPosCache.timestamp) < M2T(100)) {
     // Get the updated position from the mocap
     broadcast_pos.x = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].x;
     broadcast_pos.y = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y;
@@ -114,14 +126,13 @@ bool getExtPositionBC(state_t *state)
 static void bcCmdSrvCrtpCB(CRTPPacket* pk)
 {
   static setpoint_t setpoint;
-  numPacketsReceived2++;
+
 
   if(pk->port == CRTP_PORT_SETPOINT && pk->channel == 0) {
     struct data_setpoint* d = ((struct data_setpoint*) pk->data);
     for (int i=0; i < 2; ++i) {
       if (d->pose[i].id == my_id) {
-        numPacketsAccepted2++;
-        cmd_flag = 2;
+    	  numPacketsReceivedCmd++;
 
         struct CommanderCrtpLegacyValues data;
         data.roll = position_fix24_to_float(d->pose[i].x);
@@ -132,6 +143,15 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
         //crtpCommanderRpytDecodeSetpoint(&setpoint, &pk);
         crtpCommanderRpytDecodeSetpoint(&setpoint, pk, true, &data);
         commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+
+        if(cmdRxFreq.last_timestamp!=0){
+      	  float interval = T2M(xTaskGetTickCount()- cmdRxFreq.last_timestamp);
+      	  float sum = cmdRxFreq.avg * 500 - cmdRxFreq.data[cmdRxFreq.index];
+      	  cmdRxFreq.data[cmdRxFreq.index] = 1000.f / interval;
+      	  cmdRxFreq.avg = (sum + cmdRxFreq.data[cmdRxFreq.index]) / 500.0f;
+        }
+        cmdRxFreq.index = (cmdRxFreq.index + 1)%500;
+        cmdRxFreq.last_timestamp = xTaskGetTickCount();
         //broadcast_cmd.x = data.roll;
         //broadcast_cmd.y = data.pitch;
         //broadcast_cmd.z = data.yaw;
@@ -144,7 +164,6 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
       }
   } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
     if (pk->data[0] == my_id){
-      numPacketsAccepted2++; 
       crtpCommanderGenericDecodeSetpoint(&setpoint, pk);
       commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP); 
     } 
@@ -164,16 +183,9 @@ LOG_ADD(LOG_FLOAT, Z, &broadcast_cmd.z)
 LOG_ADD(LOG_FLOAT, Thrust, &broadcast_cmd.stdDev)
 LOG_GROUP_STOP(broadcast_cmd)
 
-LOG_GROUP_START(broadcast_flag)
-LOG_ADD(LOG_UINT16, pos_Flag, &flag)
-LOG_ADD(LOG_UINT16, cmd_Flag, &cmd_flag)
-LOG_ADD(LOG_UINT8, pos_ID, &my_id)
-LOG_ADD(LOG_UINT8, pos_IDInput, &bc_id)
-LOG_GROUP_STOP(broadcast_flag)
-
-LOG_GROUP_START(broadcast_count)
-LOG_ADD(LOG_UINT16, Rx, &numPacketsReceived)
-LOG_ADD(LOG_UINT16, Acc, &numPacketsAccepted)
-LOG_ADD(LOG_UINT16, Rx2, &numPacketsReceived2)
-LOG_ADD(LOG_UINT16, Acc2, &numPacketsAccepted2)
-LOG_GROUP_STOP(broadcast_count)
+LOG_GROUP_START(broadcast_test)
+LOG_ADD(LOG_UINT32, RxPos, &numPacketsReceivedPos)
+LOG_ADD(LOG_UINT32, RxCmd, &numPacketsReceivedCmd)
+LOG_ADD(LOG_FLOAT, RxFreqPos, &posRxFreq.avg)
+LOG_ADD(LOG_FLOAT, RxFreqCmd, &cmdRxFreq.avg)
+LOG_GROUP_STOP(broadcast_test)

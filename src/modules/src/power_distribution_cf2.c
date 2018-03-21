@@ -124,9 +124,9 @@ void powerDistribution(const control_t *control)
   }
 }
 
-LOG_GROUP_START(pwmsignal)
-LOG_ADD(LOG_FLOAT, m1, &motor_pwm[0])
-LOG_GROUP_STOP(pwmsignal)
+//LOG_GROUP_START(pwmsignal)
+//LOG_ADD(LOG_FLOAT, m1, &motor_pwm[0])
+//LOG_GROUP_STOP(pwmsignal)
 
 LOG_GROUP_START(motorpwm)
 LOG_ADD(LOG_FLOAT, m1, &motor_pwm[0])

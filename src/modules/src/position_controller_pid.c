@@ -233,37 +233,37 @@ void positionControllerResetAllPID()
   pidReset(&this.pidVZ.pid);
 }
 
-LOG_GROUP_START(posCtl)
-
-LOG_ADD(LOG_FLOAT, targetVX, &this.pidVX.pid.desired)
-LOG_ADD(LOG_FLOAT, targetVY, &this.pidVY.pid.desired)
-LOG_ADD(LOG_FLOAT, targetVZ, &this.pidVZ.pid.desired)
-
-LOG_ADD(LOG_FLOAT, targetX, &this.pidX.pid.desired)
-LOG_ADD(LOG_FLOAT, targetY, &this.pidY.pid.desired)
-LOG_ADD(LOG_FLOAT, targetZ, &this.pidZ.pid.desired)
-
-LOG_ADD(LOG_FLOAT, Xp, &this.pidX.pid.outP)
-LOG_ADD(LOG_FLOAT, Xi, &this.pidX.pid.outI)
-LOG_ADD(LOG_FLOAT, Xd, &this.pidX.pid.outD)
-
-LOG_ADD(LOG_FLOAT, Yp, &this.pidY.pid.outP)
-LOG_ADD(LOG_FLOAT, Yi, &this.pidY.pid.outI)
-LOG_ADD(LOG_FLOAT, Yd, &this.pidY.pid.outD)
-
-LOG_ADD(LOG_FLOAT, Zp, &this.pidZ.pid.outP)
-LOG_ADD(LOG_FLOAT, Zi, &this.pidZ.pid.outI)
-LOG_ADD(LOG_FLOAT, Zd, &this.pidZ.pid.outD)
-
-LOG_ADD(LOG_FLOAT, VXp, &this.pidVX.pid.outP)
-LOG_ADD(LOG_FLOAT, VXi, &this.pidVX.pid.outI)
-LOG_ADD(LOG_FLOAT, VXd, &this.pidVX.pid.outD)
-
-LOG_ADD(LOG_FLOAT, VZp, &this.pidVZ.pid.outP)
-LOG_ADD(LOG_FLOAT, VZi, &this.pidVZ.pid.outI)
-LOG_ADD(LOG_FLOAT, VZd, &this.pidVZ.pid.outD)
-
-LOG_GROUP_STOP(posCtl)
+//LOG_GROUP_START(posCtl)
+//
+//LOG_ADD(LOG_FLOAT, targetVX, &this.pidVX.pid.desired)
+//LOG_ADD(LOG_FLOAT, targetVY, &this.pidVY.pid.desired)
+//LOG_ADD(LOG_FLOAT, targetVZ, &this.pidVZ.pid.desired)
+//
+//LOG_ADD(LOG_FLOAT, targetX, &this.pidX.pid.desired)
+//LOG_ADD(LOG_FLOAT, targetY, &this.pidY.pid.desired)
+//LOG_ADD(LOG_FLOAT, targetZ, &this.pidZ.pid.desired)
+//
+//LOG_ADD(LOG_FLOAT, Xp, &this.pidX.pid.outP)
+//LOG_ADD(LOG_FLOAT, Xi, &this.pidX.pid.outI)
+//LOG_ADD(LOG_FLOAT, Xd, &this.pidX.pid.outD)
+//
+//LOG_ADD(LOG_FLOAT, Yp, &this.pidY.pid.outP)
+//LOG_ADD(LOG_FLOAT, Yi, &this.pidY.pid.outI)
+//LOG_ADD(LOG_FLOAT, Yd, &this.pidY.pid.outD)
+//
+//LOG_ADD(LOG_FLOAT, Zp, &this.pidZ.pid.outP)
+//LOG_ADD(LOG_FLOAT, Zi, &this.pidZ.pid.outI)
+//LOG_ADD(LOG_FLOAT, Zd, &this.pidZ.pid.outD)
+//
+//LOG_ADD(LOG_FLOAT, VXp, &this.pidVX.pid.outP)
+//LOG_ADD(LOG_FLOAT, VXi, &this.pidVX.pid.outI)
+//LOG_ADD(LOG_FLOAT, VXd, &this.pidVX.pid.outD)
+//
+//LOG_ADD(LOG_FLOAT, VZp, &this.pidVZ.pid.outP)
+//LOG_ADD(LOG_FLOAT, VZi, &this.pidVZ.pid.outI)
+//LOG_ADD(LOG_FLOAT, VZd, &this.pidVZ.pid.outD)
+//
+//LOG_GROUP_STOP(posCtl)
 
 PARAM_GROUP_START(velCtlPid)
 
