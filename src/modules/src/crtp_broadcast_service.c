@@ -1,7 +1,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
-
+#include <math.h>
 /* FreeRtos includes */
 #include "FreeRTOS.h"
 #include "task.h"
@@ -30,8 +30,11 @@ typedef struct{
 	float data[500];
 	uint16_t index;
 	float avg;
+	float max;
+	float min;
+	float stddev;
 	uint32_t last_timestamp;
-}MovingAvg;
+}Sampling;
 
 static ExtPositionCache crtpExtPosCache;
 static bool isInit_pos = false;
@@ -44,7 +47,7 @@ static positionMeasurement_t broadcast_cmd;
 
 static uint32_t numPacketsReceivedPos = 0, numPacketsReceivedCmd = 0;
 
-static MovingAvg posRxFreq, cmdRxFreq;
+static Sampling posRxFreq, cmdRxFreq;
 
 static void bcPosSrvCrtpCB(CRTPPacket* pk);
 static void bcCmdSrvCrtpCB(CRTPPacket* pk);
@@ -58,8 +61,11 @@ void bcPosInit()
   crtpInit();
   crtpRegisterPortCB(CRTP_PORT_EXTPOS_BRINGUP, bcPosSrvCrtpCB);
   isInit_pos = true;
-  posRxFreq.index = 0;
-  cmdRxFreq.index = 0;
+  posRxFreq.max = 0.f;
+  posRxFreq.min = 150.f;
+
+  cmdRxFreq.max = 0.f;
+  cmdRxFreq.min = 150.f;
 
   uint64_t address = configblockGetRadioAddress();
   my_id = address & 0xFF;
@@ -94,6 +100,16 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
     	  float sum = posRxFreq.avg * 500 - posRxFreq.data[posRxFreq.index];
     	  posRxFreq.data[posRxFreq.index] = 1000.f / interval;
     	  posRxFreq.avg = (sum + posRxFreq.data[posRxFreq.index]) / 500.0f;
+
+    	  posRxFreq.max = posRxFreq.max > posRxFreq.data[posRxFreq.index] ? posRxFreq.max : posRxFreq.data[posRxFreq.index];
+    	  posRxFreq.min = posRxFreq.min < posRxFreq.data[posRxFreq.index] ? posRxFreq.min : posRxFreq.data[posRxFreq.index];
+
+    	  sum = 0;
+    	  for(int i=0; i<500; ++i)
+    		  sum += (float) pow((posRxFreq.data[i] - posRxFreq.avg),2);
+    	  sum /= 499.f;
+    	  posRxFreq.stddev = (float) pow(sum, 0.5);
+
       }
 
       posRxFreq.index = (posRxFreq.index + 1)%500;
@@ -150,8 +166,18 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
       	  float sum = cmdRxFreq.avg * 500 - cmdRxFreq.data[cmdRxFreq.index];
       	  cmdRxFreq.data[cmdRxFreq.index] = 1000.f / interval;
       	  cmdRxFreq.avg = (sum + cmdRxFreq.data[cmdRxFreq.index]) / 500.0f;
+
+      	  cmdRxFreq.max = cmdRxFreq.max > cmdRxFreq.data[cmdRxFreq.index] ? cmdRxFreq.max : cmdRxFreq.data[cmdRxFreq.index];
+      	  cmdRxFreq.min = cmdRxFreq.min < cmdRxFreq.data[cmdRxFreq.index] ? cmdRxFreq.min : cmdRxFreq.data[cmdRxFreq.index];
+
+    	  sum = 0;
+    	  for(int i=0; i<500; ++i)
+    		  sum += (float) pow((cmdRxFreq.data[i] - cmdRxFreq.avg),2);
+    	  sum /= (float) 499.f;
+    	  cmdRxFreq.stddev = (float) pow(sum, 0.5);
         }
-        cmdRxFreq.index = (cmdRxFreq.index + 1)%500;
+
+        cmdRxFreq.index = (cmdRxFreq.index + 1)%1000;
         cmdRxFreq.last_timestamp = xTaskGetTickCount();
         //broadcast_cmd.x = data.roll;
         //broadcast_cmd.y = data.pitch;
@@ -185,9 +211,15 @@ LOG_ADD(LOG_FLOAT, Thrust, &broadcast_cmd.stdDev)
 LOG_GROUP_STOP(broadcast_cmd)
 
 LOG_GROUP_START(broadcast_test)
-LOG_ADD(LOG_UINT32, RxPos, &numPacketsReceivedPos)
-LOG_ADD(LOG_UINT32, RxCmd, &numPacketsReceivedCmd)
-LOG_ADD(LOG_FLOAT, RxFreqPos, &posRxFreq.avg)
-LOG_ADD(LOG_FLOAT, RxFreqCmd, &cmdRxFreq.avg)
+LOG_ADD(LOG_UINT32, RP, &numPacketsReceivedPos)
+LOG_ADD(LOG_UINT32, RC, &numPacketsReceivedCmd)
+LOG_ADD(LOG_FLOAT, aRFP, &posRxFreq.avg)
+LOG_ADD(LOG_FLOAT, aRFC, &cmdRxFreq.avg)
+LOG_ADD(LOG_FLOAT, mxRFP, &posRxFreq.max)
+LOG_ADD(LOG_FLOAT, mxRFC, &cmdRxFreq.max)
+LOG_ADD(LOG_FLOAT, mnRFP, &posRxFreq.min)
+LOG_ADD(LOG_FLOAT, mnRFC, &cmdRxFreq.min)
+LOG_ADD(LOG_FLOAT, sRFP, &posRxFreq.stddev)
+LOG_ADD(LOG_FLOAT, sRFC, &cmdRxFreq.stddev)
 LOG_GROUP_STOP(broadcast_test)
 
