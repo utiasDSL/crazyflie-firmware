@@ -173,11 +173,11 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
     	  sum = 0;
     	  for(int i=0; i<500; ++i)
     		  sum += (float) pow((cmdRxFreq.data[i] - cmdRxFreq.avg),2);
-    	  sum /= (float) 499.f;
+    	  sum /=  499.f;
     	  cmdRxFreq.stddev = (float) pow(sum, 0.5);
         }
 
-        cmdRxFreq.index = (cmdRxFreq.index + 1)%1000;
+        cmdRxFreq.index = (cmdRxFreq.index + 1)%500;
         cmdRxFreq.last_timestamp = xTaskGetTickCount();
         //broadcast_cmd.x = data.roll;
         //broadcast_cmd.y = data.pitch;
