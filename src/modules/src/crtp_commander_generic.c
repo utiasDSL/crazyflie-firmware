@@ -31,6 +31,7 @@
 #include "commander.h"
 #include "param.h"
 #include "crtp.h"
+#include "packetdef.h"
 #include "num.h"
 #include "log.h"
 #include "FreeRTOS.h"
@@ -69,6 +70,7 @@ enum packet_type {
   altHoldType       = 4,
   hoverType         = 5,
   newControllerType = 6,
+  posSetType		= 7,
 };
 
 /* ---===== 2 - Decoding functions =====--- */
@@ -283,6 +285,40 @@ static void newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void 
   } 
 }
 
+static void posSetDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, size_t datalen)
+{
+	ASSERT(datalen == sizeof(struct data_setpoint));
+
+	struct data_setpoint* d = ((struct data_setpoint*) data);
+	ASSERT(d->pose[idx].type == idx);
+
+	struct CommanderCrtpLegacyValues cmd;
+	cmd.roll = position_fix24_to_float(d->pose[idx].x);
+	cmd.pitch = position_fix24_to_float(d->pose[idx].y);
+	cmd.thrust = position_fix24_to_float(d->pose[idx].z);
+	cmd.yaw = position_fix24_to_float(d->pose[idx].yaw) / 3.1415926f * 180.0f;
+
+
+	if(cmd.thrust != 0) {
+	    setpoint->mode.x = modeAbs;
+	    setpoint->mode.y = modeAbs;
+	    setpoint->mode.z = modeAbs;
+	    setpoint->mode.roll = modeDisable;
+	    setpoint->mode.pitch = modeDisable;
+	    setpoint->mode.yaw = modeAbs;
+
+	    setpoint->position.x = -cmd.pitch;
+	    setpoint->position.y = cmd.roll;
+	    setpoint->position.z = cmd.thrust;
+
+	    setpoint->attitude.roll  = 0;
+	    setpoint->attitude.pitch = 0;
+	    setpoint->attitude.yaw = cmd.yaw;
+	    setpoint->thrust = 0;
+	}
+
+}
+
 
  /* ---===== 3 - packetDecoders array =====--- */
 const static packetDecoder_t packetDecoders[] = {
@@ -293,7 +329,7 @@ const static packetDecoder_t packetDecoders[] = {
   [altHoldType]       = altHoldDecoder,
   [hoverType]         = hoverDecoder,
   [newControllerType] = newControllerDecoder,
-
+  [posSetType]		  = posSetDecoder,
 };
 
 /* Decoder switch */
@@ -310,11 +346,32 @@ void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
   }
 
   uint8_t type = pk->data[1]; 
-  memset(setpoint, 0, sizeof(setpoint_t));
+  // should not set zero
+  // there is no guarantee that setpoint will be set properly
+//  memset(setpoint, 0, sizeof(setpoint_t));
 
   if (type<nTypes && (packetDecoders[type] != NULL)) {
     packetDecoders[type](setpoint, type, ((char*)pk->data)+2, pk->size-2);
   } 
+}
+
+void bccrtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, uint8_t idx)
+{
+	  // The first ybte in pk->data is the CF's address (aka. broadcast id)
+	  // The second byte is the packet's type
+	  static int nTypes = -1;
+
+	  ASSERT(pk->size > 0);
+
+	  if (nTypes<0) {
+	    nTypes = sizeof(packetDecoders)/sizeof(packetDecoders[0]);
+	  }
+
+	  uint8_t type = pk->data[1];
+
+	  if (type<nTypes && (packetDecoders[type] != NULL)) {
+	    packetDecoders[type](setpoint, idx, pk->data, pk->size);
+	  }
 }
 
 // Params for generic CRTP handlers

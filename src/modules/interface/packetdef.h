@@ -100,6 +100,7 @@ struct data_vicon {
 struct data_setpoint {
   struct {
     uint8_t id;
+    uint8_t type;
     posFixed24_t x; // m
     posFixed24_t y; // m
     posFixed24_t yaw; // rad

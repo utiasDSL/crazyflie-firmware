@@ -190,11 +190,15 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
         }
       }
   } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
-    if (pk->data[0] == my_id){
-      crtpCommanderGenericDecodeSetpoint(&setpoint, pk);
-      commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP); 
-    } 
+	  struct data_setpoint* d = ((struct data_setpoint*) pk->data);
+	  for (int i=0; i < 2; ++i) {
+		  if (d->pose[i].id == my_id) {
+			  bccrtpCommanderGenericDecodeSetpoint(&setpoint, pk, i);
+			  commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+	      }
+      }
   }
+
 }
 
 LOG_GROUP_START(broadcast_pos)
