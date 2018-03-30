@@ -220,6 +220,6 @@ LOG_ADD(LOG_FLOAT, mxRFC, &cmdRxFreq.max)
 LOG_ADD(LOG_FLOAT, mnRFP, &posRxFreq.min)
 LOG_ADD(LOG_FLOAT, mnRFC, &cmdRxFreq.min)
 LOG_ADD(LOG_FLOAT, sRFP, &posRxFreq.stddev)
-LOG_ADD(LOG_FLOAT, sRFC, &cmdRxFreq.stddev)
+//LOG_ADD(LOG_FLOAT, sRFC, &cmdRxFreq.stddev)
 LOG_GROUP_STOP(broadcast_test)
 
