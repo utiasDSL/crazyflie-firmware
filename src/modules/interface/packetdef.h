@@ -97,7 +97,7 @@ struct data_vicon {
   } __attribute__((packed)) pose[2];
 } __attribute__((packed));
 
-struct data_setpoint {
+typedef struct data_setpoint {
   struct {
     uint8_t id;
     uint8_t type;
@@ -106,7 +106,7 @@ struct data_setpoint {
     posFixed24_t yaw; // rad
     posFixed24_t z; // m
    } __attribute__((packed)) pose[2];
-} __attribute__((packed));
+} __attribute__((packed)) crtp_setpoint_t;
 
 struct data_packed_drops {
   uint64_t seq;

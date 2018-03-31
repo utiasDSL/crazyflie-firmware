@@ -11,7 +11,6 @@
 #include "crtp_commander.h"
 #include "log.h"
 #include "param.h"
-#include "packetdef.h"
 #include "configblock.h"
 #include "estimator_kalman.h"
 #include "commander.h"
@@ -85,7 +84,7 @@ void bcCmdInit(void)
 static void bcPosSrvCrtpCB(CRTPPacket* pk)
 {
 
-  struct data_vicon* d = ((struct data_vicon*) pk->data);
+  crtp_vicon_t* d = ((crtp_vicon_t*) pk->data);
   for (int i=0; i < 2; ++i) {
     bc_id = d->pose[i].id;
     if (d->pose[i].id == my_id) {
@@ -182,23 +181,25 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
         //broadcast_cmd.x = data.roll;
         //broadcast_cmd.y = data.pitch;
         //broadcast_cmd.z = data.yaw;
-        broadcast_cmd.stdDev = data.thrust;
-        broadcast_cmd.x = setpoint.position.x;
-        broadcast_cmd.y = setpoint.position.y;
-        broadcast_cmd.z = setpoint.position.z;
+//        broadcast_cmd.stdDev = data.thrust;
+//        broadcast_cmd.x = setpoint.position.x;
+//        broadcast_cmd.y = setpoint.position.y;
+//        broadcast_cmd.z = setpoint.position.z;
 
         }
       }
   } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
-	  struct data_setpoint* d = ((struct data_setpoint*) pk->data);
+	  crtp_setpoint_t* d = ((crtp_setpoint_t*) pk->data);
 	  for (int i=0; i < 2; ++i) {
 		  if (d->pose[i].id == my_id) {
-			  bccrtpCommanderGenericDecodeSetpoint(&setpoint, pk, i);
+			  bccrtpCommanderGenericDecodeSetpoint(&setpoint, d, i);
 			  commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
+			          broadcast_cmd.x = setpoint.position.x;
+			          broadcast_cmd.y = setpoint.position.y;
+			          broadcast_cmd.z = setpoint.velocity.z;
 	      }
       }
   }
-
 }
 
 LOG_GROUP_START(broadcast_pos)

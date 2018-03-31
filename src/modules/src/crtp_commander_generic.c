@@ -31,7 +31,7 @@
 #include "commander.h"
 #include "param.h"
 #include "crtp.h"
-#include "packetdef.h"
+#include "broadcast_data.h"
 #include "num.h"
 #include "log.h"
 #include "FreeRTOS.h"
@@ -67,10 +67,11 @@ enum packet_type {
   velocityWorldType = 1,
   zDistanceType     = 2,
   cppmEmuType       = 3,
-  altHoldType       = 4,
+  altHoldTypeOld    = 4,
   hoverType         = 5,
   newControllerType = 6,
   posSetType		= 7,
+  altHoldType		= 8,
 };
 
 /* ---===== 2 - Decoding functions =====--- */
@@ -206,7 +207,7 @@ static void cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
 }
 
 
-static void altHoldDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
+static void altHoldDecoderOld(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   const struct altHoldPacket_s *values = data;
 
@@ -287,35 +288,58 @@ static void newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void 
 
 static void posSetDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, size_t datalen)
 {
-	ASSERT(datalen == sizeof(struct data_setpoint));
+	crtp_setpoint_t* d = ((crtp_setpoint_t*) data);
+	float pos_z = position_fix24_to_float(d->pose[idx].z);
 
-	struct data_setpoint* d = ((struct data_setpoint*) data);
-	ASSERT(d->pose[idx].type == idx);
+	if(pos_z > 0.005f){
+		setpoint->mode.x = modeAbs;
+		setpoint->mode.y = modeAbs;
+		setpoint->mode.z = modeAbs;
+		setpoint->mode.roll = modeDisable;
+		setpoint->mode.pitch = modeDisable;
+		setpoint->mode.yaw = modeAbs;
 
-	struct CommanderCrtpLegacyValues cmd;
-	cmd.roll = position_fix24_to_float(d->pose[idx].x);
-	cmd.pitch = position_fix24_to_float(d->pose[idx].y);
-	cmd.thrust = position_fix24_to_float(d->pose[idx].z);
-	cmd.yaw = position_fix24_to_float(d->pose[idx].yaw) / 3.1415926f * 180.0f;
+		setpoint->position.x = position_fix24_to_float(d->pose[idx].x);
+		setpoint->position.y = position_fix24_to_float(d->pose[idx].y);
+		setpoint->position.z = position_fix24_to_float(d->pose[idx].z);
 
-
-	if(cmd.thrust != 0) {
-	    setpoint->mode.x = modeAbs;
-	    setpoint->mode.y = modeAbs;
-	    setpoint->mode.z = modeAbs;
-	    setpoint->mode.roll = modeDisable;
-	    setpoint->mode.pitch = modeDisable;
-	    setpoint->mode.yaw = modeAbs;
-
-	    setpoint->position.x = -cmd.pitch;
-	    setpoint->position.y = cmd.roll;
-	    setpoint->position.z = cmd.thrust;
-
-	    setpoint->attitude.roll  = 0;
-	    setpoint->attitude.pitch = 0;
-	    setpoint->attitude.yaw = cmd.yaw;
-	    setpoint->thrust = 0;
+		setpoint->attitude.roll  = 0;
+		setpoint->attitude.pitch = 0;
+		setpoint->attitude.yaw = position_fix24_to_float(d->pose[idx].yaw) / 3.1415926f * 180.0f;
+		setpoint->thrust = 0;
 	}
+	else{
+		// to lock thrust when set point is clost to group
+		// This would work since in controller_pid.c,
+		// if(sepoint->mode.z == modeDisabled)
+		//   actuator thrust = setpoint->thrust = 0;
+		setpoint->mode.z = modeDisable;
+		setpoint->thrust = 0.0f;
+	}
+
+
+}
+
+static void altHoldDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, size_t datalen)
+{
+	crtp_setpoint_t* d = ((crtp_setpoint_t*) data);
+
+    setpoint->mode.z = modeVelocity;
+
+    setpoint->velocity.z = position_fix24_to_float(d->pose[idx].z);		// m/s
+
+    setpoint->mode.yaw = modeVelocity;
+    setpoint->attitudeRate.yaw = position_fix24_to_float(d->pose[idx].yaw) / 3.1415926f * 180.0f; //deg/s
+
+    setpoint->mode.roll = modeAbs;
+    setpoint->mode.pitch = modeAbs;
+
+    // pid controller convention
+    // x - forward
+    // y - opposite to vicon y
+    // z - upward
+    setpoint->attitude.roll = position_fix24_to_float(d->pose[idx].x) / 3.1415926f * 180.0f;  //deg
+    setpoint->attitude.pitch = -position_fix24_to_float(d->pose[idx].y) / 3.1415926f * 180.0f; //deg
 
 }
 
@@ -326,10 +350,11 @@ const static packetDecoder_t packetDecoders[] = {
   [velocityWorldType] = velocityDecoder,
   [zDistanceType]     = zDistanceDecoder,
   [cppmEmuType]       = cppmEmuDecoder,
-  [altHoldType]       = altHoldDecoder,
+  [altHoldTypeOld]    = altHoldDecoderOld,
   [hoverType]         = hoverDecoder,
   [newControllerType] = newControllerDecoder,
   [posSetType]		  = posSetDecoder,
+  [altHoldType]       = altHoldDecoder
 };
 
 /* Decoder switch */
@@ -355,22 +380,22 @@ void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
   } 
 }
 
-void bccrtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, uint8_t idx)
+void bccrtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, crtp_setpoint_t* data, uint8_t idx)
 {
 	  // The first ybte in pk->data is the CF's address (aka. broadcast id)
 	  // The second byte is the packet's type
 	  static int nTypes = -1;
 
-	  ASSERT(pk->size > 0);
+//	  ASSERT(pk->size > 0);
 
 	  if (nTypes<0) {
 	    nTypes = sizeof(packetDecoders)/sizeof(packetDecoders[0]);
 	  }
 
-	  uint8_t type = pk->data[1];
+	  uint8_t type = data->pose[idx].type;
 
 	  if (type<nTypes && (packetDecoders[type] != NULL)) {
-	    packetDecoders[type](setpoint, idx, pk->data, pk->size);
+	    packetDecoders[type](setpoint, idx, data, 0);
 	  }
 }
 

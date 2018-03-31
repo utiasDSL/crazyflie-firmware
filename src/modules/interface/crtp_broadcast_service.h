@@ -2,7 +2,7 @@
 #define _CRTP_BROADCAST_H_
 
 #include "stabilizer_types.h"
-#include "packetdef.h"
+#include "broadcast_data.h"
 
 struct CrtpExtPosition
 {

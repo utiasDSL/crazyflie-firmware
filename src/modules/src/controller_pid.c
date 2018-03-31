@@ -40,7 +40,7 @@ void stateController(control_t *control, setpoint_t *setpoint,
   if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
     // Rate-controled YAW is moving YAW angle setpoint
     if (setpoint->mode.yaw == modeVelocity) {
-       attitudeDesired.yaw -= setpoint->attitudeRate.yaw/500.0f;
+       attitudeDesired.yaw += setpoint->attitudeRate.yaw/500.0f;
       while (attitudeDesired.yaw > 180.0f)
         attitudeDesired.yaw -= 360.0f;
       while (attitudeDesired.yaw < -180.0f)
