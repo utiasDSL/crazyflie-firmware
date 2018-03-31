@@ -143,60 +143,36 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
 {
   static setpoint_t setpoint;
 
-
-  if(pk->port == CRTP_PORT_SETPOINT && pk->channel == 0) {
-    struct data_setpoint* d = ((struct data_setpoint*) pk->data);
-    for (int i=0; i < 2; ++i) {
-      if (d->pose[i].id == my_id) {
-    	  numPacketsReceivedCmd++;
-
-        struct CommanderCrtpLegacyValues data;
-        data.roll = position_fix24_to_float(d->pose[i].x);
-        data.pitch = position_fix24_to_float(d->pose[i].y);
-        data.thrust = (int) (position_fix24_to_float(d->pose[i].z) * 1000.0f);
-        data.yaw = position_fix24_to_float(d->pose[i].yaw) / 3.1415926f * 180.0f;
-
-        //crtpCommanderRpytDecodeSetpoint(&setpoint, &pk);
-        crtpCommanderRpytDecodeSetpoint(&setpoint, pk, true, &data);
-        commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
-
-        if(cmdRxFreq.last_timestamp!=0){
-      	  float interval = T2M(xTaskGetTickCount()- cmdRxFreq.last_timestamp);
-      	  float sum = cmdRxFreq.avg * 500 - cmdRxFreq.data[cmdRxFreq.index];
-      	  cmdRxFreq.data[cmdRxFreq.index] = 1000.f / interval;
-      	  cmdRxFreq.avg = (sum + cmdRxFreq.data[cmdRxFreq.index]) / 500.0f;
-
-      	  cmdRxFreq.max = cmdRxFreq.max > cmdRxFreq.data[cmdRxFreq.index] ? cmdRxFreq.max : cmdRxFreq.data[cmdRxFreq.index];
-      	  cmdRxFreq.min = cmdRxFreq.min < cmdRxFreq.data[cmdRxFreq.index] ? cmdRxFreq.min : cmdRxFreq.data[cmdRxFreq.index];
-
-    	  sum = 0;
-    	  for(int i=0; i<500; ++i)
-    		  sum += (float) pow((cmdRxFreq.data[i] - cmdRxFreq.avg),2);
-    	  sum /=  499.f;
-    	  cmdRxFreq.stddev = (float) pow(sum, 0.5);
-        }
-
-        cmdRxFreq.index = (cmdRxFreq.index + 1)%500;
-        cmdRxFreq.last_timestamp = xTaskGetTickCount();
-        //broadcast_cmd.x = data.roll;
-        //broadcast_cmd.y = data.pitch;
-        //broadcast_cmd.z = data.yaw;
-//        broadcast_cmd.stdDev = data.thrust;
-//        broadcast_cmd.x = setpoint.position.x;
-//        broadcast_cmd.y = setpoint.position.y;
-//        broadcast_cmd.z = setpoint.position.z;
-
-        }
-      }
-  } else if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
+ if (pk->port == CRTP_PORT_SETPOINT_GENERIC && pk->channel == 0) {
 	  crtp_setpoint_t* d = ((crtp_setpoint_t*) pk->data);
 	  for (int i=0; i < 2; ++i) {
 		  if (d->pose[i].id == my_id) {
+			  numPacketsReceivedCmd++;
+
 			  bccrtpCommanderGenericDecodeSetpoint(&setpoint, d, i);
 			  commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
-			          broadcast_cmd.x = setpoint.position.x;
-			          broadcast_cmd.y = setpoint.position.y;
-			          broadcast_cmd.z = setpoint.velocity.z;
+			  broadcast_cmd.x = setpoint.position.x;
+			  broadcast_cmd.y = setpoint.position.y;
+			  broadcast_cmd.z = setpoint.velocity.z;
+
+			  if(cmdRxFreq.last_timestamp!=0){
+				  float interval = T2M(xTaskGetTickCount()- cmdRxFreq.last_timestamp);
+				  float sum = cmdRxFreq.avg * 500 - cmdRxFreq.data[cmdRxFreq.index];
+				  cmdRxFreq.data[cmdRxFreq.index] = 1000.f / interval;
+				  cmdRxFreq.avg = (sum + cmdRxFreq.data[cmdRxFreq.index]) / 500.0f;
+
+				  cmdRxFreq.max = cmdRxFreq.max > cmdRxFreq.data[cmdRxFreq.index] ? cmdRxFreq.max : cmdRxFreq.data[cmdRxFreq.index];
+				  cmdRxFreq.min = cmdRxFreq.min < cmdRxFreq.data[cmdRxFreq.index] ? cmdRxFreq.min : cmdRxFreq.data[cmdRxFreq.index];
+
+				  sum = 0;
+				  for(int i=0; i<500; ++i)
+					  sum += (float) pow((cmdRxFreq.data[i] - cmdRxFreq.avg),2);
+				  sum /=  499.f;
+				  cmdRxFreq.stddev = (float) pow(sum, 0.5);
+			 }
+
+			 cmdRxFreq.index = (cmdRxFreq.index + 1)%500;
+			 cmdRxFreq.last_timestamp = xTaskGetTickCount();
 	      }
       }
   }
