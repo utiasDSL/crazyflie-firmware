@@ -53,6 +53,7 @@
 #include "led.h"
 
 #include "log.h"
+#include "param.h"
 #include "crc_bosch.h"
 
 // Hardware defines
@@ -184,7 +185,11 @@ static void csLow(void)
   digitalWrite(USD_CS_PIN, 0);
 }
 
+/* Param var
+ *
+ */
 
+static bool start_log = false;
 
 /*********** Deck driver initialization ***************/
 
@@ -524,6 +529,10 @@ static void usdLogTask(void* prm)
 
   while(1) {
       vTaskDelayUntil(&lastWakeTime, F2T(usdLogConfig.frequency));
+
+      if(!start_log)
+    	  continue;
+
       queueMessagesWaiting = (uint8_t)uxQueueMessagesWaiting(usdLogQueue);
       /* trigger writing once there exists at least one queue item,
        * frequency will result itself */
@@ -765,3 +774,7 @@ static const DeckDriver usd_deck = {
 };
 
 DECK_DRIVER(usd_deck);
+
+PARAM_GROUP_START(usdlog)
+  PARAM_ADD(PARAM_UINT8, start, &start_log)
+PARAM_GROUP_STOP(usdlog)
