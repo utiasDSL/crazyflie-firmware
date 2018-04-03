@@ -42,6 +42,7 @@ def decode(filName):
     idx = 0
     fmtStr = ""
     setBytes = 0
+    print(setNames)
     for setName in setNames:
         fmtStr += chr(setName[0])
         setBytes += fmtChars[chr(setName[0])]
@@ -96,19 +97,35 @@ def createConfig():
     if ((re.search('^[Yy]', inStr)) or (inStr == '')):
         temp += 8
         
-    inStr = input(" * Stabilizer ([Y]es / [n]o): ")
+    inStr = input(" * Estimated States (POS) ([Y]es / [n]o): ")
     if ((re.search('^[Yy]', inStr)) or (inStr == '')):
         temp += 16
-        
-    inStr = input(" * Control ([Y]es / [n]o): ")
+
+    inStr = input(" * Estimated States (Vel) ([Y]es / [n]o): ")
     if ((re.search('^[Yy]', inStr)) or (inStr == '')):
         temp += 32
-        
-    inStr = input(" * Z-Range ([Y]es / [n]o): ")
+
+    inStr = input(" * Estimated States (Att) ([Y]es / [n]o): ")
     if ((re.search('^[Yy]', inStr)) or (inStr == '')):
         temp += 64
         
-    config = temp.to_bytes(1, byteorder='big', signed=False)
+    inStr = input(" * Control Input (POS) ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        temp += 128
+
+    inStr = input(" * Control Input (Vel) ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        temp += 256
+
+    inStr = input(" * Control Input (Att) ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        temp += 512
+        
+    inStr = input(" * Z-Range ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        temp += 1024
+        
+    config = temp.to_bytes(2, byteorder='big', signed=False)
     
     config += int(input("\nEnter the log frequency [1-1000]: ")).to_bytes(2, byteorder='big', signed=False)
     

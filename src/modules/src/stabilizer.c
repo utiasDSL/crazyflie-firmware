@@ -175,20 +175,33 @@ LOG_ADD(LOG_FLOAT, X, &setpoint.position.x)
 LOG_ADD(LOG_FLOAT, Y, &setpoint.position.y)
 LOG_ADD(LOG_FLOAT, Z, &setpoint.position.z)
 
+LOG_ADD(LOG_FLOAT, Vx, &setpoint.velocity.x)
+LOG_ADD(LOG_FLOAT, Vy, &setpoint.velocity.y)
+LOG_ADD(LOG_FLOAT, Vz, &setpoint.velocity.z)
+
 LOG_ADD(LOG_FLOAT, roll, &setpoint.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &setpoint.attitude.pitch)
-LOG_ADD(LOG_FLOAT, yaw, &setpoint.attitudeRate.yaw)
+LOG_ADD(LOG_FLOAT, yaw,  &setpoint.attitude.yaw)
+
+LOG_ADD(LOG_FLOAT, yawr, &setpoint.attitudeRate.yaw)
+LOG_ADD(LOG_FLOAT, thrust, &setpoint.thrust)
+
 LOG_GROUP_STOP(ctrltarget)
 
-LOG_GROUP_START(stateEstimate)
+LOG_GROUP_START(eststate)
 LOG_ADD(LOG_FLOAT, X, &state.position.x)
 LOG_ADD(LOG_FLOAT, Y, &state.position.y)
 LOG_ADD(LOG_FLOAT, Z, &state.position.z)
 
+LOG_ADD(LOG_FLOAT, Vx, &state.velocity.x)
+LOG_ADD(LOG_FLOAT, Vy, &state.velocity.y)
+LOG_ADD(LOG_FLOAT, Vz, &state.velocity.z)
+
 LOG_ADD(LOG_FLOAT, roll, &state.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &state.attitude.pitch)
 LOG_ADD(LOG_FLOAT, yaw, &state.attitude.yaw)
-LOG_GROUP_STOP(stateEstimate)
+
+LOG_GROUP_STOP(eststate)
 
 LOG_GROUP_START(acc)
 LOG_ADD(LOG_FLOAT, x, &sensorData.acc.x)
