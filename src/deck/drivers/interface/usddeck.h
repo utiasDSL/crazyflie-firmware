@@ -12,6 +12,14 @@
 #define USDLOG_CONTROL          (0x20)
 #define USDLOG_RANGE            (0x40)
 
+#define USDLOG_ACC_SIZE		3
+#define USDLOG_GYRO_SIZE	3
+#define USDLOG_BARO_SIZE	3
+#define USDLOG_MAG_SIZE		3
+#define USDLOG_STABILIZER_SIZE	4
+#define USDLOG_CONTROL_SIZE		3
+#define	USDLOG_RANGE_SIZE		1
+
 typedef struct usdLogDataPtr_s {
   uint32_t* tick;
   float* floats;
