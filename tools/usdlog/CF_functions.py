@@ -120,10 +120,18 @@ def createConfig():
     inStr = input(" * Control Input (Att) ([Y]es / [n]o): ")
     if ((re.search('^[Yy]', inStr)) or (inStr == '')):
         temp += 512
+
+    inStr = input(" * Vicon (Pos) ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        temp += 1024
+
+    inStr = input(" * Vicon (Vel) ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        temp += 2048
         
     inStr = input(" * Z-Range ([Y]es / [n]o): ")
     if ((re.search('^[Yy]', inStr)) or (inStr == '')):
-        temp += 1024
+        temp += 4096
         
     config = temp.to_bytes(2, byteorder='big', signed=False)
     
