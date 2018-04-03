@@ -204,14 +204,14 @@ static void usdInit(DeckInfo *info)
           if (f_open(&logFile, "config", FA_READ) == FR_OK)
             {
               /* try to read configuration */
-              char readBuffer[5];
+              char readBuffer[6];
               unsigned int bytesRead;
-              if (f_read(&logFile, readBuffer, 4, &bytesRead) == FR_OK)
+              if (f_read(&logFile, readBuffer, 5, &bytesRead) == FR_OK)
                 {
                   /* assign bytes to config struct */
-                  usdLogConfig.items = readBuffer[0];
-                  usdLogConfig.frequency = readBuffer[1]<<8 | readBuffer[2];
-                  usdLogConfig.bufferSize = readBuffer[3];
+                  usdLogConfig.items = readBuffer[0]<<8 | readBuffer[1];
+                  usdLogConfig.frequency = readBuffer[2]<<8 | readBuffer[3];
+                  usdLogConfig.bufferSize = readBuffer[4];
                   if ( (f_read(&logFile, usdLogConfig.filename, 10, &bytesRead)
                       != FR_OK) && ~bytesRead )
                     {
@@ -239,8 +239,12 @@ static void usdInit(DeckInfo *info)
 #endif
                       + ((usdLogConfig.items & USDLOG_BARO) ? USDLOG_BARO_SIZE : 0)
                       + ((usdLogConfig.items & USDLOG_MAG) ? USDLOG_MAG_SIZE : 0)
-                      + ((usdLogConfig.items & USDLOG_STABILIZER) ? USDLOG_STABILIZER_SIZE : 0)
-                      + ((usdLogConfig.items & USDLOG_CONTROL) ? USDLOG_CONTROL_SIZE : 0);
+                      + ((usdLogConfig.items & USDLOG_STABILIZER_POS) ? USDLOG_STABILIZER_POS_SIZE : 0)
+					  + ((usdLogConfig.items & USDLOG_STABILIZER_VEL) ? USDLOG_STABILIZER_VEL_SIZE : 0)
+					  + ((usdLogConfig.items & USDLOG_STABILIZER_ATT) ? USDLOG_STABILIZER_ATT_SIZE : 0)
+                      + ((usdLogConfig.items & USDLOG_CONTROL_POS) ? USDLOG_CONTROL_POS_SIZE : 0)
+					  + ((usdLogConfig.items & USDLOG_CONTROL_VEL) ? USDLOG_CONTROL_VEL_SIZE : 0)
+					  + ((usdLogConfig.items & USDLOG_CONTROL_ATT) ? USDLOG_CONTROL_ATT_SIZE : 0);
 
                   usdLogConfig.intSlots =
                       ((usdLogConfig.items & USDLOG_RANGE) ? USDLOG_RANGE_SIZE : 0);
@@ -353,32 +357,84 @@ static void usdLogTask(void* prm)
         else
           usdLogConfig.items &= ~USDLOG_MAG;
     }
-    if (usdLogConfig.items & USDLOG_STABILIZER)
+    if (usdLogConfig.items & USDLOG_STABILIZER_POS)
       {
-        floatIds[0 + usedSlots] = logGetVarId("stabilizer", "roll");
-        floatIds[1 + usedSlots] = logGetVarId("stabilizer", "pitch");
-        floatIds[2 + usedSlots] = logGetVarId("stabilizer", "yaw");
-        floatIds[3 + usedSlots] = logGetVarId("stabilizer", "thrust");
-        if (checkLogIds(&floatIds[usedSlots], USDLOG_STABILIZER_SIZE))
+        floatIds[0 + usedSlots] = logGetVarId("eststate", "X");
+        floatIds[1 + usedSlots] = logGetVarId("eststate", "Y");
+        floatIds[2 + usedSlots] = logGetVarId("eststate", "Z");
+        if (checkLogIds(&floatIds[usedSlots], USDLOG_STABILIZER_POS_SIZE))
           {
-            usedSlots += USDLOG_STABILIZER_SIZE;
-            DEBUG_PRINT("* Stabilizer\n");
+            usedSlots += USDLOG_STABILIZER_POS_SIZE;
+            DEBUG_PRINT("* Estimated State (POS)\n");
         }
         else
-          usdLogConfig.items &= ~USDLOG_STABILIZER;
+          usdLogConfig.items &= ~USDLOG_STABILIZER_POS;
     }
-    if (usdLogConfig.items & USDLOG_CONTROL)
+    if (usdLogConfig.items & USDLOG_STABILIZER_VEL)
+      {
+        floatIds[0 + usedSlots] = logGetVarId("eststate", "Vx");
+        floatIds[1 + usedSlots] = logGetVarId("eststate", "Vy");
+        floatIds[2 + usedSlots] = logGetVarId("eststate", "Vz");
+        if (checkLogIds(&floatIds[usedSlots], USDLOG_STABILIZER_VEL_SIZE))
+          {
+            usedSlots += USDLOG_STABILIZER_VEL_SIZE;
+            DEBUG_PRINT("* Estimated State (VEL)\n");
+        }
+        else
+          usdLogConfig.items &= ~USDLOG_STABILIZER_VEL;
+    }
+    if (usdLogConfig.items & USDLOG_STABILIZER_ATT)
+      {
+        floatIds[0 + usedSlots] = logGetVarId("eststate", "roll");
+        floatIds[1 + usedSlots] = logGetVarId("eststate", "pitch");
+        floatIds[2 + usedSlots] = logGetVarId("eststate", "yaw");
+        if (checkLogIds(&floatIds[usedSlots], USDLOG_STABILIZER_VEL_SIZE))
+          {
+            usedSlots += USDLOG_STABILIZER_ATT_SIZE;
+            DEBUG_PRINT("* Estimated State (ATT)\n");
+        }
+        else
+          usdLogConfig.items &= ~USDLOG_STABILIZER_ATT;
+    }
+    if (usdLogConfig.items & USDLOG_CONTROL_POS)
       {
         floatIds[0 + usedSlots] = logGetVarId("ctrltarget", "X");
         floatIds[1 + usedSlots] = logGetVarId("ctrltarget", "Y");
         floatIds[2 + usedSlots] = logGetVarId("ctrltarget", "Z");
-        if (checkLogIds(&floatIds[usedSlots], USDLOG_CONTROL_SIZE))
+        if (checkLogIds(&floatIds[usedSlots], USDLOG_CONTROL_POS_SIZE))
           {
-            usedSlots += USDLOG_CONTROL_SIZE;
-            DEBUG_PRINT("* Control\n");
+            usedSlots += USDLOG_CONTROL_POS_SIZE;
+            DEBUG_PRINT("* Control Input (POS)\n");
         }
         else
-          usdLogConfig.items &= ~USDLOG_CONTROL;
+          usdLogConfig.items &= ~USDLOG_CONTROL_POS;
+    }
+
+    if (usdLogConfig.items & USDLOG_CONTROL_VEL)
+      {
+        floatIds[0 + usedSlots] = logGetVarId("ctrltarget", "Vx");
+        floatIds[1 + usedSlots] = logGetVarId("ctrltarget", "Vy");
+        floatIds[2 + usedSlots] = logGetVarId("ctrltarget", "Vz");
+        if (checkLogIds(&floatIds[usedSlots], USDLOG_CONTROL_VEL_SIZE))
+          {
+            usedSlots += USDLOG_CONTROL_VEL_SIZE;
+            DEBUG_PRINT("* Control Input (VEL)\n");
+        }
+        else
+          usdLogConfig.items &= ~USDLOG_CONTROL_VEL;
+    }
+    if (usdLogConfig.items & USDLOG_CONTROL_ATT)
+      {
+        floatIds[0 + usedSlots] = logGetVarId("ctrltarget", "roll");
+        floatIds[1 + usedSlots] = logGetVarId("ctrltarget", "pitch");
+        floatIds[2 + usedSlots] = logGetVarId("ctrltarget", "yaw");
+        if (checkLogIds(&floatIds[usedSlots], USDLOG_CONTROL_ATT_SIZE))
+          {
+            usedSlots += USDLOG_CONTROL_ATT_SIZE;
+            DEBUG_PRINT("* Control Input (ATT)\n");
+        }
+        else
+          usdLogConfig.items &= ~USDLOG_CONTROL_ATT;
     }
     /* replace number of slots by the calculated one,
      * ('cause it was purged of unavailable log items) */
@@ -409,7 +465,6 @@ static void usdLogTask(void* prm)
     int ints[usdLogConfig.intSlots];
   };
 
-  DEBUG_PRINT("USD: waiting for sensor calibration");
   /* wait until sensor calibration is done
    * (memory of bias calculation buffer is free again) */
   while(!sensorsAreCalibrated())
@@ -417,7 +472,7 @@ static void usdLogTask(void* prm)
 
   /* allocate memory for buffer */
   DEBUG_PRINT("malloc buffer of size %d bytes...\n", usdLogConfig.bufferSize * sizeof(struct usdLogStruct));
-  // vTaskDelay(10); // small delay to allow debug message to be send
+   vTaskDelay(10); // small delay to allow debug message to be send
   struct usdLogStruct* usdLogBufferStart =
       pvPortMalloc(usdLogConfig.bufferSize * sizeof(struct usdLogStruct));
   struct usdLogStruct* usdLogBuffer = usdLogBufferStart;
@@ -539,7 +594,7 @@ static void usdWriteTask(void* usdLogQueue)
       }
 
       if (usdLogConfig.items & USDLOG_BARO) {
-          USD_WRITE(&logFile, (uint8_t*)"faslftempfpres", 5 * USDLOG_BARO_SIZE, &bytesWritten,
+          USD_WRITE(&logFile, (uint8_t*)"fasllftempfpres", 5 * USDLOG_BARO_SIZE, &bytesWritten,
                     crcValue, 0, crcTable)
       }
 
@@ -548,13 +603,35 @@ static void usdWriteTask(void* usdLogQueue)
                     crcValue, 0, crcTable)
       }
 
-      if (usdLogConfig.items & USDLOG_STABILIZER) {
-          USD_WRITE(&logFile, (uint8_t*)"fsrolfspitfsyawfsthr", 5 * USDLOG_STABILIZER_SIZE,
+      if (usdLogConfig.items & USDLOG_STABILIZER_POS) {
+          USD_WRITE(&logFile, (uint8_t*)"fspsxfspsyfspsz", 5 * USDLOG_STABILIZER_POS_SIZE,
                     &bytesWritten, crcValue, 0, crcTable)
       }
 
-      if (usdLogConfig.items & USDLOG_CONTROL) {
-          USD_WRITE(&logFile, (uint8_t*)"fcrolfcpitfcyaw", 5 * USDLOG_CONTROL_SIZE, &bytesWritten,
+      if (usdLogConfig.items & USDLOG_STABILIZER_VEL) {
+          USD_WRITE(&logFile, (uint8_t*)"fsvlxfsvlyfsvlz", 5 * USDLOG_STABILIZER_VEL_SIZE,
+                    &bytesWritten, crcValue, 0, crcTable)
+      }
+
+
+      if (usdLogConfig.items & USDLOG_STABILIZER_ATT) {
+          USD_WRITE(&logFile, (uint8_t*)"fsrolfspitfsyaw", 5 * USDLOG_STABILIZER_ATT_SIZE,
+                    &bytesWritten, crcValue, 0, crcTable)
+      }
+
+
+      if (usdLogConfig.items & USDLOG_CONTROL_POS) {
+          USD_WRITE(&logFile, (uint8_t*)"fcpsxfcpsyfcpsz", 5 * USDLOG_CONTROL_POS_SIZE, &bytesWritten,
+                    crcValue, 0, crcTable)
+      }
+
+      if (usdLogConfig.items & USDLOG_CONTROL_VEL) {
+          USD_WRITE(&logFile, (uint8_t*)"fcvlxfcvlyfcvlz", 5 * USDLOG_CONTROL_VEL_SIZE, &bytesWritten,
+                    crcValue, 0, crcTable)
+      }
+
+      if (usdLogConfig.items & USDLOG_CONTROL_ATT) {
+          USD_WRITE(&logFile, (uint8_t*)"fcrolfcpitfcyaw", 5 * USDLOG_CONTROL_ATT_SIZE, &bytesWritten,
                     crcValue, 0, crcTable)
       }
 
