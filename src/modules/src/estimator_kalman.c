@@ -353,6 +353,13 @@ static void decoupleState(stateIdx_t state)
 }
 #endif
 
+/* Log variables
+ *
+ */
+
+static point_t vicon_pos_old;
+static velocity_t vicon_vel;
+
 // --------------------------------------------------
 
 
@@ -492,9 +499,22 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
     if (first_vicon){
       resetEstimation = true;
       first_vicon = false;
+
     }else{
     stateEstimatorUpdateWithPosition(&pos);
+    float dt = T2M(xTaskGetTickCount() - vicon_pos_old.timestamp) / 1000.f;
+
+    vicon_vel.x = (pos.x - vicon_pos_old.x) / dt;
+    vicon_vel.y = (pos.y - vicon_pos_old.y) / dt;
+    vicon_vel.z = (pos.z - vicon_pos_old.z) / dt;
+    vicon_vel.timestamp = xTaskGetTickCount();
     }
+
+    vicon_pos_old.x = pos.x;
+    vicon_pos_old.y = pos.y;
+    vicon_pos_old.z = pos.z;
+    vicon_pos_old.timestamp = xTaskGetTickCount();
+
     doneUpdate = true;
   }
 
@@ -1445,12 +1465,15 @@ void estimatorKalmanSetShift(float deltax, float deltay)
 }
 
 // Temporary development groups
-LOG_GROUP_START(kalman_states)
-  LOG_ADD(LOG_FLOAT, ox, &S[STATE_X])
-  LOG_ADD(LOG_FLOAT, oy, &S[STATE_Y])
-  LOG_ADD(LOG_FLOAT, vx, &S[STATE_PX])
-  LOG_ADD(LOG_FLOAT, vy, &S[STATE_PY])
-LOG_GROUP_STOP(kalman_states)
+LOG_GROUP_START(vicon)
+  LOG_ADD(LOG_FLOAT, X, &vicon_pos_old.x)
+  LOG_ADD(LOG_FLOAT, Y, &vicon_pos_old.y)
+  LOG_ADD(LOG_FLOAT, Z, &vicon_pos_old.z)
+
+  LOG_ADD(LOG_FLOAT, Vx, &vicon_vel.x)
+  LOG_ADD(LOG_FLOAT, Vy, &vicon_vel.y)
+  LOG_ADD(LOG_FLOAT, Vz, &vicon_vel.z)
+LOG_GROUP_STOP(vicon)
 
 LOG_GROUP_START(kalman_pred)
   LOG_ADD(LOG_FLOAT, predNX, &predictedNX)

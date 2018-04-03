@@ -244,7 +244,9 @@ static void usdInit(DeckInfo *info)
 					  + ((usdLogConfig.items & USDLOG_STABILIZER_ATT) ? USDLOG_STABILIZER_ATT_SIZE : 0)
                       + ((usdLogConfig.items & USDLOG_CONTROL_POS) ? USDLOG_CONTROL_POS_SIZE : 0)
 					  + ((usdLogConfig.items & USDLOG_CONTROL_VEL) ? USDLOG_CONTROL_VEL_SIZE : 0)
-					  + ((usdLogConfig.items & USDLOG_CONTROL_ATT) ? USDLOG_CONTROL_ATT_SIZE : 0);
+					  + ((usdLogConfig.items & USDLOG_CONTROL_ATT) ? USDLOG_CONTROL_ATT_SIZE : 0)
+					  + ((usdLogConfig.items & USDLOG_VICON_POS) ? USDLOG_VICON_POS_SIZE : 0)
+					  + ((usdLogConfig.items & USDLOG_VICON_VEL) ? USDLOG_VICON_VEL_SIZE : 0);
 
                   usdLogConfig.intSlots =
                       ((usdLogConfig.items & USDLOG_RANGE) ? USDLOG_RANGE_SIZE : 0);
@@ -436,6 +438,33 @@ static void usdLogTask(void* prm)
         else
           usdLogConfig.items &= ~USDLOG_CONTROL_ATT;
     }
+    if (usdLogConfig.items & USDLOG_VICON_POS)
+       {
+         floatIds[0 + usedSlots] = logGetVarId("vicon", "X");
+         floatIds[1 + usedSlots] = logGetVarId("vicon", "Y");
+         floatIds[2 + usedSlots] = logGetVarId("vicon", "Z");
+         if (checkLogIds(&floatIds[usedSlots], USDLOG_VICON_POS_SIZE))
+           {
+             usedSlots += USDLOG_VICON_POS_SIZE;
+             DEBUG_PRINT("* VICON (POS)\n");
+         }
+         else
+           usdLogConfig.items &= ~USDLOG_VICON_POS;
+     }
+
+     if (usdLogConfig.items & USDLOG_VICON_VEL)
+       {
+         floatIds[0 + usedSlots] = logGetVarId("vicon", "Vx");
+         floatIds[1 + usedSlots] = logGetVarId("vicon", "Vy");
+         floatIds[2 + usedSlots] = logGetVarId("vicon", "Vz");
+         if (checkLogIds(&floatIds[usedSlots], USDLOG_VICON_VEL_SIZE))
+           {
+             usedSlots += USDLOG_VICON_VEL_SIZE;
+             DEBUG_PRINT("* VICON (VEL)\n");
+         }
+         else
+           usdLogConfig.items &= ~USDLOG_VICON_VEL;
+     }
     /* replace number of slots by the calculated one,
      * ('cause it was purged of unavailable log items) */
     usdLogConfig.floatSlots = usedSlots;
@@ -632,6 +661,16 @@ static void usdWriteTask(void* usdLogQueue)
 
       if (usdLogConfig.items & USDLOG_CONTROL_ATT) {
           USD_WRITE(&logFile, (uint8_t*)"fcrolfcpitfcyaw", 5 * USDLOG_CONTROL_ATT_SIZE, &bytesWritten,
+                    crcValue, 0, crcTable)
+      }
+
+      if (usdLogConfig.items & USDLOG_VICON_POS) {
+          USD_WRITE(&logFile, (uint8_t*)"fvpsxfvpsyfvpsz", 5 * USDLOG_VICON_POS_SIZE, &bytesWritten,
+                    crcValue, 0, crcTable)
+      }
+
+      if (usdLogConfig.items & USDLOG_VICON_VEL) {
+          USD_WRITE(&logFile, (uint8_t*)"fvvlxfvvlyfvvlz", 5 * USDLOG_VICON_VEL_SIZE, &bytesWritten,
                     crcValue, 0, crcTable)
       }
 
