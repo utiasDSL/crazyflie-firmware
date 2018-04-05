@@ -24,7 +24,7 @@
  *
  */
 #include <math.h>
-
+#include <string.h>
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -59,6 +59,8 @@ static setpoint_t setpoint;
 static sensorData_t sensorData;
 static state_t state;
 static control_t control;
+
+static setpoint_t setpoint_record;
 
 static void stabilizerTask(void* param);
 
@@ -142,6 +144,7 @@ static void stabilizerTask(void* param)
 
     stateController(&control, &setpoint, &sensorData, &state, tick);
 
+    memcpy(&setpoint_record, &setpoint, sizeof(setpoint));
     checkEmergencyStopTimeout();
 
     if (emergencyStop) {
@@ -171,20 +174,20 @@ void stabilizerSetEmergencyStopTimeout(int timeout)
 }
 
 LOG_GROUP_START(ctrltarget)
-LOG_ADD(LOG_FLOAT, X, &setpoint.position.x)
-LOG_ADD(LOG_FLOAT, Y, &setpoint.position.y)
-LOG_ADD(LOG_FLOAT, Z, &setpoint.position.z)
+LOG_ADD(LOG_FLOAT, X, &setpoint_record.position.x)
+LOG_ADD(LOG_FLOAT, Y, &setpoint_record.position.y)
+LOG_ADD(LOG_FLOAT, Z, &setpoint_record.position.z)
 
-LOG_ADD(LOG_FLOAT, Vx, &setpoint.velocity.x)
-LOG_ADD(LOG_FLOAT, Vy, &setpoint.velocity.y)
-LOG_ADD(LOG_FLOAT, Vz, &setpoint.velocity.z)
+LOG_ADD(LOG_FLOAT, Vx, &setpoint_record.velocity.x)
+LOG_ADD(LOG_FLOAT, Vy, &setpoint_record.velocity.y)
+LOG_ADD(LOG_FLOAT, Vz, &setpoint_record.velocity.z)
 
-LOG_ADD(LOG_FLOAT, roll, &setpoint.attitude.roll)
-LOG_ADD(LOG_FLOAT, pitch, &setpoint.attitude.pitch)
-LOG_ADD(LOG_FLOAT, yaw,  &setpoint.attitude.yaw)
+LOG_ADD(LOG_FLOAT, roll, &setpoint_record.attitude.roll)
+LOG_ADD(LOG_FLOAT, pitch, &setpoint_record.attitude.pitch)
+LOG_ADD(LOG_FLOAT, yaw,  &setpoint_record.attitude.yaw)
 
-LOG_ADD(LOG_FLOAT, yawr, &setpoint.attitudeRate.yaw)
-LOG_ADD(LOG_FLOAT, thrust, &setpoint.thrust)
+LOG_ADD(LOG_FLOAT, yawr, &setpoint_record.attitudeRate.yaw)
+LOG_ADD(LOG_FLOAT, thrust, &setpoint_record.thrust)
 
 LOG_GROUP_STOP(ctrltarget)
 
