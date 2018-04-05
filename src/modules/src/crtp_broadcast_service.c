@@ -57,6 +57,7 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk);
 
 static velocity_t curr_vel;
 static point_t curr_pos;
+static uint32_t last_time;
 
 void bcPosInit()
 {
@@ -122,18 +123,21 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
       posRxFreq.index = (posRxFreq.index + 1)%500;
       posRxFreq.last_timestamp = xTaskGetTickCount();
 
-      float dt = T2M(xTaskGetTickCount() - crtpExtPosCache.timestamp) / 1000.f;
+
 
 
       if(pow((curr_pos.x - data.x), 2) + pow((curr_pos.y - data.y), 2) + pow((curr_pos.z -data.z), 2) > 25e-10){
+    	  float dt = (float) (xTaskGetTickCount() - last_time) / 1000.f;
     	  curr_vel.x = (data.x - curr_pos.x) / dt;
-    	  curr_vel.y = (data.y - curr_pos.y)/ dt;
-    	  curr_vel.z = (data.z - curr_pos.z)/ dt;
+    	  curr_vel.y = (data.y - curr_pos.y) / dt;
+    	  curr_vel.z = (data.z - curr_pos.z) / dt;
+
+    	  last_time = xTaskGetTickCount();
+    	  curr_pos.x = data.x;
+    	  curr_pos.y = data.y;
+    	  curr_pos.z = data.z;
       }
 
-      curr_pos.x = data.x;
-      curr_pos.y = data.y;
-      curr_pos.z = data.z;
 
       crtpExtPosCache.currVal[!crtpExtPosCache.activeSide] = data;
       crtpExtPosCache.activeSide = !crtpExtPosCache.activeSide;
