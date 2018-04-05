@@ -8,12 +8,18 @@ import CF_functions as cff
 import sys, getopt, os
 import numpy as np
 
-LogGroups = {"control_inputs"  : ["crol", "cpit", "cyaw"],
+LogGroups = {"control_inputs_pos"  : ["cpsx", "cpsy", "cpsz"],
+	     "control_inputs_vel"  : ["cvlx", "cvly", "cvlz"],
+	     "control_inputs_att"  : ["crol", "cpit", "cyaw"],
+	     "estimated_states_pos"  : ["spsx", "spsy", "spsz"],
+	     "estimated_states_vel"  : ["svlx", "svly", "svlz"],
+	     "estimated_states_att"  : ["srol", "spit", "syaw"],
+	     "vicon_pos"       : ["vpsx", "vpsy", "vpsz"],
+	     "vicon_vel"       : ["vvlx", "vvly", "vvlz"],
              "sensor_acc"      : ["accx", "accy", "accz"],
              "sensor_gyro"     : ["gyrx", "gyry", "gyrz"],
              "sensor_mag"      : ["magx", "magy", "magz"],
-             "sensor_baro"     : ["pres", "temp"],
-             "estimated_states": ["sroll", "spit", "syaw", "sthr"]}
+             "sensor_baro"     : ["asll", "pres", "temp"]}
 
 def process_data(filename, foldername):
     logData = cff.decode(filename)
@@ -56,9 +62,9 @@ if __name__ == "__main__":
             elif opt in ("-i", "--ifile"):
                 inputfile = arg
             elif opt in ("-o", "--ofolder"):
-                outputfile = arg
+                outputdir = arg
 
-        if '-o' not in opts:
+        if outputdir == '':
             outputdir = 'log'
 
         print(inputfile + ' will be processed. Results will be saved under current directory in folder ' + outputdir + '\n')

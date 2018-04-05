@@ -492,10 +492,12 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
     if (first_vicon){
       resetEstimation = true;
       first_vicon = false;
+
     }else{
     stateEstimatorUpdateWithPosition(&pos);
-    }
     doneUpdate = true;
+    }
+
   }
 
   tdoaMeasurement_t tdoa;
@@ -1445,12 +1447,6 @@ void estimatorKalmanSetShift(float deltax, float deltay)
 }
 
 // Temporary development groups
-LOG_GROUP_START(kalman_states)
-  LOG_ADD(LOG_FLOAT, ox, &S[STATE_X])
-  LOG_ADD(LOG_FLOAT, oy, &S[STATE_Y])
-  LOG_ADD(LOG_FLOAT, vx, &S[STATE_PX])
-  LOG_ADD(LOG_FLOAT, vy, &S[STATE_PY])
-LOG_GROUP_STOP(kalman_states)
 
 LOG_GROUP_START(kalman_pred)
   LOG_ADD(LOG_FLOAT, predNX, &predictedNX)

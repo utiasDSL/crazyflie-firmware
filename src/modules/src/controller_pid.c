@@ -1,3 +1,4 @@
+#include <string.h>
 
 #include "stabilizer.h"
 #include "stabilizer_types.h"
@@ -13,9 +14,11 @@
 
 static bool tiltCompensationEnabled = false;
 
+static velocity_t velocityDesired;
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
 static float actuatorThrust;
+
 
 void stateControllerInit(void)
 {
@@ -52,7 +55,9 @@ void stateController(control_t *control, setpoint_t *setpoint,
 
   if (RATE_DO_EXECUTE(POSITION_RATE, tick)) {
     positionController(&actuatorThrust, &attitudeDesired, setpoint, state);
+    memcpy(&velocityDesired, &setpoint->velocity, sizeof(velocityDesired));
   }
+
 
   if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
     // Switch between manual and automatic position control
@@ -63,10 +68,13 @@ void stateController(control_t *control, setpoint_t *setpoint,
       attitudeDesired.roll = setpoint->attitude.roll;
       attitudeDesired.pitch = setpoint->attitude.pitch;
     }
-
+    // Attitude Convention
+    // Forward, Right, Up ( Not Cartesian Coodinates)
     attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
                                 attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
                                 &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw);
+
+
 
     // For roll and pitch, if velocity mode, overwrite rateDesired with the setpoint
     // value. Also reset the PID to avoid error buildup, which can lead to unstable
@@ -81,15 +89,20 @@ void stateController(control_t *control, setpoint_t *setpoint,
     }
 
     // TODO: Investigate possibility to subtract gyro drift.
+    // Forward, Left, Up Convention for sensors->gyro
     attitudeControllerCorrectRatePID(sensors->gyro.x, -sensors->gyro.y, sensors->gyro.z,
                              rateDesired.roll, rateDesired.pitch, rateDesired.yaw);
+
+
 
     attitudeControllerGetActuatorOutput(&control->roll,
                                         &control->pitch,
                                         &control->yaw);
-
+    // Power Distribution Convention
+    // Forward, Right, Down
     control->yaw = -control->yaw;
   }
+
 
   if (tiltCompensationEnabled)
   {
@@ -99,6 +112,11 @@ void stateController(control_t *control, setpoint_t *setpoint,
   {
     control->thrust = actuatorThrust;
   }
+
+  memcpy(&setpoint->velocity, &velocityDesired, sizeof(velocityDesired));
+  memcpy(&setpoint->attitude, &attitudeDesired, sizeof(attitudeDesired));
+  memcpy(&setpoint->attitudeRate, &rateDesired, sizeof(rateDesired));
+  setpoint->thrust = control->thrust;
 
   if (control->thrust == 0)
   {

@@ -51,6 +51,14 @@ static Sampling posRxFreq, cmdRxFreq;
 static void bcPosSrvCrtpCB(CRTPPacket* pk);
 static void bcCmdSrvCrtpCB(CRTPPacket* pk);
 
+/*
+ * Log Variable
+ */
+
+static velocity_t curr_vel;
+static point_t curr_pos;
+static uint32_t last_time;
+
 void bcPosInit()
 {
   if (isInit_pos) {
@@ -94,6 +102,7 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
       data.y = position_fix24_to_float(d->pose[i].y);
       data.z = position_fix24_to_float(d->pose[i].z);
 
+
       if(posRxFreq.last_timestamp!=0){
     	  float interval = T2M(xTaskGetTickCount()- posRxFreq.last_timestamp);
     	  float sum = posRxFreq.avg * 500 - posRxFreq.data[posRxFreq.index];
@@ -114,9 +123,26 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
       posRxFreq.index = (posRxFreq.index + 1)%500;
       posRxFreq.last_timestamp = xTaskGetTickCount();
 
+
+
+
+      if(pow((curr_pos.x - data.x), 2) + pow((curr_pos.y - data.y), 2) + pow((curr_pos.z -data.z), 2) > 25e-10){
+    	  float dt = (float) (xTaskGetTickCount() - last_time) / 1000.f;
+    	  curr_vel.x = (data.x - curr_pos.x) / dt;
+    	  curr_vel.y = (data.y - curr_pos.y) / dt;
+    	  curr_vel.z = (data.z - curr_pos.z) / dt;
+
+    	  last_time = xTaskGetTickCount();
+    	  curr_pos.x = data.x;
+    	  curr_pos.y = data.y;
+    	  curr_pos.z = data.z;
+      }
+
+
       crtpExtPosCache.currVal[!crtpExtPosCache.activeSide] = data;
       crtpExtPosCache.activeSide = !crtpExtPosCache.activeSide;
       crtpExtPosCache.timestamp = xTaskGetTickCount();
+
       }
     }
 }
@@ -124,12 +150,13 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
 bool getExtPositionBC(state_t *state)
 {
   // Only use position information if it's valid and recent
-  if ((xTaskGetTickCount() - crtpExtPosCache.timestamp) < M2T(100)) {
+  if ((xTaskGetTickCount() - crtpExtPosCache.timestamp) < M2T(5)) {
     // Get the updated position from the mocap
     broadcast_pos.x = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].x;
     broadcast_pos.y = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y;
     broadcast_pos.z = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].z;
     broadcast_pos.stdDev = 0.01;
+
 #ifndef PLATFORM_CF1
     estimatorKalmanEnqueuePosition(&broadcast_pos);
 #endif
@@ -177,6 +204,16 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
       }
   }
 }
+
+LOG_GROUP_START(vicon)
+LOG_ADD(LOG_FLOAT, X, &curr_pos.x)
+LOG_ADD(LOG_FLOAT, Y, &curr_pos.y)
+LOG_ADD(LOG_FLOAT, Z, &curr_pos.z)
+
+LOG_ADD(LOG_FLOAT, Vx, &curr_vel.x)
+LOG_ADD(LOG_FLOAT, Vy, &curr_vel.y)
+LOG_ADD(LOG_FLOAT, Vz, &curr_vel.z)
+LOG_GROUP_STOP(vicon)
 
 LOG_GROUP_START(broadcast_pos)
 LOG_ADD(LOG_FLOAT, X, &broadcast_pos.x)
