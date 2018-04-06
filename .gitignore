@@ -16,3 +16,8 @@ tags
 *.gch
 
 /generated-test/**
+/.metadata/
+
+\.idea/
+
+*.pyc
