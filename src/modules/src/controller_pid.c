@@ -69,7 +69,7 @@ void stateController(control_t *control, setpoint_t *setpoint,
       attitudeDesired.pitch = setpoint->attitude.pitch;
     }
     // Attitude Convention
-    // Forward, Right, Up ( Not Cartesian Coodinates)
+    // Forward, Right, Up ( Not Cartesian Coordinates)
     attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
                                 attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
                                 &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw);
