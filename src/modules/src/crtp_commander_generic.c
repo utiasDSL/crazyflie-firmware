@@ -324,12 +324,14 @@ static void altHoldDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, 
 {
 	crtp_setpoint_t* d = ((crtp_setpoint_t*) data);
 
-    setpoint->mode.z = modeVelocity;
+	setpoint->mode.x = modeDisable;
+	setpoint->mode.y = modeDisable;
+    setpoint->mode.z = modeDisable;
 
-    setpoint->velocity.z = position_fix24_to_float(d->pose[idx].z);		// m/s
+    setpoint->thrust = position_fix24_to_float(d->pose[idx].z) * 65536;		// m/s
 
-    setpoint->mode.yaw = modeVelocity;
-    setpoint->attitudeRate.yaw = position_fix24_to_float(d->pose[idx].yaw) / 3.1415926f * 180.0f; //deg/s
+    setpoint->mode.yaw = modeAbs;
+    setpoint->attitudeRate.yaw = position_fix24_to_float(d->pose[idx].yaw) / 3.1415926f * 180.0f; //deg
 
     setpoint->mode.roll = modeAbs;
     setpoint->mode.pitch = modeAbs;

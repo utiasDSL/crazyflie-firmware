@@ -132,7 +132,7 @@ static struct this_s this = {
     .pid.dt = DT,
   },
 
-  .thrustBase = 36000,
+  .thrustBase = 40000,
   .thrustMin  = 20000,
 };
 #endif
@@ -203,24 +203,35 @@ void velocityController(float* thrust, attitude_t *attitude, setpoint_t *setpoin
   //this.pidVZ.pid.outputLimit = (this.thrustBase - this.thrustMin) / thrustScale;
 
   // Roll and Pitch
-  float rollRaw  = runPid(state->velocity.x, &this.pidVX, setpoint->velocity.x, DT);
-  float pitchRaw = runPid(state->velocity.y, &this.pidVY, setpoint->velocity.y, DT);
+  float rollRaw = 0;
+  float pitchRaw = 0;
+  if(setpoint->mode.x != modeDisable && setpoint->mode.y != modeDisable){
+	  rollRaw  = runPid(state->velocity.x, &this.pidVX, setpoint->velocity.x, DT);
+	  pitchRaw = runPid(state->velocity.y, &this.pidVY, setpoint->velocity.y, DT);
+  }
 
   float yawRad = state->attitude.yaw * (float)M_PI / 180;
-  attitude->pitch = -(rollRaw  * cosf(yawRad)) - (pitchRaw * sinf(yawRad));
-  attitude->roll  = -(pitchRaw * cosf(yawRad)) + (rollRaw  * sinf(yawRad));
+  if(setpoint->mode.x != modeDisable && setpoint->mode.y != modeDisable){
+	  attitude->pitch = -(rollRaw  * cosf(yawRad)) - (pitchRaw * sinf(yawRad));
+	  attitude->roll  = -(pitchRaw * cosf(yawRad)) + (rollRaw  * sinf(yawRad));
 
-  attitude->roll  = constrain(attitude->roll,  -rpLimit, rpLimit);
-  attitude->pitch = constrain(attitude->pitch, -rpLimit, rpLimit);
-
-  // Thrust
-  float thrustRaw = runPid(state->velocity.z, &this.pidVZ, setpoint->velocity.z, DT);
-  // Scale the thrust and add feed forward term
-  *thrust = thrustRaw*thrustScale + this.thrustBase;
-  // Check for minimum thrust
-  if (*thrust < this.thrustMin) {
-    *thrust = this.thrustMin;
+	  attitude->roll  = constrain(attitude->roll,  -rpLimit, rpLimit);
+	  attitude->pitch = constrain(attitude->pitch, -rpLimit, rpLimit);
   }
+  // Thrust
+  float thrustRaw = 0;
+  if(setpoint->mode.z != modeDisable){
+	  thrustRaw = runPid(state->velocity.z, &this.pidVZ, setpoint->velocity.z, DT);
+	  *thrust = thrustRaw*thrustScale + this.thrustBase;
+	  // Check for minimum thrust
+	  if (*thrust < this.thrustMin) {
+	    *thrust = this.thrustMin;
+	  }
+  }
+
+
+  // Scale the thrust and add feed forward term
+
 }
 
 void positionControllerResetAllPID()

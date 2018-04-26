@@ -178,9 +178,9 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
 
 			  bccrtpCommanderGenericDecodeSetpoint(&setpoint, d, i);
 			  commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
-			  broadcast_cmd.x = setpoint.position.x;
-			  broadcast_cmd.y = setpoint.position.y;
-			  broadcast_cmd.z = setpoint.velocity.z;
+			  broadcast_cmd.x = setpoint.attitude.roll;
+			  broadcast_cmd.y = setpoint.attitude.pitch;
+			  broadcast_cmd.z = setpoint.thrust;
 
 			  if(cmdRxFreq.last_timestamp!=0){
 				  float interval = T2M(xTaskGetTickCount()- cmdRxFreq.last_timestamp);
