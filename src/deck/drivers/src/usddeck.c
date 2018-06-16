@@ -251,7 +251,8 @@ static void usdInit(DeckInfo *info)
 					  + ((usdLogConfig.items & USDLOG_CONTROL_VEL) ? USDLOG_CONTROL_VEL_SIZE : 0)
 					  + ((usdLogConfig.items & USDLOG_CONTROL_ATT) ? USDLOG_CONTROL_ATT_SIZE : 0)
 					  + ((usdLogConfig.items & USDLOG_VICON_POS) ? USDLOG_VICON_POS_SIZE : 0)
-					  + ((usdLogConfig.items & USDLOG_VICON_VEL) ? USDLOG_VICON_VEL_SIZE : 0);
+					  + ((usdLogConfig.items & USDLOG_VICON_VEL) ? USDLOG_VICON_VEL_SIZE : 0)
+					  + USDLOG_CONTROL_THR_SIZE + USDLOG_COMM_FREQ_SIZE;
 
                   usdLogConfig.intSlots =
                       ((usdLogConfig.items & USDLOG_RANGE) ? USDLOG_RANGE_SIZE : 0);
@@ -470,6 +471,31 @@ static void usdLogTask(void* prm)
          else
            usdLogConfig.items &= ~USDLOG_VICON_VEL;
      }
+     if (true)
+       {
+         floatIds[0 + usedSlots] = logGetVarId("ctrltarget", "thrust");
+
+         if (checkLogIds(&floatIds[usedSlots], USDLOG_CONTROL_THR_SIZE))
+           {
+             usedSlots += USDLOG_CONTROL_THR_SIZE;
+             DEBUG_PRINT("* Control Input  (THR)\n");
+         }
+         else
+           usdLogConfig.items &= ~USDLOG_CONTROL_THR_SIZE;
+     }
+     if (true)
+            {
+              floatIds[0 + usedSlots] = logGetVarId("broadcast_test", "aRFP");
+              floatIds[1 + usedSlots] = logGetVarId("broadcast_test", "aRFC");
+
+              if (checkLogIds(&floatIds[usedSlots], USDLOG_COMM_FREQ_SIZE))
+                {
+                  usedSlots += USDLOG_COMM_FREQ_SIZE;
+                  DEBUG_PRINT("* Control Input  (THR)\n");
+              }
+              else
+                usdLogConfig.items &= ~USDLOG_COMM_FREQ_SIZE;
+          }
     /* replace number of slots by the calculated one,
      * ('cause it was purged of unavailable log items) */
     usdLogConfig.floatSlots = usedSlots;
@@ -680,6 +706,16 @@ static void usdWriteTask(void* usdLogQueue)
 
       if (usdLogConfig.items & USDLOG_VICON_VEL) {
           USD_WRITE(&logFile, (uint8_t*)"fvvlxfvvlyfvvlz", 5 * USDLOG_VICON_VEL_SIZE, &bytesWritten,
+                    crcValue, 0, crcTable)
+      }
+
+      if (true) {
+          USD_WRITE(&logFile, (uint8_t*)"fcthr", 5 * USDLOG_CONTROL_THR_SIZE, &bytesWritten,
+                    crcValue, 0, crcTable)
+      }
+
+      if (true) {
+          USD_WRITE(&logFile, (uint8_t*)"fbcapfbcac", 5 * USDLOG_COMM_FREQ_SIZE, &bytesWritten,
                     crcValue, 0, crcTable)
       }
 

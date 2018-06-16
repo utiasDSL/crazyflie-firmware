@@ -30,6 +30,8 @@
 #define USDLOG_CONTROL_ATT_SIZE		3
 #define USDLOG_VICON_POS_SIZE		3
 #define USDLOG_VICON_VEL_SIZE		3
+#define USDLOG_CONTROL_THR_SIZE		1
+#define USDLOG_COMM_FREQ_SIZE		2
 #define	USDLOG_RANGE_SIZE			1
 
 typedef struct usdLogDataPtr_s {
