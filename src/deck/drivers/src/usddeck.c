@@ -252,10 +252,10 @@ static void usdInit(DeckInfo *info)
 					  + ((usdLogConfig.items & USDLOG_CONTROL_ATT) ? USDLOG_CONTROL_ATT_SIZE : 0)
 					  + ((usdLogConfig.items & USDLOG_VICON_POS) ? USDLOG_VICON_POS_SIZE : 0)
 					  + ((usdLogConfig.items & USDLOG_VICON_VEL) ? USDLOG_VICON_VEL_SIZE : 0)
-					  + USDLOG_CONTROL_THR_SIZE + USDLOG_COMM_FREQ_SIZE;
+					  + USDLOG_CONTROL_THR_SIZE + USDLOG_COMM_FREQ_SIZE+USDLOG_CONTROL_ACC_SIZE;
 
                   usdLogConfig.intSlots =
-                      ((usdLogConfig.items & USDLOG_RANGE) ? USDLOG_RANGE_SIZE : 0);
+                      ((usdLogConfig.items & USDLOG_RANGE) ? USDLOG_RANGE_SIZE : 0)+USDLOG_MOT_SIZE;
 
                   DEBUG_PRINT("Config read [OK].\n");
                   DEBUG_PRINT("Frequency: %dHz. Buffer size: %d\n",
@@ -480,8 +480,7 @@ static void usdLogTask(void* prm)
              usedSlots += USDLOG_CONTROL_THR_SIZE;
              DEBUG_PRINT("* Control Input  (THR)\n");
          }
-         else
-           usdLogConfig.items &= ~USDLOG_CONTROL_THR_SIZE;
+
      }
      if (true)
             {
@@ -491,10 +490,22 @@ static void usdLogTask(void* prm)
               if (checkLogIds(&floatIds[usedSlots], USDLOG_COMM_FREQ_SIZE))
                 {
                   usedSlots += USDLOG_COMM_FREQ_SIZE;
-                  DEBUG_PRINT("* Control Input  (THR)\n");
+                  DEBUG_PRINT("* Comm (FREQ)\n");
               }
-              else
-                usdLogConfig.items &= ~USDLOG_COMM_FREQ_SIZE;
+
+          }
+     if (true)
+            {
+              floatIds[0 + usedSlots] = logGetVarId("ctrltarget", "Accx");
+              floatIds[1 + usedSlots] = logGetVarId("ctrltarget", "Accy");
+              floatIds[2 + usedSlots] = logGetVarId("ctrltarget", "Accz");
+
+              if (checkLogIds(&floatIds[usedSlots], USDLOG_CONTROL_ACC_SIZE))
+                {
+                  usedSlots += USDLOG_CONTROL_ACC_SIZE;
+                  DEBUG_PRINT("* Control Input  (ACC)\n");
+              }
+
           }
     /* replace number of slots by the calculated one,
      * ('cause it was purged of unavailable log items) */
@@ -511,6 +522,19 @@ static void usdLogTask(void* prm)
         else
           usdLogConfig.items &= ~USDLOG_RANGE;
     }
+    if (true)
+          {
+            intIds[0 + usedSlots] = logGetVarId("motor", "m1");
+            intIds[1 + usedSlots] = logGetVarId("motor", "m2");
+            intIds[2 + usedSlots] = logGetVarId("motor", "m3");
+            intIds[3 + usedSlots] = logGetVarId("motor", "m4");
+            if (checkLogIds(&intIds[usedSlots], USDLOG_MOT_SIZE))
+              {
+                usedSlots += USDLOG_MOT_SIZE;
+                DEBUG_PRINT("* MOT-Range\n");
+            }
+
+        }
     usdLogConfig.intSlots = usedSlots;
   }
 
@@ -718,11 +742,20 @@ static void usdWriteTask(void* usdLogQueue)
           USD_WRITE(&logFile, (uint8_t*)"fbcapfbcac", 5 * USDLOG_COMM_FREQ_SIZE, &bytesWritten,
                     crcValue, 0, crcTable)
       }
+      if (true) {
+                USD_WRITE(&logFile, (uint8_t*)"fcacxfcacyfcacz", 5 * USDLOG_CONTROL_ACC_SIZE, &bytesWritten,
+                          crcValue, 0, crcTable)
+      }
 
       if (usdLogConfig.items & USDLOG_RANGE) {
           USD_WRITE(&logFile, (uint8_t*)"irang", 5 * USDLOG_RANGE_SIZE, &bytesWritten,
                     crcValue, 0, crcTable)
       }
+
+      if (true) {
+                USD_WRITE(&logFile, (uint8_t*)"imot1imot2imot3imot4", 5 * USDLOG_MOT_SIZE, &bytesWritten,
+                          crcValue, 0, crcTable)
+            }
 
       /* negate crc value */
       crcValue = ~(crcValue^FINAL_XOR_VALUE);
