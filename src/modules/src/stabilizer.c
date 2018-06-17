@@ -59,7 +59,6 @@ static setpoint_t setpoint;
 static sensorData_t sensorData;
 static state_t state;
 static control_t control;
-
 static setpoint_t setpoint_record;
 
 static void stabilizerTask(void* param);
@@ -181,6 +180,10 @@ LOG_ADD(LOG_FLOAT, Z, &setpoint_record.position.z)
 LOG_ADD(LOG_FLOAT, Vx, &setpoint_record.velocity.x)
 LOG_ADD(LOG_FLOAT, Vy, &setpoint_record.velocity.y)
 LOG_ADD(LOG_FLOAT, Vz, &setpoint_record.velocity.z)
+
+LOG_ADD(LOG_FLOAT, Accx, &setpoint_record.acceleration.x)
+LOG_ADD(LOG_FLOAT, Accy, &setpoint_record.acceleration.y)
+LOG_ADD(LOG_FLOAT, Accz, &setpoint_record.acceleration.z)
 
 LOG_ADD(LOG_FLOAT, roll, &setpoint_record.attitude.roll)
 LOG_ADD(LOG_FLOAT, pitch, &setpoint_record.attitude.pitch)

@@ -303,9 +303,8 @@ static void posSetDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, s
 		setpoint->position.y = position_fix24_to_float(d->pose[idx].y);
 		setpoint->position.z = position_fix24_to_float(d->pose[idx].z);
 
-		setpoint->attitude.roll  = 0;
-		setpoint->attitude.pitch = 0;
 		setpoint->attitude.yaw = position_fix24_to_float(d->pose[idx].yaw) / 3.1415926f * 180.0f;
+
 		setpoint->thrust = 0;
 	}
 	else{

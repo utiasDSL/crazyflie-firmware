@@ -34,18 +34,24 @@ We added the following:
  * D-term for angular velocity
  * Support to use this controller as an attitude-only controller for manual flight
 */
-
+#include <string.h>
 #include <math.h>
 
 #include "param.h"
 #include "log.h"
 #include "math3d.h"
 #include "position_controller.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "system.h"
 
 #define GRAVITY_MAGNITUDE (9.81f)
 
-static float g_vehicleMass = 0.032; // TODO: should be CF global for other modules
+static float g_vehicleMass = 0.030; // TODO: should be CF global for other modules
 static float massThrust = 132000;
+static float c_2 = -73820.0;
+static float c_1 = 147723.96;
+static float c = 1369.68;
 
 // XY Position PID
 static float kp_xy = 0.4;       // P
@@ -91,15 +97,8 @@ static float i_error_m_z = 0;
 
 // Logging variables
 static struct vec z_axis_desired;
+static acc_t acc_desired;
 
-void stateControllerInit(void)
-{
-}
-
-bool stateControllerTest(void)
-{
-  return true;
-}
 
 void stateControllerReset(void)
 {
@@ -110,6 +109,18 @@ void stateControllerReset(void)
   i_error_m_y = 0;
   i_error_m_z = 0;
 }
+
+void stateControllerInit(void)
+{
+	stateControllerReset();
+}
+
+bool stateControllerTest(void)
+{
+  return true;
+}
+
+
 
 float clamp(float value, float min, float max) {
   if (value < min) return min;
@@ -135,6 +146,9 @@ void stateController(control_t *control, setpoint_t *setpoint,
   float desiredYaw = 0; //deg
 
   if (!RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
+	  setpoint->acceleration.x = acc_desired.x;
+	  setpoint->acceleration.y = acc_desired.y;
+	  setpoint->acceleration.z = acc_desired.z;
     return;
   }
 
@@ -284,7 +298,9 @@ void stateController(control_t *control, setpoint_t *setpoint,
   if (setpoint->mode.z == modeDisable) {
     control->thrust = setpoint->thrust;
   } else {
-    control->thrust = massThrust * current_thrust;
+//    control->thrust = massThrust * current_thrust;
+	  control->thrust = c_2 * current_thrust * current_thrust + c_1 * current_thrust + c;
+
   }
 
   if (control->thrust > 0) {
@@ -297,6 +313,15 @@ void stateController(control_t *control, setpoint_t *setpoint,
     control->yaw = 0;
     stateControllerReset();
   }
+
+  // log
+
+  setpoint->acceleration.x = target_thrust.x/g_vehicleMass;
+  setpoint->acceleration.y = target_thrust.y/g_vehicleMass;
+  setpoint->acceleration.z = target_thrust.z/g_vehicleMass;
+
+  memcpy(&acc_desired, &setpoint->acceleration, sizeof(acc_desired));
+
 }
 
 PARAM_GROUP_START(ctrlMel)
