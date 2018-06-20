@@ -131,8 +131,10 @@ static void stabilizerTask(void* param)
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
     #ifndef BROADCAST_ENABLE
     getExtPosition(&state);
+
     #else
-    getExtPositionBC(&state);
+//    getExtPositionBC(&state);
+    getExtPosVelBC(&state);
     #endif
 
     stateEstimator(&state, &sensorData, &control, tick);

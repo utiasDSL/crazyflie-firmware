@@ -132,6 +132,17 @@ static inline bool stateEstimatorHasPositionMeasurement(positionMeasurement_t *p
   return (pdTRUE == xQueueReceive(posDataQueue, pos, 0));
 }
 
+// Direct measurements of Crazyflie position and velocity
+static xQueueHandle posvelDataQueue;
+#define POSVEL_QUEUE_LENGTH (10)
+
+static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel);
+
+static inline bool stateEstimatorHasPosVelMeasurement(posvelMeasurement_t *posvel) {
+  return (pdTRUE == xQueueReceive(posvelDataQueue, posvel, 0));
+}
+
+
 // Measurements of a UWB Tx/Rx
 static xQueueHandle tdoaDataQueue;
 #define UWB_QUEUE_LENGTH (10)
@@ -171,7 +182,7 @@ static inline bool stateEstimatorHasTOFPacket(tofMeasurement_t *tof) {
 #define RAD_TO_DEG (180.0f/PI)
 
 #define GRAVITY_MAGNITUDE (9.81f) // we use the magnitude such that the sign/direction is explicit in calculations
-#define CRAZYFLIE_WEIGHT_grams (27.0f)
+#define CRAZYFLIE_WEIGHT_grams (32.3f)
 
 //thrust is thrust mapped for 65536 <==> 60 GRAMS!
 #ifdef CONTROLLER_TYPE_new
@@ -215,8 +226,8 @@ static const float stdDevInitialVelocity = 0.01;
 static const float stdDevInitialAttitude_rollpitch = 0.01;
 static const float stdDevInitialAttitude_yaw = 0.01;
 
-static float procNoiseAcc_xy = 0.5f;
-static float procNoiseAcc_z = 1.0f;
+static float procNoiseAcc_xy = 2.0f;
+static float procNoiseAcc_z = 2.0f;
 static float procNoiseVel = 0;
 static float procNoisePos = 0;
 static float procNoiseAtt = 0;
@@ -225,9 +236,10 @@ static float measNoiseGyro_rollpitch = 0.1f; // radians per second
 static float measNoiseGyro_yaw = 0.1f; // radians per second
 
 
-static float dragXY = 0.19f;
-static float dragZ = 0.05f;
-
+//static float dragXY = 0.19f;
+//static float dragZ = 0.05f;
+static float dragXY = 0.0f;
+static float dragZ = 0.00f;
 // We track a TDOA skew as part of the Kalman filter
 static const float stdDevInitialSkew = 0.1;
 //static float procNoiseSkew = 10e-6f; // seconds per second^2 (is multiplied by dt to give skew noise)
@@ -500,6 +512,12 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
 
   }
 
+  posvelMeasurement_t posvel;
+  while(stateEstimatorHasPosVelMeasurement(&posvel)){
+	  stateEstimatorUpdateWithPosVel(&posvel);
+	  doneUpdate = true;
+  }
+
   tdoaMeasurement_t tdoa;
   while (stateEstimatorHasTDOAPacket(&tdoa))
   {
@@ -718,14 +736,14 @@ static void stateEstimatorPredict(float cmdThrust, Axis3f *acc, Axis3f *gyro, fl
     tmpSPZ = S[STATE_PZ];
 
     // body-velocity update: accelerometers - gyros cross velocity - gravity in body frame
-    // S[STATE_PX] += dt * (gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * R[2][0]);
-    // S[STATE_PY] += dt * (-gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]);
-    // S[STATE_PZ] += dt * (zacc + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]);
+     S[STATE_PX] += dt * (gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * R[2][0]);
+     S[STATE_PY] += dt * (-gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]);
+     S[STATE_PZ] += dt * (zacc + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]);
 
     //drag term for new controller
-    S[STATE_PX] += dt * (gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * R[2][0]) + dragXY*tmpSPX*tmpSPX*dt*(tmpSPX<0?1:-1);
-    S[STATE_PY] += dt * (-gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]) + dragXY*tmpSPY*tmpSPY*dt*(tmpSPY<0?1:-1);
-    S[STATE_PZ] += dt * (zacc + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]) + dragZ*tmpSPZ*tmpSPZ*dt*(tmpSPZ<0?1:-1);
+//    S[STATE_PX] += dt * (gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * R[2][0]) + dragXY*tmpSPX*tmpSPX*dt*(tmpSPX<0?1:-1);
+//    S[STATE_PY] += dt * (-gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]) + dragXY*tmpSPY*tmpSPY*dt*(tmpSPY<0?1:-1);
+//    S[STATE_PZ] += dt * (zacc + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]) + dragZ*tmpSPZ*tmpSPZ*dt*(tmpSPZ<0?1:-1);
   }
   else // Acceleration can be in any direction, as measured by the accelerometer. This occurs, eg. in freefall or while being carried.
   {
@@ -954,6 +972,25 @@ static void stateEstimatorUpdateWithPosition(positionMeasurement_t *xyz)
   }
 }
 
+static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel){
+	// a direct measurement of states x, y, and z
+	  // do a scalar update for each state, since this should be faster than updating all together
+	  for (int i=0; i<3; i++) {
+	    float h[STATE_DIM] = {0};
+	    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+	    h[STATE_X+i] = 1;
+	    stateEstimatorScalarUpdate(&H, posvel->pos[i] - S[STATE_X+i], posvel->stdDev_pos);
+	  }
+
+	  for (int i=0; i<3; i++) {
+	    float h[STATE_DIM] = {0};
+	    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+	    h[STATE_PX] = R[i][0];
+	    h[STATE_PY] = R[i][1];
+	    h[STATE_PZ] = R[i][2];
+	    stateEstimatorScalarUpdate(&H, posvel->vel[i] - S[STATE_PX+i], posvel->stdDev_vel);
+	  }
+}
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 {
   // a measurement of distance to point (x, y, z)
@@ -1300,6 +1337,7 @@ void estimatorKalmanInit(void) {
   {
     distDataQueue = xQueueCreate(DIST_QUEUE_LENGTH, sizeof(distanceMeasurement_t));
     posDataQueue = xQueueCreate(POS_QUEUE_LENGTH, sizeof(positionMeasurement_t));
+    posvelDataQueue = xQueueCreate(POSVEL_QUEUE_LENGTH, sizeof(posvelMeasurement_t));
     tdoaDataQueue = xQueueCreate(UWB_QUEUE_LENGTH, sizeof(tdoaMeasurement_t));
     flowDataQueue = xQueueCreate(FLOW_QUEUE_LENGTH, sizeof(flowMeasurement_t));
     tofDataQueue = xQueueCreate(TOF_QUEUE_LENGTH, sizeof(tofMeasurement_t));
@@ -1308,6 +1346,7 @@ void estimatorKalmanInit(void) {
   {
     xQueueReset(distDataQueue);
     xQueueReset(posDataQueue);
+    xQueueReset(posvelDataQueue);
     xQueueReset(tdoaDataQueue);
     xQueueReset(flowDataQueue);
     xQueueReset(tofDataQueue);
@@ -1406,6 +1445,13 @@ bool estimatorKalmanEnqueuePosition(positionMeasurement_t *pos)
   ASSERT(isInit);
   return stateEstimatorEnqueueExternalMeasurement(posDataQueue, (void *)pos);
 }
+
+bool estimatorKalmanEnqueuePosVel(posvelMeasurement_t *posvel)
+{
+  ASSERT(isInit);
+  return stateEstimatorEnqueueExternalMeasurement(posvelDataQueue, (void *)posvel);
+}
+
 
 bool estimatorKalmanEnqueueDistance(distanceMeasurement_t *dist)
 {

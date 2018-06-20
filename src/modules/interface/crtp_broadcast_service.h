@@ -16,4 +16,6 @@ void bcCmdInit(void);
 
 // Get the current position from the cache
 bool getExtPositionBC(state_t *state);
+bool getExtPosVelBC(state_t *state);
+
 #endif /* _CRTP_BROADCAST_H_ */

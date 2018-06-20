@@ -67,6 +67,7 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
  */
 bool estimatorKalmanEnqueueTDOA(tdoaMeasurement_t *uwb);
 bool estimatorKalmanEnqueuePosition(positionMeasurement_t *pos);
+bool estimatorKalmanEnqueuePosVel(posvelMeasurement_t * posvel);
 bool estimatorKalmanEnqueueDistance(distanceMeasurement_t *dist);
 bool estimatorKalmanEnqueueTOF(tofMeasurement_t *tof);
 bool estimatorKalmanEnqueueFlow(flowMeasurement_t *flow);

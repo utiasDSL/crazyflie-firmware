@@ -22,7 +22,8 @@ typedef struct
 {
   struct CrtpExtPosition currVal[2];
   bool activeSide;
-  uint32_t timestamp; // FreeRTOS ticks
+  uint32_t timestamp[2]; // FreeRTOS ticks
+  bool new_data;	  // new position data
 } ExtPositionCache;
 
 typedef struct{
@@ -43,7 +44,7 @@ static uint8_t my_id;
 static uint8_t bc_id;
 static positionMeasurement_t broadcast_pos;
 static positionMeasurement_t broadcast_cmd;
-
+static posvelMeasurement_t posvel;
 static uint32_t numPacketsReceivedPos = 0, numPacketsReceivedCmd = 0;
 
 static Sampling posRxFreq, cmdRxFreq;
@@ -140,8 +141,9 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
 
 
       crtpExtPosCache.currVal[!crtpExtPosCache.activeSide] = data;
+      crtpExtPosCache.timestamp[!crtpExtPosCache.activeSide] = xTaskGetTickCount();
       crtpExtPosCache.activeSide = !crtpExtPosCache.activeSide;
-      crtpExtPosCache.timestamp = xTaskGetTickCount();
+      crtpExtPosCache.new_data = true;
 
       }
     }
@@ -150,20 +152,63 @@ static void bcPosSrvCrtpCB(CRTPPacket* pk)
 bool getExtPositionBC(state_t *state)
 {
   // Only use position information if it's valid and recent
-  if ((xTaskGetTickCount() - crtpExtPosCache.timestamp) < M2T(5)) {
+  if ((xTaskGetTickCount() - crtpExtPosCache.timestamp[crtpExtPosCache.activeSide]) < M2T(5)) {
     // Get the updated position from the mocap
     broadcast_pos.x = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].x;
     broadcast_pos.y = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y;
     broadcast_pos.z = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].z;
-    broadcast_pos.stdDev = 0.01;
+    broadcast_pos.stdDev = 0.0005;
+
+    posvelMeasurement_t posvel;
+    posvel.x = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].x;
+    posvel.y = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y;
+    posvel.z = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].z;
 
 #ifndef PLATFORM_CF1
-    estimatorKalmanEnqueuePosition(&broadcast_pos);
+//    estimatorKalmanEnqueuePosition(&broadcast_pos);
+    estimatorKalmanEnqueuePosVel(&posvel);
 #endif
 
     return true;
   }
   return false;
+}
+
+bool getExtPosVelBC(state_t *state){
+
+	if(crtpExtPosCache.new_data && crtpExtPosCache.timestamp[!crtpExtPosCache.activeSide] != 0){
+		// get position
+
+	    posvel.x = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].x;
+	    posvel.y = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y;
+	    posvel.z = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].z;
+
+	    posvel.stdDev_pos = 0.0005;
+
+		float dt = T2M(crtpExtPosCache.timestamp[crtpExtPosCache.activeSide] - crtpExtPosCache.timestamp[!crtpExtPosCache.activeSide])/1000.f;
+		if(dt < 7e-3f)
+			dt = 7e-3f;
+		else if(dt > 0.1f)
+			dt = 0.1f;
+
+		// dp/dt
+
+		posvel.vx =  (crtpExtPosCache.currVal[crtpExtPosCache.activeSide].x - crtpExtPosCache.currVal[!crtpExtPosCache.activeSide].x)/dt;
+		posvel.vy =  (crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y - crtpExtPosCache.currVal[!crtpExtPosCache.activeSide].y)/dt;
+		posvel.vz =  (crtpExtPosCache.currVal[crtpExtPosCache.activeSide].z - crtpExtPosCache.currVal[!crtpExtPosCache.activeSide].z)/dt;
+
+		posvel.stdDev_vel = 1.414e-2;
+
+		#ifndef PLATFORM_CF1
+		//    estimatorKalmanEnqueuePosition(&broadcast_pos);
+			estimatorKalmanEnqueuePosVel(&posvel);
+		#endif
+		crtpExtPosCache.new_data = false;
+
+		return true;
+	}
+
+	return false;
 }
 
 static void bcCmdSrvCrtpCB(CRTPPacket* pk)
@@ -206,13 +251,13 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
 }
 
 LOG_GROUP_START(vicon)
-LOG_ADD(LOG_FLOAT, X, &curr_pos.x)
-LOG_ADD(LOG_FLOAT, Y, &curr_pos.y)
-LOG_ADD(LOG_FLOAT, Z, &curr_pos.z)
+LOG_ADD(LOG_FLOAT, X, &posvel.x)
+LOG_ADD(LOG_FLOAT, Y, &posvel.y)
+LOG_ADD(LOG_FLOAT, Z, &posvel.z)
 
-LOG_ADD(LOG_FLOAT, Vx, &curr_vel.x)
-LOG_ADD(LOG_FLOAT, Vy, &curr_vel.y)
-LOG_ADD(LOG_FLOAT, Vz, &curr_vel.z)
+LOG_ADD(LOG_FLOAT, Vx, &posvel.vx)
+LOG_ADD(LOG_FLOAT, Vy, &posvel.vy)
+LOG_ADD(LOG_FLOAT, Vz, &posvel.vz)
 LOG_GROUP_STOP(vicon)
 
 LOG_GROUP_START(broadcast_pos)
