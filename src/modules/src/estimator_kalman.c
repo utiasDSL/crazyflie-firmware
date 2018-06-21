@@ -136,7 +136,7 @@ static inline bool stateEstimatorHasPositionMeasurement(positionMeasurement_t *p
 static xQueueHandle posvelDataQueue;
 #define POSVEL_QUEUE_LENGTH (10)
 
-static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel);
+static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel, sensorData_t *sensors);
 
 static inline bool stateEstimatorHasPosVelMeasurement(posvelMeasurement_t *posvel) {
   return (pdTRUE == xQueueReceive(posvelDataQueue, posvel, 0));
@@ -514,7 +514,7 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
 
   posvelMeasurement_t posvel;
   while(stateEstimatorHasPosVelMeasurement(&posvel)){
-	  stateEstimatorUpdateWithPosVel(&posvel);
+	  stateEstimatorUpdateWithPosVel(&posvel,sensors);
 	  doneUpdate = true;
   }
 
@@ -972,7 +972,7 @@ static void stateEstimatorUpdateWithPosition(positionMeasurement_t *xyz)
   }
 }
 
-static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel){
+static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel, sensorData_t *sensors){
 	// a direct measurement of states x, y, and z
 	  // do a scalar update for each state, since this should be faster than updating all together
 	  for (int i=0; i<3; i++) {
@@ -981,14 +981,19 @@ static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel){
 	    h[STATE_X+i] = 1;
 	    stateEstimatorScalarUpdate(&H, posvel->pos[i] - S[STATE_X+i], posvel->stdDev_pos);
 	  }
+	  // Measurement model of velocity as measured in world frame
+	  // v_w = R(P + omega^x x)
 
 	  for (int i=0; i<3; i++) {
 	    float h[STATE_DIM] = {0};
 	    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+
 	    h[STATE_PX] = R[i][0];
 	    h[STATE_PY] = R[i][1];
 	    h[STATE_PZ] = R[i][2];
-	    stateEstimatorScalarUpdate(&H, posvel->vel[i] - S[STATE_PX+i], posvel->stdDev_vel);
+	    float pred_vel_w = R[i][0] * S[STATE_PX] + R[i][1] * S[STATE_PY] + R[i][2] * S[STATE_PZ];
+
+	    stateEstimatorScalarUpdate(&H, posvel->vel[i] - pred_vel_w, posvel->stdDev_vel);
 	  }
 }
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
