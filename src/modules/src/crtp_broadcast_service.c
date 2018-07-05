@@ -197,7 +197,7 @@ bool getExtPosVelBC(state_t *state){
 		posvel.vy =  (crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y - crtpExtPosCache.currVal[!crtpExtPosCache.activeSide].y)/dt;
 		posvel.vz =  (crtpExtPosCache.currVal[crtpExtPosCache.activeSide].z - crtpExtPosCache.currVal[!crtpExtPosCache.activeSide].z)/dt;
 
-		posvel.stdDev_vel = 1.414e-2;
+		posvel.stdDev_vel = 4.414e-3;
 
 		#ifndef PLATFORM_CF1
 		//    estimatorKalmanEnqueuePosition(&broadcast_pos);
