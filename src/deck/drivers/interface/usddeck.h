@@ -16,7 +16,7 @@
 #define USDLOG_CONTROL_ATT      (0x200)
 #define USDLOG_VICON_POS        (0x400)
 #define USDLOG_VICON_VEL        (0x800)
-#define USDLOG_RANGE            (0x1000)
+#define USDLOG_RANGE            (0x2000)
 
 #define USDLOG_ACC_SIZE				3
 #define USDLOG_GYRO_SIZE			3
