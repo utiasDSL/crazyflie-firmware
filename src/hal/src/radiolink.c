@@ -43,7 +43,7 @@
 #include "ledseq.h"
 #include "queuemonitor.h"
 
-#define RADIOLINK_TX_QUEUE_SIZE (1)
+#define RADIOLINK_TX_QUEUE_SIZE (10)
 
 static xQueueHandle  txQueue;
 static xQueueHandle crtpPacketDelivery;

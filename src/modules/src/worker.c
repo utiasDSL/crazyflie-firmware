@@ -34,7 +34,7 @@
 
 #include "console.h"
 
-#define WORKER_QUEUE_LENGTH 5
+#define WORKER_QUEUE_LENGTH 20
 
 struct worker_work {
   void (*function)(void*);
