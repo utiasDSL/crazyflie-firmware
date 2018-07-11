@@ -8,7 +8,6 @@
 
 #define DEFAULT_ESTIMATOR complementaryEstimator
 static StateEstimatorType currentEstimator = anyEstimator;
-static bool isInit;
 
 static void initEstimator();
 
@@ -21,14 +20,14 @@ typedef struct {
 static EstimatorFcns estimatorFunctions[] = {
   {.init = 0, .test = 0, .update = 0}, // Any
   {.init = estimatorComplementaryInit, .test = estimatorComplementaryTest, .update = estimatorComplementary},
-#ifndef PLATFORM_CF1
   {.init = estimatorKalmanInit, .test = estimatorKalmanTest, .update = estimatorKalman},
-#endif
 };
 
 
 void stateEstimatorInit(StateEstimatorType estimator) {
-  ASSERT(!isInit);
+  if (estimator < 0 || estimator >= StateEstimatorTypeCount) {
+    return;
+  }
 
   currentEstimator = estimator;
 
@@ -43,7 +42,6 @@ void stateEstimatorInit(StateEstimatorType estimator) {
   }
 
   initEstimator();
-  isInit = true;
 
   DEBUG_PRINT("Using estimator %d\n", currentEstimator);
 }

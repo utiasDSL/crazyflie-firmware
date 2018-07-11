@@ -70,6 +70,7 @@ bool estimatorKalmanEnqueuePosition(positionMeasurement_t *pos);
 bool estimatorKalmanEnqueuePosVel(posvelMeasurement_t * posvel);
 bool estimatorKalmanEnqueueDistance(distanceMeasurement_t *dist);
 bool estimatorKalmanEnqueueTOF(tofMeasurement_t *tof);
+bool estimatorKalmanEnqueueAsoluteHeight(heightMeasurement_t *height);
 bool estimatorKalmanEnqueueFlow(flowMeasurement_t *flow);
 
 /*
@@ -77,5 +78,7 @@ bool estimatorKalmanEnqueueFlow(flowMeasurement_t *flow);
  */
 float estimatorKalmanGetElevation();
 void estimatorKalmanSetShift(float deltax, float deltay);
+
+void estimatorKalmanGetEstimatedPos(point_t* pos);
 
 #endif // __ESTIMATOR_KALMAN_H__

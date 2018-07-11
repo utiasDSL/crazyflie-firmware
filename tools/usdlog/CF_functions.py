@@ -9,9 +9,6 @@ import struct
 import numpy as np
 import os
 
-# lookup dictionary to determine size of data types
-fmtChars = {'c': 1, 'b': 1, 'b': 1, 'B': 1, '?': 1, 'h': 2, 'H': 2,
-            'i': 4, 'I': 4, 'l': 4, 'L': 4, 'q': 8, 'Q': 8, 'f': 4, 'd': 8} 
 
 def decode(filName):
     # read file as binary
@@ -25,27 +22,35 @@ def decode(filName):
     # process file header
     setWidth = struct.unpack('B', filCon[:1])
     setNames = []
+    idx = 1
     for ii in range(0, setWidth[0]):
-        setNames.append(filCon[ii*5+1:ii*5+6])
+        startIdx = idx
+        while True:
+            if filCon[idx] == ','.encode('ascii')[0]:
+                break
+            idx += 1
+        print(filCon[startIdx:idx], startIdx, idx)
+        setNames.append(filCon[startIdx:idx])
+        idx += 1
     print("[CRC] of file header:", end="")
-    crcVal = crc32(filCon[0:setWidth[0]*5+1+4]) & 0xffffffff
+    crcVal = crc32(filCon[0:idx+4]) & 0xffffffff
     crcErrors = 0
     if ( crcVal == 0xffffffff):
         print("\tOK\t["+hex(crcVal)+"]")
     else:
         print("\tERROR\t["+hex(crcVal)+"]")
         crcErrors += 1
-    offset = setWidth[0]*5+5
+    offset = idx + 4
     
     # process data sets
-    setCon = np.zeros(statinfo.st_size // 4)
+    setCon = np.zeros(statinfo.st_size) # upper bound...
     idx = 0
     fmtStr = ""
     setBytes = 0
     print(setNames)
     for setName in setNames:
-        fmtStr += chr(setName[0])
-        setBytes += fmtChars[chr(setName[0])]
+        fmtStr += chr(setName[-2])
+    setBytes = struct.calcsize(fmtStr)
     while(offset < len(filCon)):
         setNumber = struct.unpack('B', filCon[offset:offset+1])
         offset += 1
@@ -72,7 +77,7 @@ def decode(filName):
     # create output dictionary
     output = {}
     for ii in range(setWidth[0]):
-        output[setNames[ii][1:].decode("utf-8").strip()] = setCon[ii]
+        output[setNames[ii][0:-3].decode("utf-8").strip()] = setCon[ii]
     return output
 
 def createConfig():

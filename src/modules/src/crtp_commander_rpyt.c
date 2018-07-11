@@ -88,25 +88,6 @@ static void rotateYaw(setpoint_t *setpoint, float yawRad)
 /**
  * Update Yaw according to current setting
  */
-#ifdef PLATFORM_CF1
-static void yawModeUpdate(setpoint_t *setpoint)
-{
-  switch (yawMode)
-  {
-    case CAREFREE:
-      // FIXME: Add frame of reference to setpoint
-      ASSERT(false);
-      break;
-    case PLUSMODE:
-      // Default in plus mode. Do nothing
-      break;
-    case XMODE: // Fall through
-    default:
-      rotateYaw(setpoint, -45 * M_PI / 180);
-      break;
-  }
-}
-#else
 static void yawModeUpdate(setpoint_t *setpoint)
 {
   switch (yawMode)
@@ -124,7 +105,6 @@ static void yawModeUpdate(setpoint_t *setpoint)
       break;
   }
 }
-#endif
 
 void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool broadcast, struct CommanderCrtpLegacyValues *values )
 {

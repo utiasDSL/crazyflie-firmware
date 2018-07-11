@@ -50,11 +50,11 @@ static struct {
 } rangingStats[LOCODECK_NR_OF_ANCHORS];
 
 // Rangin statistics
-static uint32_t rangingPerSec[LOCODECK_NR_OF_ANCHORS];
-static float rangingSuccessRate[LOCODECK_NR_OF_ANCHORS];
+static uint8_t rangingPerSec[LOCODECK_NR_OF_ANCHORS];
+static uint8_t rangingSuccessRate[LOCODECK_NR_OF_ANCHORS];
 // Used to calculate above values
-static uint32_t succededRanging[LOCODECK_NR_OF_ANCHORS];
-static uint32_t failedRanging[LOCODECK_NR_OF_ANCHORS];
+static uint8_t succededRanging[LOCODECK_NR_OF_ANCHORS];
+static uint8_t failedRanging[LOCODECK_NR_OF_ANCHORS];
 
 // Timestamps for ranging
 static dwTime_t poll_tx;
@@ -79,6 +79,9 @@ static lpsAlgoOptions_t* options;
 static bool tdmaSynchronized;
 static dwTime_t frameStart;
 
+static bool rangingOk;
+
+static distanceMeasurement_t dist_log;
 static void txcallback(dwDevice_t *dev)
 {
   dwTime_t departure;
@@ -191,6 +194,8 @@ static uint32_t rxcallback(dwDevice_t *dev) {
 
       rangingStats[current_anchor].history[rangingStats[current_anchor].ptr] = options->distance[current_anchor];
 
+      rangingOk = true;
+
       if ((options->combinedAnchorPositionOk || options->anchorPosition[current_anchor].timestamp) &&
           (diff < (OUTLIER_TH*stddev))) {
         distanceMeasurement_t dist;
@@ -199,7 +204,8 @@ static uint32_t rxcallback(dwDevice_t *dev) {
         dist.y = options->anchorPosition[current_anchor].y;
         dist.z = options->anchorPosition[current_anchor].z;
         dist.stdDev = 0.25;
-        estimatorKalmanEnqueueDistance(&dist);
+//        estimatorKalmanEnqueueDistance(&dist);
+        memcpy(&dist_log, &dist, sizeof(dist));
       }
 
       if (options->useTdma && current_anchor == 0) {
@@ -239,7 +245,7 @@ static dwTime_t transmitTimeForSlot(int slot)
   return transmitTime;
 }
 
-void initiateRanging(dwDevice_t *dev)
+static void initiateRanging(dwDevice_t *dev)
 {
   if (!options->useTdma || tdmaSynchronized) {
     if (options->useTdma) {
@@ -276,7 +282,7 @@ void initiateRanging(dwDevice_t *dev)
   dwStartTransmit(dev);
 }
 
-void sendLppShort(dwDevice_t *dev, lpsLppShortPacket_t *packet)
+static void sendLppShort(dwDevice_t *dev, lpsLppShortPacket_t *packet)
 {
   dwIdle(dev);
 
@@ -398,14 +404,40 @@ static void twrTagInit(dwDevice_t *dev, lpsAlgoOptions_t* algoOptions)
   memset(options->distance, 0, sizeof(options->distance));
   memset(options->pressures, 0, sizeof(options->pressures));
   memset(options->failedRanging, 0, sizeof(options->failedRanging));
+
+  dwSetReceiveWaitTimeout(dev, TWR_RECEIVE_TIMEOUT);
+
+  dwCommitConfiguration(dev);
+
+  rangingOk = false;
+}
+
+static bool isRangingOk()
+{
+  return rangingOk;
 }
 
 uwbAlgorithm_t uwbTwrTagAlgorithm = {
   .init = twrTagInit,
   .onEvent = twrTagOnEvent,
+  .isRangingOk = isRangingOk,
 };
 
 LOG_GROUP_START(twr)
-LOG_ADD(LOG_FLOAT, rangingSuccessRate0, &rangingSuccessRate[0])
-LOG_ADD(LOG_UINT32, rangingPerSec0, &rangingPerSec[0])
+LOG_ADD(LOG_UINT8, rangingSuccessRate0, &rangingSuccessRate[0])
+LOG_ADD(LOG_UINT8, rangingPerSec0, &rangingPerSec[0])
+LOG_ADD(LOG_UINT8, rangingSuccessRate1, &rangingSuccessRate[1])
+LOG_ADD(LOG_UINT8, rangingPerSec1, &rangingPerSec[1])
+LOG_ADD(LOG_UINT8, rangingSuccessRate2, &rangingSuccessRate[2])
+LOG_ADD(LOG_UINT8, rangingPerSec2, &rangingPerSec[2])
+LOG_ADD(LOG_UINT8, rangingSuccessRate3, &rangingSuccessRate[3])
+LOG_ADD(LOG_UINT8, rangingPerSec3, &rangingPerSec[3])
+LOG_ADD(LOG_UINT8, rangingSuccessRate4, &rangingSuccessRate[4])
+LOG_ADD(LOG_UINT8, rangingPerSec4, &rangingPerSec[4])
+LOG_ADD(LOG_UINT8, rangingSuccessRate5, &rangingSuccessRate[5])
+LOG_ADD(LOG_UINT8, rangingPerSec5, &rangingPerSec[5])
+LOG_ADD(LOG_FLOAT, dist, &dist_log.distance)
+LOG_ADD(LOG_FLOAT, aX, &dist_log.x)
+LOG_ADD(LOG_FLOAT, aY, &dist_log.y)
+LOG_ADD(LOG_FLOAT, aZ, &dist_log.z)
 LOG_GROUP_STOP(twr)

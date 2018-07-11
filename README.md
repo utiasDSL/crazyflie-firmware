@@ -1,6 +1,12 @@
-# Crazyflie 1.0/2.0 Firmware  [![Build Status](https://api.travis-ci.org/bitcraze/crazyflie-firmware.svg)](https://travis-ci.org/bitcraze/crazyflie-firmware)
+# Crazyflie 2.0 Firmware  [![Build Status](https://api.travis-ci.org/bitcraze/crazyflie-firmware.svg)](https://travis-ci.org/bitcraze/crazyflie-firmware)
 
-This project contains the source code for the Crazyflie 1.0/2.0 firmware. 
+This project contains the source code for the Crazyflie 2.0 firmware.
+
+### Crazyflie 1.0 support
+
+The 2017.06 release was the last release with Crazyflie 1.0 support. If you want
+to play with the Crazyflie 1.0 and modify the code, please clone this repo and
+branch off from the 2017.06 tag. 
 
 ## Dependencies
 
@@ -69,9 +75,11 @@ This repository uses git submodules. Clone with the --recursive flag
 git clone --recursive https://github.com/bitcraze/crazyflie-firmware.git
 ```
 
-If you already have cloned the repo, use
+If you already have cloned the repo without the --recursive option, you need to 
+get the submodules manually
 
 ```bash
+cd crazyflie-firmware
 git submodule init
 git submodule update
 ```
@@ -79,22 +87,9 @@ git submodule update
 
 ## Compiling
 
-### Crazyflie 1.0
-
-Build with:
-```bash
-make PLATFORM=CF1
-```
-
-or with the toolbelt
-
-```bash
-tb make PLATFORM=CF1
-```
-
 ### Crazyflie 2.0
 
-This is the dafault build so just running "make" is enough or:
+This is the default build so just running "make" is enough or:
 ```bash
 make PLATFORM=CF2
 ```
@@ -106,10 +101,10 @@ tb make
 ```
 
 ### config.mk
-To create custom build options create a file called config.mk in the root folder 
-(same as Makefile) and fill it with options. E.g. 
+To create custom build options create a file called config.mk in the tools/make/
+folder and fill it with options. E.g. 
 ```
-PLATFORM=CF1
+PLATFORM=CF2
 DEBUG=1
 CLOAD=0
 ```
@@ -173,7 +168,7 @@ with the docker builder image and the toolbelt
         
 ## Running one unit test
        
-When working with one specific file it is often convinient to run only one unit test
+When working with one specific file it is often convenient to run only one unit test
        
        make unit FILES=test/utils/src/TestNum.c
 
@@ -187,7 +182,7 @@ Defines are managed by make and are passed on to the unit test code. Use the
 normal ways of configuring make when running tests. For instance to run test
 for Crazyflie 1
 
-      make unit PLATFORM=CF1
+      make unit LPS_TDOA_ENABLE=1
 
 ## Dependencies
 

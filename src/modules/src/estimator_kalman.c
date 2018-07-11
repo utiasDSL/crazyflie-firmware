@@ -55,10 +55,6 @@
  *
  */
 
-#ifdef PLATFORM_CF1
-#error ESTIMATOR = kalman is only compatible with the Crazyflie 2.0 // since it requires an FPU
-#endif
-
 #include "estimator_kalman.h"
 
 #include "stm32f4xx.h"
@@ -174,6 +170,16 @@ static inline bool stateEstimatorHasTOFPacket(tofMeasurement_t *tof) {
   return (pdTRUE == xQueueReceive(tofDataQueue, tof, 0));
 }
 
+// Absolute height measurement along the room Z
+static xQueueHandle heightDataQueue;
+#define HEIGHT_QUEUE_LENGTH (10)
+
+static void stateEstimatorUpdateWithAbsoluteHeight(heightMeasurement_t *height);
+
+static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
+  return (pdTRUE == xQueueReceive(heightDataQueue, height, 0));
+}
+
 /**
  * Constants used in the estimator
  */
@@ -209,14 +215,18 @@ static inline bool stateEstimatorHasTOFPacket(tofMeasurement_t *tof) {
 #define IN_FLIGHT_TIME_THRESHOLD (500)
 
 // the reversion of pitch and roll to zero
+#ifdef LPS_2D_POSITION_HEIGHT
+#define ROLLPITCH_ZERO_REVERSION (0.0f)
+#else
 #define ROLLPITCH_ZERO_REVERSION (0.001f)
+#endif
 
 // The bounds on the covariance, these shouldn't be hit, but sometimes are... why?
 #define MAX_COVARIANCE (100)
 #define MIN_COVARIANCE (1e-6f)
 
 // The bounds on states, these shouldn't be hit...
-#define MAX_POSITION (10) //meters
+#define MAX_POSITION (100) //meters
 #define MAX_VELOCITY (10) //meters per second
 
 // Initial variances, uncertain of position, but know we're stationary and roughly flat
@@ -235,6 +245,9 @@ static float procNoiseAtt = 0;
 static float measNoiseGyro_rollpitch = 0.1f; // radians per second
 static float measNoiseGyro_yaw = 0.1f; // radians per second
 
+static float initialX = 0.5;
+static float initialY = 0.5;
+static float initialZ = 0.0;
 
 //static float dragXY = 0.19f;
 //static float dragZ = 0.05f;
@@ -488,6 +501,13 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
   while (stateEstimatorHasTOFPacket(&tof))
   {
     stateEstimatorUpdateWithTof(&tof);
+    doneUpdate = true;
+  }
+
+  heightMeasurement_t height;
+  while (stateEstimatorHasHeightPacket(&height))
+  {
+    stateEstimatorUpdateWithAbsoluteHeight(&height);
     doneUpdate = true;
   }
 
@@ -960,6 +980,13 @@ static void stateEstimatorUpdateWithBaro(baro_t *baro)
 }
 #endif
 
+static void stateEstimatorUpdateWithAbsoluteHeight(heightMeasurement_t* height) {
+  float h[STATE_DIM] = {0};
+  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+  h[STATE_Z] = 1;
+  stateEstimatorScalarUpdate(&H, height->height - S[STATE_Z], height->stdDev);
+}
+
 static void stateEstimatorUpdateWithPosition(positionMeasurement_t *xyz)
 {
   // a direct measurement of states x, y, and z
@@ -1346,6 +1373,7 @@ void estimatorKalmanInit(void) {
     tdoaDataQueue = xQueueCreate(UWB_QUEUE_LENGTH, sizeof(tdoaMeasurement_t));
     flowDataQueue = xQueueCreate(FLOW_QUEUE_LENGTH, sizeof(flowMeasurement_t));
     tofDataQueue = xQueueCreate(TOF_QUEUE_LENGTH, sizeof(tofMeasurement_t));
+    heightDataQueue = xQueueCreate(HEIGHT_QUEUE_LENGTH, sizeof(heightMeasurement_t));
   }
   else
   {
@@ -1378,9 +1406,9 @@ void estimatorKalmanInit(void) {
   memset(P, 0, sizeof(S));
 
   // TODO: Can we initialize this more intelligently?
-  S[STATE_X] = 0.5;
-  S[STATE_Y] = 0.5;
-  S[STATE_Z] = 0;
+  S[STATE_X] = initialX;
+  S[STATE_Y] = initialY;
+  S[STATE_Z] = initialZ;
   S[STATE_PX] = 0;
   S[STATE_PY] = 0;
   S[STATE_PZ] = 0;
@@ -1478,6 +1506,13 @@ bool estimatorKalmanEnqueueTOF(tofMeasurement_t *tof)
   return stateEstimatorEnqueueExternalMeasurement(tofDataQueue, (void *)tof);
 }
 
+bool estimatorKalmanEnqueueAsoluteHeight(heightMeasurement_t *height)
+{
+  // A distance (height) [m] to the ground along the z axis.
+  ASSERT(isInit);
+  return stateEstimatorEnqueueExternalMeasurement(heightDataQueue, (void *)height);
+}
+
 bool estimatorKalmanTest(void)
 {
   // TODO: Figure out what we could test?
@@ -1495,6 +1530,12 @@ void estimatorKalmanSetShift(float deltax, float deltay)
   // Return elevation, used in the optical flow
   S[STATE_X] -= deltax;
   S[STATE_Y] -= deltay;
+}
+
+void estimatorKalmanGetEstimatedPos(point_t* pos) {
+  pos->x = S[STATE_X];
+  pos->y = S[STATE_Y];
+  pos->z = S[STATE_Z];
 }
 
 // Temporary development groups

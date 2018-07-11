@@ -84,9 +84,9 @@ typedef struct tdoaMeasurement_s {
 } tdoaMeasurement_t;
 
 typedef struct baro_s {
-  float pressure;
-  float temperature;
-  float asl;
+  float pressure;           // mbar
+  float temperature;        // degree Celcius
+  float asl;                // m (ASL = altitude above sea level)
 } baro_t;
 
 typedef struct positionMeasurement_s {
@@ -137,24 +137,28 @@ typedef struct distanceMeasurement_s {
 
 typedef struct zDistance_s {
   uint32_t timestamp;
-  float distance;
+  float distance;           // m
 } zDistance_t;
 
 typedef struct sensorData_s {
-  Axis3f acc;
-  Axis3f gyro;
-  Axis3f mag;
+  Axis3f acc;               // Gs
+  Axis3f gyro;              // deg/s
+  Axis3f mag;               // gauss
   baro_t baro;
   zDistance_t zrange;
-  point_t position; 
+  point_t position;         // m
+#ifdef LOG_SEC_IMU
+  Axis3f accSec;            // Gs
+  Axis3f gyroSec;           // deg/s
+#endif
 } sensorData_t;
 
 typedef struct state_s {
-  attitude_t attitude;
+  attitude_t attitude;      // deg (legacy CF2 body coordinate system, where pitch is inverted)
   quaternion_t attitudeQuaternion;
-  point_t position;
-  velocity_t velocity;
-  acc_t acc;
+  point_t position;         // m
+  velocity_t velocity;      // m/s
+  acc_t acc;                // Gs (but acc.z without considering gravity)
 } state_t;
 
 typedef struct control_s {
@@ -245,6 +249,13 @@ typedef struct tofMeasurement_s {
   float distance;
   float stdDev;
 } tofMeasurement_t;
+
+/** Absolute height measurement */
+typedef struct heightMeasurement_s {
+  uint32_t timestamp;
+  float height;
+  float stdDev;
+} heightMeasurement_t;
 
 // Frequencies to bo used with the RATE_DO_EXECUTE_HZ macro. Do NOT use an arbitrary number.
 #define RATE_1000_HZ 1000

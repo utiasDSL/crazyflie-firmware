@@ -49,6 +49,7 @@
 #include "cfassert.h"
 
 #if 0
+#include "debug.h"
 #define LOG_DEBUG(fmt, ...) DEBUG_PRINT("D/log " fmt, ## __VA_ARGS__)
 #define LOG_ERROR(fmt, ...) DEBUG_PRINT("E/log " fmt, ## __VA_ARGS__)
 #else
@@ -72,13 +73,8 @@ static const uint8_t typeLength[] = {
 #define LOG_MAX_LEN 26
 
 /* Log packet parameters storage */
-#ifdef PLATFORM_CF1
-#define LOG_MAX_OPS 64
-#define LOG_MAX_BLOCKS 8
-#else
 #define LOG_MAX_OPS 128
 #define LOG_MAX_BLOCKS 16
-#endif
 struct log_ops {
   struct log_ops * next;
   uint8_t storageType : 4;
@@ -151,6 +147,8 @@ static void logReset();
 void logInit(void)
 {
   int i;
+  const char* group = NULL;
+  int groupLength = 0;
 
   if(isInit)
     return;
@@ -166,8 +164,19 @@ void logInit(void)
     int len = 5;
     memcpy(&p.data[0], &logsCrc, 4);
     p.data[4] = logs[i].type;
+    if (logs[i].type & LOG_GROUP) {
+      if (logs[i].type & LOG_START) {
+        group = logs[i].name;
+        groupLength = strlen(group);
+      }
+    } else {
+      // CMD_GET_ITEM result's size is: 3 + strlen(logs[i].name) + groupLength + 2
+      if (strlen(logs[i].name) + groupLength + 2 > 27) {
+        LOG_ERROR("'%s.%s' too long\n", group, logs[i].name);
+        ASSERT_FAILED();
+      }
+    }
     if (logs[i].name) {
-      ASSERT(strlen(logs[i].name) < (30-4-1));  // Param group or name too big!
       memcpy(&p.data[5], logs[i].name, strlen(logs[i].name));
       len += strlen(logs[i].name);
     }
@@ -265,9 +274,10 @@ void logTOCProcess(int command)
       p.data[0]=CMD_GET_ITEM;
       p.data[1]=n;
       p.data[2]=logs[ptr].type;
+      p.size=3+2+strlen(group)+strlen(logs[ptr].name);
+      ASSERT(p.size <= CRTP_MAX_DATA_SIZE); // Too long! The name of the group or the parameter may be too long.
       memcpy(p.data+3, group, strlen(group)+1);
       memcpy(p.data+3+strlen(group)+1, logs[ptr].name, strlen(logs[ptr].name)+1);
-      p.size=3+2+strlen(group)+strlen(logs[ptr].name);
       crtpSendPacket(&p);
     } else {
       LOG_DEBUG("    Index out of range!");
@@ -531,44 +541,74 @@ void logRunBlock(void * arg)
 
   while (ops)
   {
-    float variable;
     int valuei = 0;
     float valuef = 0;
 
-    // FPU instructions must run on aligned data. Make sure it is.
-    variable = *(float *)ops->variable;
-
+    // FPU instructions must run on aligned data.
+    // We first copy the data to an (aligned) local variable, before assigning it
     switch(ops->storageType)
     {
       case LOG_UINT8:
-        valuei = *(uint8_t *)&variable;
+      {
+        uint8_t v;
+        memcpy(&v, ops->variable, sizeof(v));
+        valuei = v;
         break;
+      }
       case LOG_INT8:
-        valuei = *(int8_t *)&variable;
+      {
+        int8_t v;
+        memcpy(&v, ops->variable, sizeof(v));
+        valuei = v;
         break;
+      }
       case LOG_UINT16:
-        valuei = *(uint16_t *)&variable;
+      {
+        uint16_t v;
+        memcpy(&v, ops->variable, sizeof(v));
+        valuei = v;
         break;
+      }
       case LOG_INT16:
-        valuei = *(int16_t *)&variable;
+      {
+        int16_t v;
+        memcpy(&v, ops->variable, sizeof(v));
+        valuei = v;
         break;
+      }
       case LOG_UINT32:
-        valuei = *(uint32_t *)&variable;
+      {
+        uint32_t v;
+        memcpy(&v, ops->variable, sizeof(v));
+        valuei = v;
         break;
+      }
       case LOG_INT32:
-        valuei = *(int32_t *)&variable;
+      {
+        int32_t v;
+        memcpy(&v, ops->variable, sizeof(v));
+        valuei = v;
         break;
+      }
       case LOG_FLOAT:
-        valuei = *(float *)&variable;
+      {
+        float v;
+        memcpy(&v, ops->variable, sizeof(v));
+        valuei = v;
         break;
+      }
     }
 
     if (ops->logType == LOG_FLOAT || ops->logType == LOG_FP16)
     {
       if (ops->storageType == LOG_FLOAT)
-        valuef = *(float *)&variable;
+      {
+        memcpy(&valuef, ops->variable, sizeof(valuef));
+      }
       else
+      {
         valuef = valuei;
+      }
 
       // Try to append the next item to the packet.  If we run out of space,
       // drop this and subsequent items.
@@ -711,6 +751,42 @@ int logGetVarId(char* group, char* name)
   }
 
   return -1;
+}
+
+int logGetType(int varid)
+{
+  return logs[varid].type;
+}
+
+void logGetGroupAndName(int varid, char** group, char** name)
+{
+  char * currgroup = "";
+  *group = 0;
+  *name = 0;
+
+  for(int i=0; i<logsLen; i++) {
+    if (logs[i].type & LOG_GROUP) {
+      if (logs[i].type & LOG_START) {
+        currgroup = logs[i].name;
+      }
+    }
+
+    if (i == varid) {
+      *group = currgroup;
+      *name = logs[i].name;
+      break;
+    }
+  }
+}
+
+void* logGetAddress(int varid)
+{
+  return logs[varid].address;
+}
+
+uint8_t logVarSize(int type)
+{
+  return typeLength[type];
 }
 
 int logGetInt(int varid)

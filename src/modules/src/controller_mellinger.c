@@ -100,7 +100,7 @@ static struct vec z_axis_desired;
 static acc_t acc_desired;
 
 
-void stateControllerReset(void)
+void controllerMellingerReset(void)
 {
   i_error_x = 0;
   i_error_y = 0;
@@ -110,12 +110,12 @@ void stateControllerReset(void)
   i_error_m_z = 0;
 }
 
-void stateControllerInit(void)
+void controllerMellingerInit(void)
 {
-	stateControllerReset();
+	controllerMellingerReset();
 }
 
-bool stateControllerTest(void)
+bool controllerMellingerTest(void)
 {
   return true;
 }
@@ -128,7 +128,7 @@ float clamp(float value, float min, float max) {
   return value;
 }
 
-void stateController(control_t *control, setpoint_t *setpoint,
+void controllerMellinger(control_t *control, setpoint_t *setpoint,
                                          const sensorData_t *sensors,
                                          const state_t *state,
                                          const uint32_t tick)
@@ -311,7 +311,7 @@ void stateController(control_t *control, setpoint_t *setpoint,
     control->roll = 0;
     control->pitch = 0;
     control->yaw = 0;
-    stateControllerReset();
+    controllerMellingerReset();
   }
 
   // log

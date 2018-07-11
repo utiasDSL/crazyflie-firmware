@@ -55,16 +55,9 @@ void commInit(void)
 {
   if (isInit)
     return;
-#ifdef PLATFORM_CF1
-  #ifdef USE_ESKYLINK
-    eskylinkInit();
-  #else
-    nrf24linkInit();
-  #endif
-#else
+
   uartslkInit();
   radiolinkInit();
-#endif
 
   /* These functions are moved to be initialized early so
    * that DEBUG_PRINT can be used early */
@@ -80,9 +73,7 @@ void commInit(void)
 #endif
 
   crtpserviceInit();
-#ifdef PLATFORM_CF2
   platformserviceInit();
-#endif
   logInit();
   paramInit();
 #ifndef BROADCAST_ENABLE
@@ -104,22 +95,11 @@ void commInit(void)
 bool commTest(void)
 {
   bool pass=isInit;
-
-#ifdef PLATFORM_CF1
-  #ifdef USE_ESKYLINK
-    pass &= eskylinkTest();
-  #else
-    pass &= nrf24linkTest();
-  #endif
-#else
+  
   pass &= radiolinkTest();
-#endif
-
   pass &= crtpTest();
   pass &= crtpserviceTest();
-#ifdef PLATFORM_CF2
   pass &= platformserviceTest();
-#endif
   pass &= consoleTest();
   pass &= paramTest();
 
