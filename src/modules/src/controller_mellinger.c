@@ -47,11 +47,11 @@ We added the following:
 
 #define GRAVITY_MAGNITUDE (9.81f)
 
-static float g_vehicleMass = 0.030; // TODO: should be CF global for other modules
+static float g_vehicleMass = 0.032; // TODO: should be CF global for other modules
 static float massThrust = 132000;
-static float c_2 = -73820.0;
-static float c_1 = 147723.96;
-static float c = 1369.68;
+static float c_2 = -1.1264;
+static float c_1 = 2.2541;
+static float c = 0.0209;
 
 // XY Position PID
 static float kp_xy = 0.4;       // P
@@ -61,9 +61,9 @@ static float i_range_xy = 2.0;
 
 // Z Position
 static float kp_z = 1.25;       // P
-static float kd_z = 0.5;      // D
+static float kd_z = 0.4;      // D
 static float ki_z = 0.05;       // I
-static float i_range_z  = 0.15;
+static float i_range_z  = 0.5;
 
 // Attitude
 static float kR_xy = 70000; // P
@@ -112,6 +112,7 @@ void stateControllerReset(void)
 
 void stateControllerInit(void)
 {
+
 	stateControllerReset();
 }
 
@@ -332,7 +333,7 @@ void stateController(control_t *control, setpoint_t *setpoint,
     control->thrust = setpoint->thrust;
   } else {
 //    control->thrust = massThrust * current_thrust;
-	  control->thrust = c_2 * current_thrust * current_thrust + c_1 * current_thrust + c;
+	  control->thrust = 65535 *(c_2 * current_thrust * current_thrust + c_1 * current_thrust + c);
 
   }
 
@@ -377,6 +378,9 @@ PARAM_ADD(PARAM_FLOAT, ki_m_z, &ki_m_z)
 PARAM_ADD(PARAM_FLOAT, kd_omega_rp, &kd_omega_rp)
 PARAM_ADD(PARAM_FLOAT, i_range_m_xy, &i_range_m_xy)
 PARAM_ADD(PARAM_FLOAT, i_range_m_z, &i_range_m_z)
+PARAM_ADD(PARAM_FLOAT, c2, &c_2)
+PARAM_ADD(PARAM_FLOAT, c1, &c_1)
+PARAM_ADD(PARAM_FLOAT, c, &c)
 PARAM_GROUP_STOP(ctrlMel)
 
 LOG_GROUP_START(ctrlMel)
