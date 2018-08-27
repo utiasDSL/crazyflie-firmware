@@ -71,7 +71,7 @@ void radiolinkInit(void)
 
   txQueue = xQueueCreate(RADIOLINK_TX_QUEUE_SIZE, sizeof(SyslinkPacket));
   DEBUG_QUEUE_MONITOR_REGISTER(txQueue);
-  crtpPacketDelivery = xQueueCreate(1, sizeof(CRTPPacket));
+  crtpPacketDelivery = xQueueCreate(5, sizeof(CRTPPacket));
   DEBUG_QUEUE_MONITOR_REGISTER(crtpPacketDelivery);
 
 
