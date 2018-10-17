@@ -35,6 +35,7 @@
 #include "task.h"
 
 #include "log.h"
+#include "param.h"
 #include "crtp_localization_service.h"
 
 #include "stabilizer_types.h"
@@ -43,13 +44,16 @@
 
 // Outlier rejection
 #define RANGING_HISTORY_LENGTH 32
-#define OUTLIER_TH 4
+#define OUTLIER_TH 4 // decrease to reject more outliers
 static struct {
   float32_t history[RANGING_HISTORY_LENGTH];
   size_t ptr;
 } rangingStats[LOCODECK_NR_OF_ANCHORS];
 
-// Rangin statistics
+// Extra variable
+static bool validAnchors[LOCODECK_NR_OF_ANCHORS];
+
+// Ranging statistics
 static uint8_t rangingPerSec[LOCODECK_NR_OF_ANCHORS];
 static uint8_t rangingSuccessRate[LOCODECK_NR_OF_ANCHORS];
 // Used to calculate above values
@@ -82,6 +86,16 @@ static dwTime_t frameStart;
 static bool rangingOk;
 
 static distanceMeasurement_t dist_log;
+
+//static bool isvalueinarray(int val, uint8_t *arr, int size){
+//    int i;
+//    for (i=0; i < size; i++) {
+//        if (arr[i] == val)
+//            return true;
+//    }
+//    return false;
+//}
+
 static void txcallback(dwDevice_t *dev)
 {
   dwTime_t departure;
@@ -204,7 +218,9 @@ static uint32_t rxcallback(dwDevice_t *dev) {
         dist.y = options->anchorPosition[current_anchor].y;
         dist.z = options->anchorPosition[current_anchor].z;
         dist.stdDev = 0.25;
-//        estimatorKalmanEnqueueDistance(&dist);
+        dist.anchor_ID = current_anchor;
+        if (validAnchors[current_anchor])
+        	estimatorKalmanEnqueueDistance(&dist);
         memcpy(&dist_log, &dist, sizeof(dist));
       }
 
@@ -441,3 +457,30 @@ LOG_ADD(LOG_FLOAT, aX, &dist_log.x)
 LOG_ADD(LOG_FLOAT, aY, &dist_log.y)
 LOG_ADD(LOG_FLOAT, aZ, &dist_log.z)
 LOG_GROUP_STOP(twr)
+
+PARAM_GROUP_START(twr)
+	#if (LOCODECK_NR_OF_ANCHORS > 0)
+	PARAM_ADD(PARAM_UINT8, useAnchor0, &validAnchors[0])
+	#endif
+	#if (LOCODECK_NR_OF_ANCHORS > 1)
+	PARAM_ADD(PARAM_UINT8, useAnchor1, &validAnchors[1])
+	#endif
+	#if (LOCODECK_NR_OF_ANCHORS > 2)
+	PARAM_ADD(PARAM_UINT8, useAnchor2, &validAnchors[2])
+	#endif
+	#if (LOCODECK_NR_OF_ANCHORS > 3)
+	PARAM_ADD(PARAM_UINT8, useAnchor3, &validAnchors[3])
+	#endif
+	#if (LOCODECK_NR_OF_ANCHORS > 4)
+	PARAM_ADD(PARAM_UINT8, useAnchor4, &validAnchors[4])
+	#endif
+	#if (LOCODECK_NR_OF_ANCHORS > 5)
+	PARAM_ADD(PARAM_UINT8, useAnchor5, &validAnchors[5])
+	#endif
+	#if (LOCODECK_NR_OF_ANCHORS > 6)
+	PARAM_ADD(PARAM_UINT8, useAnchor6, &validAnchors[6])
+	#endif
+	#if (LOCODECK_NR_OF_ANCHORS > 7)
+	PARAM_ADD(PARAM_UINT8, useAnchor7, &validAnchors[7])
+	#endif
+PARAM_GROUP_STOP(twr)

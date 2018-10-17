@@ -245,8 +245,8 @@ static float procNoiseAtt = 0;
 static float measNoiseGyro_rollpitch = 0.1f; // radians per second
 static float measNoiseGyro_yaw = 0.1f; // radians per second
 
-static float initialX = 0.5;
-static float initialY = 0.5;
+static float initialX = 0.0;
+static float initialY = 0.0;
 static float initialZ = 0.0;
 
 //static float dragXY = 0.19f;
@@ -314,6 +314,8 @@ static float varSkew;
 static uint32_t lastFlightCmd;
 static uint32_t takeoffTime;
 static uint32_t tdoaCount;
+static float twrDist;
+static int anchorID;
 
 /**
  * Supporting and utility functions
@@ -787,14 +789,14 @@ static void stateEstimatorPredict(float cmdThrust, Axis3f *acc, Axis3f *gyro, fl
     S[STATE_PY] += dt * (acc->y - gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]);
     S[STATE_PZ] += dt * (acc->z + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]);
   }
-
+/* Remove kalman lock of Z position < 0
   if(S[STATE_Z] < 0) {
     S[STATE_Z] = 0;
     S[STATE_PX] = 0;
     S[STATE_PY] = 0;
     S[STATE_PZ] = 0;
   }
-
+*/
   // attitude update (rotate by gyroscope), we do this in quaternions
   // this is the gyroscope angular velocity integrated over the sample period
   float dtwx = dt*gyro->x;
@@ -1040,6 +1042,10 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
   h[STATE_X] = dx/predictedDistance;
   h[STATE_Y] = dy/predictedDistance;
   h[STATE_Z] = dz/predictedDistance;
+
+  // Extra logging variables
+  twrDist = d->distance;
+  anchorID = d->anchor_ID;
 
   stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
 }
@@ -1546,6 +1552,11 @@ LOG_GROUP_START(kalman_pred)
   LOG_ADD(LOG_FLOAT, measNX, &measuredNX)
   LOG_ADD(LOG_FLOAT, measNY, &measuredNY)
 LOG_GROUP_STOP(kalman_pred)
+
+LOG_GROUP_START(twr_ekf)
+  LOG_ADD(LOG_FLOAT, distance, &twrDist)
+  LOG_ADD(LOG_UINT8, anchorID, &anchorID)
+LOG_GROUP_STOP(twr_ekf)
 
 // Stock log groups
 LOG_GROUP_START(kalman)
