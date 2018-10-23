@@ -40,7 +40,8 @@
 
 typedef struct usdLogDataPtr_s {
   uint32_t* tick;
-  uint8_t* data;
+  float* floats;
+  int* ints;
 } usdLogQueuePtr_t;
 
 typedef struct usdLogConfig_s {
@@ -48,9 +49,8 @@ typedef struct usdLogConfig_s {
   uint16_t items;
   uint16_t frequency;
   uint8_t bufferSize;
-  uint16_t numSlots;
-  uint16_t numBytes;
-  int* varIds; // dynamically allocated
+  uint8_t floatSlots;
+  uint8_t intSlots;
 } usdLogConfig_t;
 
 #define USD_WRITE(FILE, MESSAGE, BYTES, BYTES_WRITTEN, CRC_VALUE, CRC_FINALXOR, CRC_TABLE) \

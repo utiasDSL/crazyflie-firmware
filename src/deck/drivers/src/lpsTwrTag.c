@@ -210,7 +210,6 @@ static uint32_t rxcallback(dwDevice_t *dev) {
         dist.anchor_ID = current_anchor;
         if (validAnchors[current_anchor])
         	estimatorKalmanEnqueueDistance(&dist);
-        memcpy(&dist_log, &dist, sizeof(dist));
       }
 
       if (options->useTdma && current_anchor == 0) {
