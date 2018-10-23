@@ -68,7 +68,7 @@
 
 
 // Task priorities. Higher number higher priority
-#define STABILIZER_TASK_PRI     5
+#define STABILIZER_TASK_PRI     4
 #define SENSORS_TASK_PRI        4
 #define ADC_TASK_PRI            3
 #define FLOW_TASK_PRI           3
@@ -89,7 +89,7 @@
 #define PCA9685_TASK_PRI        3
 #define CMD_HIGH_LEVEL_TASK_PRI 2
 
-#define SYSLINK_TASK_PRI        3
+#define SYSLINK_TASK_PRI        5
 #define USBLINK_TASK_PRI        3
 
 // Not compiled

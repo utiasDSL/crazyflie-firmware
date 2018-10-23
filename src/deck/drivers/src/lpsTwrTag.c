@@ -77,16 +77,18 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 
    // To set a static anchor position from startup, uncomment and modify the
    // following code:
- //   .anchorPosition = {
- //     {timestamp: 1, x: 0.99, y: 1.49, z: 1.80},
- //     {timestamp: 1, x: 0.99, y: 3.29, z: 1.80},
- //     {timestamp: 1, x: 4.67, y: 2.54, z: 1.80},
- //     {timestamp: 1, x: 0.59, y: 2.27, z: 0.20},
- //     {timestamp: 1, x: 4.70, y: 3.38, z: 0.20},
- //     {timestamp: 1, x: 4.70, y: 1.14, z: 0.20},
- //   },
- //
- //   .combinedAnchorPositionOk = true,
+    .anchorPosition = {
+	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
+	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
+	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
+	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
+	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
+	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
+	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
+	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
+    },
+
+    .combinedAnchorPositionOk = true,
 };
 
 typedef struct {
@@ -107,7 +109,7 @@ static struct {
 } rangingStats[LOCODECK_NR_OF_TWR_ANCHORS];
 
 // Extra variable
-static bool validAnchors[LOCODECK_NR_OF_ANCHORS];
+static bool validAnchors[LOCODECK_NR_OF_TWR_ANCHORS];
 // Rangin statistics
 static uint8_t rangingPerSec[LOCODECK_NR_OF_TWR_ANCHORS];
 static uint8_t rangingSuccessRate[LOCODECK_NR_OF_TWR_ANCHORS];
@@ -623,28 +625,28 @@ LOG_ADD(LOG_FLOAT, pressure7, &state.pressures[7])
 LOG_GROUP_STOP(ranging)
 
 PARAM_GROUP_START(twr)
-	#if (LOCODECK_NR_OF_ANCHORS > 0)
-	PARAM_ADD(PARAM_UINT8, useAnchor0, &validAnchors[0])
-	#endif
-	#if (LOCODECK_NR_OF_ANCHORS > 1)
-	PARAM_ADD(PARAM_UINT8, useAnchor1, &validAnchors[1])
-	#endif
-	#if (LOCODECK_NR_OF_ANCHORS > 2)
-	PARAM_ADD(PARAM_UINT8, useAnchor2, &validAnchors[2])
-	#endif
-	#if (LOCODECK_NR_OF_ANCHORS > 3)
-	PARAM_ADD(PARAM_UINT8, useAnchor3, &validAnchors[3])
-	#endif
-	#if (LOCODECK_NR_OF_ANCHORS > 4)
-	PARAM_ADD(PARAM_UINT8, useAnchor4, &validAnchors[4])
-	#endif
-	#if (LOCODECK_NR_OF_ANCHORS > 5)
-	PARAM_ADD(PARAM_UINT8, useAnchor5, &validAnchors[5])
-	#endif
-	#if (LOCODECK_NR_OF_ANCHORS > 6)
-	PARAM_ADD(PARAM_UINT8, useAnchor6, &validAnchors[6])
-	#endif
-	#if (LOCODECK_NR_OF_ANCHORS > 7)
-	PARAM_ADD(PARAM_UINT8, useAnchor7, &validAnchors[7])
-	#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 0)
+PARAM_ADD(PARAM_UINT8, useAnchor0, &validAnchors[0])
+#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 1)
+PARAM_ADD(PARAM_UINT8, useAnchor1, &validAnchors[1])
+#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 2)
+PARAM_ADD(PARAM_UINT8, useAnchor2, &validAnchors[2])
+#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 3)
+PARAM_ADD(PARAM_UINT8, useAnchor3, &validAnchors[3])
+#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 4)
+PARAM_ADD(PARAM_UINT8, useAnchor4, &validAnchors[4])
+#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 5)
+PARAM_ADD(PARAM_UINT8, useAnchor5, &validAnchors[5])
+#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 6)
+PARAM_ADD(PARAM_UINT8, useAnchor6, &validAnchors[6])
+#endif
+#if (LOCODECK_NR_OF_TWR_ANCHORS > 7)
+PARAM_ADD(PARAM_UINT8, useAnchor7, &validAnchors[7])
+#endif
 PARAM_GROUP_STOP(twr)
