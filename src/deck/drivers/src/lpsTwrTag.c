@@ -85,17 +85,6 @@ static dwTime_t frameStart;
 
 static bool rangingOk;
 
-static distanceMeasurement_t dist_log;
-
-//static bool isvalueinarray(int val, uint8_t *arr, int size){
-//    int i;
-//    for (i=0; i < size; i++) {
-//        if (arr[i] == val)
-//            return true;
-//    }
-//    return false;
-//}
-
 static void txcallback(dwDevice_t *dev)
 {
   dwTime_t departure;
@@ -452,10 +441,6 @@ LOG_ADD(LOG_UINT8, rangingSuccessRate4, &rangingSuccessRate[4])
 LOG_ADD(LOG_UINT8, rangingPerSec4, &rangingPerSec[4])
 LOG_ADD(LOG_UINT8, rangingSuccessRate5, &rangingSuccessRate[5])
 LOG_ADD(LOG_UINT8, rangingPerSec5, &rangingPerSec[5])
-LOG_ADD(LOG_FLOAT, dist, &dist_log.distance)
-LOG_ADD(LOG_FLOAT, aX, &dist_log.x)
-LOG_ADD(LOG_FLOAT, aY, &dist_log.y)
-LOG_ADD(LOG_FLOAT, aZ, &dist_log.z)
 LOG_GROUP_STOP(twr)
 
 PARAM_GROUP_START(twr)
