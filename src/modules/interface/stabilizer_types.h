@@ -53,6 +53,7 @@ struct vec3_s {
   float z;
 };
 
+typedef struct vec3_s vector_t;
 typedef struct vec3_s point_t;
 typedef struct vec3_s velocity_t;
 typedef struct vec3_s acc_t;
@@ -152,6 +153,7 @@ typedef struct sensorData_s {
   Axis3f accSec;            // Gs
   Axis3f gyroSec;           // deg/s
 #endif
+  uint64_t interruptTimestamp;
 } sensorData_t;
 
 typedef struct state_s {

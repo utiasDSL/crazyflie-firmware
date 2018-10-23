@@ -24,6 +24,7 @@ CLOAD_ARGS        ?=
 PLATFORM					?= CF2
 LPS_TDMA_ENABLE   ?= 0
 LPS_TDOA_ENABLE   ?= 0
+LPS_TDOA3_ENABLE  ?= 0
 BROADCAST_ENABLE  ?= 1
 
 ######### Stabilizer configuration ##########
@@ -73,7 +74,7 @@ VPATH_CF2 += $(LIB)/CMSIS/STM32F4xx/Source/
 VPATH_CF2 += $(LIB)/STM32_USB_Device_Library/Core/src
 VPATH_CF2 += $(LIB)/STM32_USB_OTG_Driver/src
 VPATH_CF2 += src/deck/api src/deck/core src/deck/drivers/src src/deck/drivers/src/test
-VPATH_CF2 += src/utils/src/clockCorrection
+VPATH_CF2 += src/utils/src/tdoa src/utils/src/lighthouse
 CRT0_CF2 = startup_stm32f40xx.o system_stm32f4xx.o
 
 # Should maybe be in separate file?
@@ -152,6 +153,7 @@ PROJ_OBJ_CF2 += vl53l1_register_funcs.o vl53l1_wait.o vl53l1_core_support.o
 PROJ_OBJ += system.o comm.o console.o pid.o crtpservice.o param.o
 PROJ_OBJ += log.o worker.o trigger.o sitaw.o queuemonitor.o msp.o
 PROJ_OBJ_CF2 += platformservice.o sound_cf2.o extrx.o sysload.o mem_cf2.o
+PROJ_OBJ += range.o
 
 # Stabilizer modules
 PROJ_OBJ += commander.o crtp_commander.o crtp_commander_rpyt.o
@@ -192,17 +194,22 @@ PROJ_OBJ_CF2 += cppmdeck.o
 PROJ_OBJ_CF2 += usddeck.o
 PROJ_OBJ_CF2 += zranger.o zranger2.o
 PROJ_OBJ_CF2 += locodeck.o
-PROJ_OBJ_CF2 += clockCorrectionFunctions.o clockCorrectionEngine.o
+PROJ_OBJ_CF2 += clockCorrectionEngine.o
 PROJ_OBJ_CF2 += lpsTwrTag.o
 PROJ_OBJ_CF2 += lpsTdoa2Tag.o
-PROJ_OBJ_CF2 += lpsTdoa3Tag.o lpsTdoaTagEngine.o lpsTdoaTagStats.o
+PROJ_OBJ_CF2 += lpsTdoa3Tag.o tdoaEngine.o tdoaStats.o tdoaStorage.o
 PROJ_OBJ_CF2 += outlierFilter.o
 PROJ_OBJ_CF2 += flowdeck_v1v2.o
 PROJ_OBJ_CF2 += oa.o
 PROJ_OBJ_CF2 += multiranger.o
+PROJ_OBJ_CF2 += lighthouse.o
 
 ifeq ($(LPS_TDOA_ENABLE), 1)
 CFLAGS += -DLPS_TDOA_ENABLE
+endif
+
+ifeq ($(LPS_TDOA3_ENABLE), 1)
+CFLAGS += -DLPS_TDOA3_ENABLE
 endif
 
 ifeq ($(LPS_TDMA_ENABLE), 1)
@@ -220,6 +227,8 @@ PROJ_OBJ += filter.o cpuid.o cfassert.o  eprintf.o crc.o num.o debug.o
 PROJ_OBJ += version.o FreeRTOS-openocd.o
 PROJ_OBJ_CF2 += configblockeeprom.o crc_bosch.o
 PROJ_OBJ_CF2 += sleepus.o
+PROJ_OBJ_CF2 += pulseProcessor.o lighthouseGeometry.o
+
 
 # Libs
 PROJ_OBJ_CF2 += libarm_math.a
@@ -252,6 +261,8 @@ INCLUDES_CF2 += -I$(LIB)/STM32_USB_Device_Library/Core/inc
 INCLUDES_CF2 += -I$(LIB)/STM32_USB_OTG_Driver/inc
 INCLUDES_CF2 += -Isrc/deck/interface -Isrc/deck/drivers/interface
 INCLUDES_CF2 += -Isrc/utils/interface/clockCorrection
+INCLUDES_CF2 += -Isrc/utils/interface/tdoa
+INCLUDES_CF2 += -Isrc/utils/interface/lighthouse
 INCLUDES_CF2 += -Ivendor/libdw1000/inc
 INCLUDES_CF2 += -I$(LIB)/FatFS
 INCLUDES_CF2 += -I$(LIB)/vl53l1
