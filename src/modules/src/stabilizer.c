@@ -490,17 +490,17 @@ LOG_ADD(LOG_FLOAT, z, &sensorData.accSec.z)
 LOG_GROUP_STOP(accSec)
 #endif
 
-LOG_GROUP_START(baro)
-LOG_ADD(LOG_FLOAT, asl, &sensorData.baro.asl)
-LOG_ADD(LOG_FLOAT, temp, &sensorData.baro.temperature)
-LOG_ADD(LOG_FLOAT, pressure, &sensorData.baro.pressure)
-LOG_GROUP_STOP(baro)
-
-LOG_GROUP_START(gyro)
-LOG_ADD(LOG_FLOAT, x, &sensorData.gyro.x)
-LOG_ADD(LOG_FLOAT, y, &sensorData.gyro.y)
-LOG_ADD(LOG_FLOAT, z, &sensorData.gyro.z)
-LOG_GROUP_STOP(gyro)
+//LOG_GROUP_START(baro)
+//LOG_ADD(LOG_FLOAT, asl, &sensorData.baro.asl)
+//LOG_ADD(LOG_FLOAT, temp, &sensorData.baro.temperature)
+//LOG_ADD(LOG_FLOAT, pressure, &sensorData.baro.pressure)
+//LOG_GROUP_STOP(baro)
+//
+//LOG_GROUP_START(gyro)
+//LOG_ADD(LOG_FLOAT, x, &sensorData.gyro.x)
+//LOG_ADD(LOG_FLOAT, y, &sensorData.gyro.y)
+//LOG_ADD(LOG_FLOAT, z, &sensorData.gyro.z)
+//LOG_GROUP_STOP(gyro)
 
 #ifdef LOG_SEC_IMU
 LOG_GROUP_START(gyroSec)
@@ -510,20 +510,20 @@ LOG_ADD(LOG_FLOAT, z, &sensorData.gyroSec.z)
 LOG_GROUP_STOP(gyroSec)
 #endif
 
-LOG_GROUP_START(mag)
-LOG_ADD(LOG_FLOAT, x, &sensorData.mag.x)
-LOG_ADD(LOG_FLOAT, y, &sensorData.mag.y)
-LOG_ADD(LOG_FLOAT, z, &sensorData.mag.z)
-LOG_GROUP_STOP(mag)
-
-
-LOG_GROUP_START(stateEstimate)
-LOG_ADD(LOG_FLOAT, x, &state.position.x)
-LOG_ADD(LOG_FLOAT, y, &state.position.y)
-LOG_ADD(LOG_FLOAT, z, &state.position.z)
-LOG_GROUP_STOP(stateEstimate)
-
-LOG_GROUP_START(latency)
-LOG_ADD(LOG_UINT32, intToOut, &inToOutLatency)
-LOG_GROUP_STOP(latency)
+//LOG_GROUP_START(mag)
+//LOG_ADD(LOG_FLOAT, x, &sensorData.mag.x)
+//LOG_ADD(LOG_FLOAT, y, &sensorData.mag.y)
+//LOG_ADD(LOG_FLOAT, z, &sensorData.mag.z)
+//LOG_GROUP_STOP(mag)
+//
+//
+//LOG_GROUP_START(stateEstimate)
+//LOG_ADD(LOG_FLOAT, x, &state.position.x)
+//LOG_ADD(LOG_FLOAT, y, &state.position.y)
+//LOG_ADD(LOG_FLOAT, z, &state.position.z)
+//LOG_GROUP_STOP(stateEstimate)
+//
+//LOG_GROUP_START(latency)
+//LOG_ADD(LOG_UINT32, intToOut, &inToOutLatency)
+//LOG_GROUP_STOP(latency)
 

@@ -309,7 +309,7 @@ static uint32_t gyroAccumulatorCount;
 static uint32_t baroAccumulatorCount;
 static bool quadIsFlying = false;
 static int32_t lastTDOAUpdate;
-static float stateSkew;
+//static float stateSkew;
 static float varSkew;
 static uint32_t lastFlightCmd;
 static uint32_t takeoffTime;
@@ -1574,12 +1574,12 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 
 // Temporary development groups
 
-LOG_GROUP_START(kalman_pred)
-  LOG_ADD(LOG_FLOAT, predNX, &predictedNX)
-  LOG_ADD(LOG_FLOAT, predNY, &predictedNY)
-  LOG_ADD(LOG_FLOAT, measNX, &measuredNX)
-  LOG_ADD(LOG_FLOAT, measNY, &measuredNY)
-LOG_GROUP_STOP(kalman_pred)
+//LOG_GROUP_START(kalman_pred)
+//  LOG_ADD(LOG_FLOAT, predNX, &predictedNX)
+//  LOG_ADD(LOG_FLOAT, predNY, &predictedNY)
+//  LOG_ADD(LOG_FLOAT, measNX, &measuredNX)
+//  LOG_ADD(LOG_FLOAT, measNY, &measuredNY)
+//LOG_GROUP_STOP(kalman_pred)
 
 LOG_GROUP_START(twr_ekf)
   LOG_ADD(LOG_FLOAT, distance, &twrDist)
@@ -1587,33 +1587,33 @@ LOG_GROUP_START(twr_ekf)
 LOG_GROUP_STOP(twr_ekf)
 
 // Stock log groups
-LOG_GROUP_START(kalman)
-  LOG_ADD(LOG_UINT8, inFlight, &quadIsFlying)
-  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
-  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
-  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
-  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
-  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
-  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
-  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
-  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
-  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
-  LOG_ADD(LOG_FLOAT, stateSkew, &stateSkew)
-  LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
-  LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
-  LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
-  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
-  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
-  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
-  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
-  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
-  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
-  LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
-  LOG_ADD(LOG_FLOAT, q0, &q[0])
-  LOG_ADD(LOG_FLOAT, q1, &q[1])
-  LOG_ADD(LOG_FLOAT, q2, &q[2])
-  LOG_ADD(LOG_FLOAT, q3, &q[3])
-LOG_GROUP_STOP(kalman)
+//LOG_GROUP_START(kalman)
+//  LOG_ADD(LOG_UINT8, inFlight, &quadIsFlying)
+//  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
+//  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
+//  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
+//  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
+//  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
+//  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
+//  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
+//  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
+//  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
+//  LOG_ADD(LOG_FLOAT, stateSkew, &stateSkew)
+//  LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
+//  LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
+//  LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
+//  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
+//  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
+//  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
+//  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
+//  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
+//  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
+//  LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
+//  LOG_ADD(LOG_FLOAT, q0, &q[0])
+//  LOG_ADD(LOG_FLOAT, q1, &q[1])
+//  LOG_ADD(LOG_FLOAT, q2, &q[2])
+//  LOG_ADD(LOG_FLOAT, q3, &q[3])
+//LOG_GROUP_STOP(kalman)
 
 PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_UINT8, resetEstimation, &resetEstimation)
