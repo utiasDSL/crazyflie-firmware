@@ -47,11 +47,11 @@ We added the following:
 
 #define GRAVITY_MAGNITUDE (9.81f)
 
-static float g_vehicleMass = 0.030; // TODO: should be CF global for other modules
+static float g_vehicleMass = 0.032; // TODO: should be CF global for other modules
 static float massThrust = 132000;
-static float c_2 = -73820.0;
-static float c_1 = 147723.96;
-static float c = 1369.68;
+static float c_2 = -1.1264;
+static float c_1 = 2.2541;
+static float c = 0.0209;
 
 // XY Position PID
 static float kp_xy = 0.4;       // P
@@ -61,9 +61,9 @@ static float i_range_xy = 2.0;
 
 // Z Position
 static float kp_z = 1.25;       // P
-static float kd_z = 0.5;      // D
+static float kd_z = 0.4;      // D
 static float ki_z = 0.05;       // I
-static float i_range_z  = 0.15;
+static float i_range_z  = 0.5;
 
 // Attitude
 static float kR_xy = 70000; // P
@@ -137,7 +137,7 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   struct vec v_error;
   struct vec target_thrust;
   struct vec z_axis;
-  float current_thrust;
+  float current_thrust=0;
   struct vec x_axis_desired;
   struct vec y_axis_desired;
   struct vec x_c_des;
@@ -146,6 +146,7 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   float desiredYaw = 0; //deg
 
   if (!RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
+	  // Just for logging purpose
 	  setpoint->acceleration.x = acc_desired.x;
 	  setpoint->acceleration.y = acc_desired.y;
 	  setpoint->acceleration.z = acc_desired.z;
@@ -158,46 +159,54 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   struct vec statePos = mkvec(state->position.x, state->position.y, state->position.z);
   struct vec stateVel = mkvec(state->velocity.x, state->velocity.y, state->velocity.z);
 
-  // Position Error (ep)
-  r_error = vsub(setpointPos, statePos);
+  // Update errors only in PosSet mode
+  if(setpoint->mode.x == modeAbs && setpoint->mode.y == modeAbs && setpoint->mode.z == modeAbs){
+	  // Position Error (ep)
+	    r_error = vsub(setpointPos, statePos);
 
-  // Velocity Error (ev)
-  v_error = vsub(setpointVel, stateVel);
+	    // Velocity Error (ev)
+	    v_error = vsub(setpointVel, stateVel);
 
-  // Integral Error
-  i_error_z += r_error.z * dt;
-  i_error_z = clamp(i_error_z, -i_range_z, i_range_z);
+	    // Integral Error
+	    i_error_z += r_error.z * dt;
+	    i_error_z = clamp(i_error_z, -i_range_z, i_range_z);
 
-  i_error_x += r_error.x * dt;
-  i_error_x = clamp(i_error_x, -i_range_xy, i_range_xy);
+	    i_error_x += r_error.x * dt;
+	    i_error_x = clamp(i_error_x, -i_range_xy, i_range_xy);
 
-  i_error_y += r_error.y * dt;
-  i_error_y = clamp(i_error_y, -i_range_xy, i_range_xy);
+	    i_error_y += r_error.y * dt;
+	    i_error_y = clamp(i_error_y, -i_range_xy, i_range_xy);
+
+//  }
 
   // Desired thrust [F_des]
-  if (setpoint->mode.x == modeAbs) {
+//  if (setpoint->mode.x == modeAbs && setpoint->mode.y == modeAbs && setpoint->mode.z == modeAbs) {
     target_thrust.x = g_vehicleMass * setpoint->acceleration.x                       + kp_xy * r_error.x + kd_xy * v_error.x + ki_xy * i_error_x;
     target_thrust.y = g_vehicleMass * setpoint->acceleration.y                       + kp_xy * r_error.y + kd_xy * v_error.y + ki_xy * i_error_y;
     target_thrust.z = g_vehicleMass * (setpoint->acceleration.z + GRAVITY_MAGNITUDE) + kp_z  * r_error.z + kd_z  * v_error.z + ki_z  * i_error_z;
-  } else {
-    target_thrust.x = -sinf(radians(setpoint->attitude.pitch));
-    target_thrust.y = -sinf(radians(setpoint->attitude.roll));
-    // In case of a timeout, the commander tries to level, ie. x/y are disabled, but z will use the previous setting
-    // In that case we ignore the last feedforward term for acceleration
-    if (setpoint->mode.z == modeAbs) {
-      target_thrust.z = g_vehicleMass * GRAVITY_MAGNITUDE + kp_z  * r_error.z + kd_z  * v_error.z + ki_z  * i_error_z;
-    } else {
-      target_thrust.z = 1;
-    }
-  }
+  } //else {
+//    target_thrust.x = -sinf(radians(setpoint->attitude.pitch));
+//    target_thrust.y = -sinf(radians(setpoint->attitude.roll));
+//    // In case of a timeout, the commander tries to level, ie. x/y are disabled, but z will use the previous setting
+//    // In that case we ignore the last feedforward term for acceleration
+//    if (setpoint->mode.z == modeAbs) {
+//      target_thrust.z = g_vehicleMass * GRAVITY_MAGNITUDE + kp_z  * r_error.z + kd_z  * v_error.z + ki_z  * i_error_z;
+//    } else {
+//      target_thrust.z = 1;
+//    }
+//	  i_error_z = 0;
+//	  i_error_x = 0;
+//	  i_error_y = 0;
+//  }
 
   // Rate-controled YAW is moving YAW angle setpoint
   if (setpoint->mode.yaw == modeVelocity) {
      desiredYaw = state->attitude.yaw - setpoint->attitudeRate.yaw * dt;
-  } else if (setpoint->mode.quat == modeAbs) {
-    struct quat setpoint_quat = mkquat(setpoint->attitudeQuaternion.x, setpoint->attitudeQuaternion.y, setpoint->attitudeQuaternion.z, setpoint->attitudeQuaternion.w);
-    struct vec rpy = quat2rpy(setpoint_quat);
-    desiredYaw = degrees(rpy.z);
+  } else if (setpoint->mode.yaw == modeAbs) {
+//    struct quat setpoint_quat = mkquat(setpoint->attitudeQuaternion.x, setpoint->attitudeQuaternion.y, setpoint->attitudeQuaternion.z, setpoint->attitudeQuaternion.w);
+//    struct vec rpy = quat2rpy(setpoint_quat);
+//    desiredYaw = degrees(rpy.z);
+    desiredYaw = setpoint->attitude.yaw;
   }
 
   // Z-Axis [zB]
@@ -206,30 +215,54 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   z_axis = mcolumn(R, 2);
 
   // yaw correction (only if position control is not used)
-  if (setpoint->mode.x != modeAbs) {
-    struct vec x_yaw = mcolumn(R, 0);
-    x_yaw.z = 0;
-    x_yaw = vnormalize(x_yaw);
-    struct vec y_yaw = vcross(mkvec(0, 0, 1), x_yaw);
-    struct mat33 R_yaw_only = mcolumns(x_yaw, y_yaw, mkvec(0, 0, 1));
-    target_thrust = mvmult(R_yaw_only, target_thrust);
+//  if (setpoint->mode.x != modeAbs) {
+//    struct vec x_yaw = mcolumn(R, 0);
+//    x_yaw.z = 0;
+//    x_yaw = vnormalize(x_yaw);
+//    struct vec y_yaw = vcross(mkvec(0, 0, 1), x_yaw);
+//    struct mat33 R_yaw_only = mcolumns(x_yaw, y_yaw, mkvec(0, 0, 1));
+//    target_thrust = mvmult(R_yaw_only, target_thrust);
+//  }
+
+  if(setpoint->mode.x == modeAbs && setpoint->mode.y == modeAbs && setpoint->mode.z == modeAbs){
+	  // Current thrust [F]
+	  current_thrust = vdot(target_thrust, z_axis);
+
+	  // Calculate axis [zB_des]
+	  z_axis_desired = vnormalize(target_thrust);
+
+	  // [xC_des]
+	  // x_axis_desired = z_axis_desired x [sin(yaw), cos(yaw), 0]^T
+	  x_c_des.x = cosf(radians(desiredYaw));
+	  x_c_des.y = sinf(radians(desiredYaw));
+	  x_c_des.z = 0;
+	  // [yB_des]
+	  y_axis_desired = vnormalize(vcross(z_axis_desired, x_c_des));
+	  // [xB_des]
+	  x_axis_desired = vcross(y_axis_desired, z_axis_desired);
+  }else{
+	  float phi = radians(setpoint->attitude.roll);
+	  float tht = radians(-setpoint->attitude.pitch);
+	  float psi = radians(setpoint->attitude.yaw);
+
+	  x_axis_desired.x = cosf(tht) * cosf(psi);
+	  x_axis_desired.y = cosf(tht) * sinf(psi);
+	  x_axis_desired.z = -sin(tht);
+
+	  y_axis_desired.x = sinf(phi)*sinf(tht)*cosf(psi) - cosf(phi)*sinf(psi);
+	  y_axis_desired.y = sinf(phi)*sinf(tht)*sinf(psi) + cosf(phi)*cosf(psi);
+	  y_axis_desired.z = sinf(phi)*cosf(tht);
+
+	  z_axis_desired.x = cosf(phi)*sinf(tht)*cosf(psi) + sinf(phi)*sinf(tht);
+	  z_axis_desired.y = cosf(phi)*sinf(tht)*sinf(psi) - sinf(phi)*cosf(psi);
+	  z_axis_desired.z = cosf(phi)*cosf(tht);
+
   }
 
-  // Current thrust [F]
-  current_thrust = vdot(target_thrust, z_axis);
 
-  // Calculate axis [zB_des]
-  z_axis_desired = vnormalize(target_thrust);
 
-  // [xC_des]
-  // x_axis_desired = z_axis_desired x [sin(yaw), cos(yaw), 0]^T
-  x_c_des.x = cosf(radians(desiredYaw));
-  x_c_des.y = sinf(radians(desiredYaw));
-  x_c_des.z = 0;
-  // [yB_des]
-  y_axis_desired = vnormalize(vcross(z_axis_desired, x_c_des));
-  // [xB_des]
-  x_axis_desired = vcross(y_axis_desired, z_axis_desired);
+
+
 
   // [eR]
   // Slow version
@@ -299,7 +332,7 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
     control->thrust = setpoint->thrust;
   } else {
 //    control->thrust = massThrust * current_thrust;
-	  control->thrust = c_2 * current_thrust * current_thrust + c_1 * current_thrust + c;
+	  control->thrust = 65535 *(c_2 * current_thrust * current_thrust + c_1 * current_thrust + c);
 
   }
 
@@ -344,6 +377,9 @@ PARAM_ADD(PARAM_FLOAT, ki_m_z, &ki_m_z)
 PARAM_ADD(PARAM_FLOAT, kd_omega_rp, &kd_omega_rp)
 PARAM_ADD(PARAM_FLOAT, i_range_m_xy, &i_range_m_xy)
 PARAM_ADD(PARAM_FLOAT, i_range_m_z, &i_range_m_z)
+PARAM_ADD(PARAM_FLOAT, c2, &c_2)
+PARAM_ADD(PARAM_FLOAT, c1, &c_1)
+PARAM_ADD(PARAM_FLOAT, c, &c)
 PARAM_GROUP_STOP(ctrlMel)
 
 LOG_GROUP_START(ctrlMel)

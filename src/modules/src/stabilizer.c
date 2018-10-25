@@ -496,11 +496,11 @@ LOG_GROUP_STOP(accSec)
 //LOG_ADD(LOG_FLOAT, pressure, &sensorData.baro.pressure)
 //LOG_GROUP_STOP(baro)
 //
-//LOG_GROUP_START(gyro)
-//LOG_ADD(LOG_FLOAT, x, &sensorData.gyro.x)
-//LOG_ADD(LOG_FLOAT, y, &sensorData.gyro.y)
-//LOG_ADD(LOG_FLOAT, z, &sensorData.gyro.z)
-//LOG_GROUP_STOP(gyro)
+LOG_GROUP_START(gyro)
+LOG_ADD(LOG_FLOAT, x, &sensorData.gyro.x)
+LOG_ADD(LOG_FLOAT, y, &sensorData.gyro.y)
+LOG_ADD(LOG_FLOAT, z, &sensorData.gyro.z)
+LOG_GROUP_STOP(gyro)
 
 #ifdef LOG_SEC_IMU
 LOG_GROUP_START(gyroSec)
