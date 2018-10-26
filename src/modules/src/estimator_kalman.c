@@ -56,6 +56,8 @@
  */
 
 #include "estimator_kalman.h"
+#include "outlierFilter.h"
+
 
 #include "stm32f4xx.h"
 
@@ -197,8 +199,6 @@ static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
 #define CONTROL_TO_ACC (GRAVITY_MAGNITUDE*60.0f/CRAZYFLIE_WEIGHT_grams/65536.0f)
 #endif
 
-#define SPEED_OF_LIGHT (299792458)
-
 // TODO: Decouple the TDOA implementation from the Kalman filter...
 #define METERS_PER_TDOATICK (4.691763979e-3f)
 #define SECONDS_PER_TDOATICK (15.650040064e-12f)
@@ -309,7 +309,7 @@ static uint32_t gyroAccumulatorCount;
 static uint32_t baroAccumulatorCount;
 static bool quadIsFlying = false;
 static int32_t lastTDOAUpdate;
-static float stateSkew;
+//static float stateSkew;
 static float varSkew;
 static uint32_t lastFlightCmd;
 static uint32_t takeoffTime;
@@ -789,14 +789,7 @@ static void stateEstimatorPredict(float cmdThrust, Axis3f *acc, Axis3f *gyro, fl
     S[STATE_PY] += dt * (acc->y - gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * R[2][1]);
     S[STATE_PZ] += dt * (acc->z + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * R[2][2]);
   }
-/* Remove kalman lock of Z position < 0
-  if(S[STATE_Z] < 0) {
-    S[STATE_Z] = 0;
-    S[STATE_PX] = 0;
-    S[STATE_PY] = 0;
-    S[STATE_PZ] = 0;
-  }
-*/
+
   // attitude update (rotate by gyroscope), we do this in quaternions
   // this is the gyroscope angular velocity integrated over the sample period
   float dtwx = dt*gyro->x;
@@ -1035,13 +1028,23 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
   float dy = S[STATE_Y] - d->y;
   float dz = S[STATE_Z] - d->z;
 
-  float predictedDistance = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2));
   float measuredDistance = d->distance;
 
-  // The measurement is: z = sqrt(dx^2 + dy^2 + dz^2). The derivative dz/dX gives h.
-  h[STATE_X] = dx/predictedDistance;
-  h[STATE_Y] = dy/predictedDistance;
-  h[STATE_Z] = dz/predictedDistance;
+  float predictedDistance = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2));
+  if (predictedDistance != 0.0f)
+  {
+    // The measurement is: z = sqrt(dx^2 + dy^2 + dz^2). The derivative dz/dX gives h.
+    h[STATE_X] = dx/predictedDistance;
+    h[STATE_Y] = dy/predictedDistance;
+    h[STATE_Z] = dz/predictedDistance;
+  }
+  else
+  {
+    // Avoid divide by zero
+    h[STATE_X] = 1.0f;
+    h[STATE_Y] = 0.0f;
+    h[STATE_Z] = 0.0f;
+  }
 
   // Extra logging variables
   twrDist = d->distance;
@@ -1052,37 +1055,62 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 {
-  /**
-   * Measurement equation:
-   * dR = dT + d1 - d0
-   */
-
-  float measurement = tdoa->distanceDiff;
-
-  // predict based on current state
-  float x = S[STATE_X];
-  float y = S[STATE_Y];
-  float z = S[STATE_Z];
-
-  float x1 = tdoa->anchorPosition[1].x, y1 = tdoa->anchorPosition[1].y, z1 = tdoa->anchorPosition[1].z;
-  float x0 = tdoa->anchorPosition[0].x, y0 = tdoa->anchorPosition[0].y, z0 = tdoa->anchorPosition[0].z;
-
-  float d1 = sqrtf(powf(x - x1, 2) + powf(y - y1, 2) + powf(z - z1, 2));
-  float d0 = sqrtf(powf(x - x0, 2) + powf(y - y0, 2) + powf(z - z0, 2));
-
-  float predicted = d1 - d0;
-  float error = measurement - predicted;
-
   if (tdoaCount >= 100)
   {
+    /**
+     * Measurement equation:
+     * dR = dT + d1 - d0
+     */
+
+    float measurement = tdoa->distanceDiff;
+
+    // predict based on current state
+    float x = S[STATE_X];
+    float y = S[STATE_Y];
+    float z = S[STATE_Z];
+
+    float x1 = tdoa->anchorPosition[1].x, y1 = tdoa->anchorPosition[1].y, z1 = tdoa->anchorPosition[1].z;
+    float x0 = tdoa->anchorPosition[0].x, y0 = tdoa->anchorPosition[0].y, z0 = tdoa->anchorPosition[0].z;
+
+    float dx1 = x - x1;
+    float dy1 = y - y1;
+    float dz1 = z - z1;
+
+    float dx0 = x - x0;
+    float dy0 = y - y0;
+    float dz0 = z - z0;
+
+    float d1 = sqrtf(powf(dx1, 2) + powf(dy1, 2) + powf(dz1, 2));
+    float d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
+
+    float predicted = d1 - d0;
+    float error = measurement - predicted;
+
     float h[STATE_DIM] = {0};
     arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 
-    h[STATE_X] = ((x - x1) / d1 - (x - x0) / d0);
-    h[STATE_Y] = ((y - y1) / d1 - (y - y0) / d0);
-    h[STATE_Z] = ((z - z1) / d1 - (z - z0) / d0);
+    if ((d0 != 0.0f) && (d1 != 0.0f)) {
+      h[STATE_X] = (dx1 / d1 - dx0 / d0);
+      h[STATE_Y] = (dy1 / d1 - dy0 / d0);
+      h[STATE_Z] = (dz1 / d1 - dz0 / d0);
 
-    stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+      vector_t jacobian = {
+        .x = h[STATE_X],
+        .y = h[STATE_Y],
+        .z = h[STATE_Z],
+      };
+
+      point_t estimatedPosition = {
+        .x = S[STATE_X],
+        .y = S[STATE_Y],
+        .z = S[STATE_Z],
+      };
+
+      bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
+      if (sampleIsGood) {
+        stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+      }
+    }
   }
 
   tdoaCount++;
@@ -1546,12 +1574,12 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 
 // Temporary development groups
 
-LOG_GROUP_START(kalman_pred)
-  LOG_ADD(LOG_FLOAT, predNX, &predictedNX)
-  LOG_ADD(LOG_FLOAT, predNY, &predictedNY)
-  LOG_ADD(LOG_FLOAT, measNX, &measuredNX)
-  LOG_ADD(LOG_FLOAT, measNY, &measuredNY)
-LOG_GROUP_STOP(kalman_pred)
+//LOG_GROUP_START(kalman_pred)
+//  LOG_ADD(LOG_FLOAT, predNX, &predictedNX)
+//  LOG_ADD(LOG_FLOAT, predNY, &predictedNY)
+//  LOG_ADD(LOG_FLOAT, measNX, &measuredNX)
+//  LOG_ADD(LOG_FLOAT, measNY, &measuredNY)
+//LOG_GROUP_STOP(kalman_pred)
 
 LOG_GROUP_START(twr_ekf)
   LOG_ADD(LOG_FLOAT, distance, &twrDist)
@@ -1559,33 +1587,33 @@ LOG_GROUP_START(twr_ekf)
 LOG_GROUP_STOP(twr_ekf)
 
 // Stock log groups
-LOG_GROUP_START(kalman)
-  LOG_ADD(LOG_UINT8, inFlight, &quadIsFlying)
-  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
-  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
-  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
-  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
-  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
-  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
-  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
-  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
-  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
-  LOG_ADD(LOG_FLOAT, stateSkew, &stateSkew)
-  LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
-  LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
-  LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
-  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
-  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
-  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
-  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
-  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
-  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
-  LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
-  LOG_ADD(LOG_FLOAT, q0, &q[0])
-  LOG_ADD(LOG_FLOAT, q1, &q[1])
-  LOG_ADD(LOG_FLOAT, q2, &q[2])
-  LOG_ADD(LOG_FLOAT, q3, &q[3])
-LOG_GROUP_STOP(kalman)
+//LOG_GROUP_START(kalman)
+//  LOG_ADD(LOG_UINT8, inFlight, &quadIsFlying)
+//  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
+//  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
+//  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
+//  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
+//  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
+//  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
+//  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
+//  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
+//  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
+//  LOG_ADD(LOG_FLOAT, stateSkew, &stateSkew)
+//  LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
+//  LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
+//  LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
+//  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
+//  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
+//  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
+//  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
+//  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
+//  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
+//  LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
+//  LOG_ADD(LOG_FLOAT, q0, &q[0])
+//  LOG_ADD(LOG_FLOAT, q1, &q[1])
+//  LOG_ADD(LOG_FLOAT, q2, &q[2])
+//  LOG_ADD(LOG_FLOAT, q3, &q[3])
+//LOG_GROUP_STOP(kalman)
 
 PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_UINT8, resetEstimation, &resetEstimation)

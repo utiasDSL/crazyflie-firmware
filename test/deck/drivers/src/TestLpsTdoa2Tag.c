@@ -9,10 +9,10 @@
 #include "mock_cfassert.h"
 #include "mock_estimator_kalman.h"
 #include "mock_locodeck.h"
-#include "mock_outlierFilter.h"
 
 #include "dw1000Mocks.h"
 #include "freertosMocks.h"
+#include "physicalConstants.h"
 
 // The local clock uses 40 bits
 #define TIMER_TAG_MAX_VALUE 0x000000FFFFFFFFFFul
@@ -21,7 +21,7 @@
 #define TIMER_ANCHOR_MAX_VALUE 0x00000000FFFFFFFFul
 
 static dwDevice_t dev;
-static lpsAlgoOptions_t options = {
+static lpsTdoa2AlgoOptions_t options = {
   .anchorAddress = {
     0xbccf000000000000,
     0xbccf000000000001,
@@ -121,6 +121,8 @@ const uint64_t iTxTime3_4 = ANCHOR_TIME(3, 4);
 const uint64_t iTxTime3_5 = ANCHOR_TIME(3, 5);
 
 void setUp(void) {
+  lpsTdoa2TagSetOptions(&options);
+
   dwGetData_resetMock();
   dwGetReceiveTimestamp_resetMock();
 
@@ -131,10 +133,13 @@ void setUp(void) {
   dwSetReceiveWaitTimeout_Expect(&dev, TDOA2_RECEIVE_TIMEOUT);
   dwCommitConfiguration_Expect(&dev);
 
-  uwbTdoa2TagAlgorithm.init(&dev, &options);
+  locoDeckSetRangingState_Expect(0);
+  uwbTdoa2TagAlgorithm.init(&dev);
 
   lpsGetLppShort_StubWithCallback(lpsGetLppShortCallbackForLppShortPacketSent);
   lpsGetLppShort_ignoreAndReturnFalse = true;
+
+  locoDeckSetRangingState_Ignore();
 }
 
 void tearDown(void)
@@ -388,7 +393,6 @@ void testMissingTimestampInhibitsClockDriftCalculationInFirstIteration() {
   mockKalmanEstimator(0, 5, expectedDiff);
   mockKalmanEstimator(5, 0, -expectedDiff);
   mockKalmanEstimator(0, 5, expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -447,7 +451,6 @@ void testMissingPacketAnchorToAnchorInhibitsDiffCalculation() {
   // Not called
   // mockKalmanEstimator(5, 0, -expectedDiff);
   mockKalmanEstimator(0, 5, expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -506,7 +509,6 @@ void testMissingAnchorToAnchorDistanceInhibitsDiffCalculation() {
   // Not called
   // mockKalmanEstimator(5, 0, -expectedDiff);
   mockKalmanEstimator(0, 5, expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -564,7 +566,6 @@ void testMissingPacketPacketAnchorToAnchorInhibitsDiffCalculation() {
   // Not called
   // mockKalmanEstimator(5, 0, -expectedDiff);
   mockKalmanEstimator(0, 5, expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -622,7 +623,6 @@ void testMissingPacketPacketAnchorToAnchorInhibitsDiffCalculationWhenSequenceNrW
   // Not called
   // mockKalmanEstimator(5, 0, -expectedDiff);
   mockKalmanEstimator(0, 5, expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -689,66 +689,12 @@ void testMissingPacketAnchorToTagInhibitsDiffCalculation() {
 
   // Not called since previous packet from same anchor was lost
   //  mockKalmanEstimator(5, 0, -expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
   //  uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
-  uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
-  uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
-
-  // Assert
-  // Nothing here, verification in mocks
-}
-
-void testDataNotSentToKalmanFilterWhenOutlierDetected() {
-  // Fixture
-  // Two anchors, separated by 1.0m
-  // Distance from A0 to tag is 2.0m
-  // Distance from A5 to tag is 2.5m
-  float expectedDiff = 0.5;
-
-  // Ideal times in universal clock
-  uint64_t timeA0ToTag = time2m;
-  uint64_t timeA5ToTag = time2_5m;
-  uint64_t timeA0ToA5 = time1m;
-
-  mockMessageFromAnchor(5, iTxTime0_5 + timeA5ToTag,
-    (uint8_t[]) {10,                      0,  0,  0,  0,  20,                      0,  0},
-    (uint64_t[]){NS,                      NS, NS, NS, NS, iTxTime0_5,              NS, NS},
-    (uint64_t[]){NS,                      NS, NS, NS, NS, NS,                      NS, NS});
-
-  mockMessageFromAnchor(0, iTxTime1_0 + timeA0ToTag,
-    (uint8_t[]) {11,                      0,  0,  0,  0,  20,                      0,  0},
-    (uint64_t[]){iTxTime1_0,              NS, NS, NS, NS, iTxTime0_5 + timeA0ToA5, NS, NS},
-    (uint64_t[]){NS,                      NS, NS, NS, NS, timeA0ToA5,              NS, NS});
-
-  mockMessageFromAnchor(5, iTxTime1_5 + timeA5ToTag,
-    (uint8_t[]) {11,                      0,  0,  0,  0,  21,                      0,  0},
-    (uint64_t[]){iTxTime1_0 + timeA0ToA5, NS, NS, NS, NS, iTxTime1_5,              NS, NS},
-    (uint64_t[]){timeA0ToA5,              NS, NS, NS, NS, NS,                      NS, NS});
-
-  mockMessageFromAnchor(0, iTxTime2_0 + timeA0ToTag,
-    (uint8_t[]) {12,                      0,  0,  0,  0,  21,                      0, 0},
-    (uint64_t[]){iTxTime2_0,              NS, NS, NS, NS, iTxTime1_5 + timeA0ToA5, NS, NS},
-    (uint64_t[]){NS,                      NS, NS, NS, NS, timeA0ToA5,              NS, NS});
-
-  mockMessageFromAnchor(5, iTxTime2_5 + timeA5ToTag,
-    (uint8_t[]) {12,                      0,  0,  0,  0,  22,                      0, 0},
-    (uint64_t[]){iTxTime2_0 + timeA0ToA5, NS, NS, NS, NS, iTxTime2_5,              NS, NS},
-    (uint64_t[]){timeA0ToA5,              NS, NS, NS, NS, NS,                      NS, NS});
-
-
-  // The outlier filter reports that the data is identified as outliers and should
-  // not be sent to the kalman filter
-  outlierFilterValidateTdoa_IgnoreAndReturn(false);
-
-  // Test
-  uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
-  uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
-  uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
 
@@ -793,23 +739,6 @@ void testEventReceiveTimeoutShouldSetTheRadioInReceiveMode() {
 
   // Assert
   TEST_ASSERT_EQUAL_UINT32(MAX_TIMEOUT, actual);
-}
-
-void testStatusShowsAnchorIsRanging() {
-  // Fixture
-  uint64_t tO = 3 * LOCODECK_TS_FREQ;
-  uint64_t a0O = 1 * LOCODECK_TS_FREQ;
-  uint64_t a1O = 2 * LOCODECK_TS_FREQ;
-  verifyDifferenceOfDistanceWithNoClockDriftButConfigurableClockOffset(tO, a0O, a1O);
-
-  // Expect anchors 0 and 1 to be active
-  uint16_t expected = (1 << 0) | (1 << 1);
-
-  // test
-  uint16_t actual = options.rangingState;
-
-  // Assert
-  TEST_ASSERT_EQUAL_UINT16(expected, actual);
 }
 
 void testThatLppShortPacketIsNotSentToWrongAnchorWhenAvailable() {
@@ -950,7 +879,6 @@ void testDifferenceOfDistanceNotPushedInKalmanIfAnchorsPositionIsInValid() {
     (uint64_t[]){timeA0ToA1,                    NS,               NS, NS, NS, NS, NS, NS});
 
   // The measurement should not be pushed in the kalman filter
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -962,17 +890,24 @@ void testDifferenceOfDistanceNotPushedInKalmanIfAnchorsPositionIsInValid() {
 }
 
 void testLppPacketIsHandled() {
-  // Simplified test, not verifying the actual LPP data
   // Fixture
-  uint8_t lppData[] = {1, 2, 3, 4};
-  uint8_t lppDataSize = sizeof(lppData);
-  uint8_t expectedId = 4;
+  float expectedX = 1.23;
+  float expectedY = 2.34;
+  float expectedZ = 3.45;
 
-  mockMessageFromAnchorWithLppData(expectedId, NS,
+  struct lppShortAnchorPos_s position;
+  position.x = expectedX;
+  position.y = expectedY;
+  position.z = expectedZ;
+
+  uint8_t lppDataSize = sizeof(struct lppShortAnchorPos_s);
+  uint8_t anchorId = 4;
+
+  mockMessageFromAnchorWithLppData(anchorId, NS,
     (uint8_t[]) {0, 0, 0,  0,  0,  0,  0,  0},
     (uint64_t[]){NS, NS, NS, NS, NS, NS, NS, NS},
     (uint64_t[]){NS, NS, NS, NS, NS, NS, NS, NS},
-    lppDataSize, lppData);
+    lppDataSize, (uint8_t*)(&position));
 
   ignoreKalmanEstimatorValidation();
 
@@ -980,7 +915,9 @@ void testLppPacketIsHandled() {
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
 
   // Assert
-  // Verified in mock
+  TEST_ASSERT_EQUAL_FLOAT(expectedX, options.anchorPosition[anchorId].x);
+  TEST_ASSERT_EQUAL_FLOAT(expectedY, options.anchorPosition[anchorId].y);
+  TEST_ASSERT_EQUAL_FLOAT(expectedZ, options.anchorPosition[anchorId].z);
 }
 
 void testThatInitiallyNoRangingAreReportedToBeOk() {
@@ -1019,7 +956,7 @@ static void mockMessageFromAnchorWithLppData(uint8_t anchorIndex, uint64_t rxTim
 
   rangePacket2_t* payload = (rangePacket2_t*)&packet.payload;
   payload->type = 0x22;
-  for (int i = 0; i < LOCODECK_NR_OF_ANCHORS; i++) {
+  for (int i = 0; i < LOCODECK_NR_OF_TDOA2_ANCHORS; i++) {
     payload->sequenceNrs[i] = sequenceNrs[i];
     payload->timestamps[i] = (uint32_t)(timestamps[i] & 0xffffffff);
     payload->distances[i] = (uint16_t)(distances[i] & 0xffff);
@@ -1031,10 +968,6 @@ static void mockMessageFromAnchorWithLppData(uint8_t anchorIndex, uint64_t rxTim
     packet.payload[LPS_TDOA2_LPP_TYPE] = LPP_SHORT_ANCHORPOS;
     memcpy(&packet.payload[LPS_TDOA2_LPP_PAYLOAD], lppData, lppDataSize);
     lppTotalSize = lppDataSize + 2;
-
-    uint8_t* ignore = 0;
-    lpsHandleLppShortPacket_Expect(anchorIndex, ignore, lppTotalSize - 1); // Header byte not included
-    lpsHandleLppShortPacket_IgnoreArg_data();
   }
 
   uint32_t totalDataLength = dataLengthNoLpp + lppTotalSize;
@@ -1059,7 +992,7 @@ static void mockMessageFromAnchorNotComingBackToReceive(uint8_t anchorIndex, uin
 
   rangePacket2_t* payload = (rangePacket2_t*)&packet.payload;
   payload->type = 0x22;
-  for (int i = 0; i < LOCODECK_NR_OF_ANCHORS; i++) {
+  for (int i = 0; i < LOCODECK_NR_OF_TDOA2_ANCHORS; i++) {
     payload->sequenceNrs[i] = sequenceNrs[i];
     payload->timestamps[i] = (uint32_t)(timestamps[i] & 0xffffffff);
     payload->distances[i] = (uint16_t)(distances[i] & 0xffff);
@@ -1182,7 +1115,6 @@ void verifyDifferenceOfDistanceWithNoClockDriftButConfigurableClockOffset(uint64
 
   // Only the last message will create calls to the estimator. The two first are discarded due to missing data.
   mockKalmanEstimator(0, 1, expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -1243,7 +1175,6 @@ void verifyDifferenceOfDistanceWithTwoAnchors3FramesWithClockDrift(float driftTa
   mockKalmanEstimator(0, 5, expectedDiff);
   mockKalmanEstimator(5, 0, -expectedDiff);
   mockKalmanEstimator(0, 5, expectedDiff);
-  outlierFilterValidateTdoa_IgnoreAndReturn(true);
 
   // Test
   uwbTdoa2TagAlgorithm.onEvent(&dev, eventPacketReceived);
@@ -1263,8 +1194,8 @@ static void populateLppPacket(packet_t* packet, char *data, int length, locoAddr
 
   MAC80215_PACKET_INIT((*packet), MAC802154_TYPE_DATA);
   packet->pan = 0xbccf;
-  memcpy(&packet->payload[LPS_TDOA2_SEND_LPP_PAYLOAD], data, length);
-  packet->payload[LPS_TDOA2_TYPE] = LPP_HEADER_SHORT_PACKET;
+  memcpy(&packet->payload[LPS_TDOA2_SEND_LPP_PAYLOAD_INDEX], data, length);
+  packet->payload[LPS_TDOA2_TYPE_INDEX] = LPP_HEADER_SHORT_PACKET;
   packet->sourceAddress = sourceAddress;
   packet->destAddress = destinationAddress;
 }

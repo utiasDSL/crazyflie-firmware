@@ -53,6 +53,7 @@ struct vec3_s {
   float z;
 };
 
+typedef struct vec3_s vector_t;
 typedef struct vec3_s point_t;
 typedef struct vec3_s velocity_t;
 typedef struct vec3_s acc_t;
@@ -152,6 +153,7 @@ typedef struct sensorData_s {
   Axis3f accSec;            // Gs
   Axis3f gyroSec;           // deg/s
 #endif
+  uint64_t interruptTimestamp;
 } sensorData_t;
 
 typedef struct state_s {
@@ -184,15 +186,14 @@ typedef enum mode_e {
 typedef struct setpoint_s {
   uint32_t timestamp;
 
-  attitude_t attitude;
-  attitude_t attitudeRate;
+  attitude_t attitude;      // deg
+  attitude_t attitudeRate;  // deg/s
   quaternion_t attitudeQuaternion;
-
   float thrust;
-  point_t position;
-  velocity_t velocity;
-  acc_t acceleration;
-  bool velocity_body;
+  point_t position;         // m
+  velocity_t velocity;      // m/s
+  acc_t acceleration;       // m/s^2
+  bool velocity_body;       // true if velocity is given in body frame; false if velocity is given in world frame
 
   struct {
     stab_mode_t x;
