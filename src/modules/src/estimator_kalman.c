@@ -75,6 +75,8 @@
 //#define KALMAN_USE_BARO_UPDATE
 //#define KALMAN_NAN_CHECK
 
+#define UWB_MIN_HEIGHT 2.5f // minimum height before you start fusing UWB measurements into the EKF
+
 
 /**
  * Primary Kalman filter functions
@@ -1107,7 +1109,10 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
       };
 
       bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
-      if (sampleIsGood) {
+      tdoa->stdDev = (-0.85f/0.3f)*(estimatedPosition.z) + 1.0f;
+
+
+      if (sampleIsGood && (estimatedPosition.z > UWB_MIN_HEIGHT)) {
         stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
       }
     }
@@ -1616,6 +1621,8 @@ LOG_GROUP_STOP(twr_ekf)
 //LOG_GROUP_STOP(kalman)
 
 PARAM_GROUP_START(kalman)
+  PARAM_ADD(PARAM_FLOAT, init_x, &initialX)
+  PARAM_ADD(PARAM_FLOAT, init_y, &initialY)
   PARAM_ADD(PARAM_UINT8, resetEstimation, &resetEstimation)
 //  PARAM_ADD(PARAM_UINT8, quadIsFlying, &quadIsFlying)
 //  PARAM_ADD(PARAM_FLOAT, pNAcc_xy, &procNoiseAcc_xy)
