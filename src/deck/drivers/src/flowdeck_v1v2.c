@@ -64,6 +64,9 @@ static uint8_t outlierCount = 0;
 static bool isInit1 = false;
 static bool isInit2 = false;
 
+static float dpixelx;
+static float dpixely;
+
 motionBurst_t currentMotion;
 
 // Disables pushing the flow measurement in the EKF
@@ -120,6 +123,8 @@ static void flowdeckTask(void *param)
       // Use raw measurements
       flowData.dpixelx = (float)accpx;
       flowData.dpixely = (float)accpy;
+      dpixelx = flowData.dpixelx;
+      dpixely = flowData.dpixely;
 #endif
       // Push measurements into the Kalman filter
       if (!useFlowDisabled) {
@@ -230,6 +235,8 @@ LOG_ADD(LOG_UINT8, maxRaw, &currentMotion.maxRawData)
 LOG_ADD(LOG_UINT8, minRaw, &currentMotion.minRawData)
 LOG_ADD(LOG_UINT8, Rawsum, &currentMotion.rawDataSum)
 LOG_ADD(LOG_UINT8, outlierCount, &outlierCount)
+LOG_ADD(LOG_FLOAT, dpixelx, &dpixelx)
+LOG_ADD(LOG_FLOAT, dpixely, &dpixely)
 LOG_GROUP_STOP(motion)
 
 PARAM_GROUP_START(motion)

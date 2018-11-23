@@ -52,6 +52,7 @@ static float expStdA = 0.0025f; // STD at elevation expPointA [m]
 static float expPointB = 1.3f;
 static float expStdB = 0.2f;    // STD at elevation expPointB [m]
 static float expCoeff;
+static float zdist;
 
 #define RANGE_OUTLIER_LIMIT 3000 // the measured range is in [mm]
 
@@ -115,6 +116,7 @@ void zRangerTask(void* arg)
       tofData.timestamp = xTaskGetTickCount();
       tofData.distance = (float)range_last * 0.001f; // Scale from [mm] to [m]
       tofData.stdDev = expStdA * (1.0f  + expf( expCoeff * ( tofData.distance - expPointA)));
+      zdist = tofData.distance;
       estimatorKalmanEnqueueTOF(&tofData);
     }
   }
@@ -145,6 +147,10 @@ static const DeckDriver zranger_deck = {
 };
 
 DECK_DRIVER(zranger_deck);
+
+LOG_GROUP_START(zranger)
+LOG_ADD(LOG_FLOAT, zdist, &zdist)
+LOG_GROUP_STOP(zranger)
 
 PARAM_GROUP_START(deck)
 PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcZRanger, &isInit)
