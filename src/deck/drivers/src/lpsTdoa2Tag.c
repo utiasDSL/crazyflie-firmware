@@ -67,28 +67,28 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
    // To set a static anchor position from startup, uncomment and modify the
    // following code:
    //DSL
-//    .anchorPosition = {
-//	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
-//	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
-//	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
-//	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
-//	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
-//	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
-//	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
-//	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
-//    },
+    .anchorPosition = {
+	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
+	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
+	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
+	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
+	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
+	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
+	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
+	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
+    },
 
 	// OPG
-	.anchorPosition = {
-		  {timestamp: 1, x: -1.7911, y: -1.8757, z: 0.1545},
-		  {timestamp: 1, x: -1.9517, y: 2.1574, z: 2.6899},
-		  {timestamp: 1, x: 2.3122, y: -2.3496, z: 0.1533},
-		  {timestamp: 1, x: 2.2837 , y: -2.4442, z: 2.7443},
-		  {timestamp: 1, x: -2.1887, y: -2.5725, z: 2.7729},
-		  {timestamp: 1, x: 2.2656, y: 2.1935, z: 0.1502},
-		  {timestamp: 1, x: 2.4215, y: 2.2767 , z:2.8830},
-		  {timestamp: 1, x: -1.9229, y: 2.0743, z: 0.1582},
-	    },
+//	.anchorPosition = {
+//		  {timestamp: 1, x: -1.7911, y: -1.8757, z: 0.1545},
+//		  {timestamp: 1, x: -1.9517, y: 2.1574, z: 2.6899},
+//		  {timestamp: 1, x: 2.3122, y: -2.3496, z: 0.1533},
+//		  {timestamp: 1, x: 2.2837 , y: -2.4442, z: 2.7443},
+//		  {timestamp: 1, x: -2.1887, y: -2.5725, z: 2.7729},
+//		  {timestamp: 1, x: 2.2656, y: 2.1935, z: 0.1502},
+//		  {timestamp: 1, x: 2.4215, y: 2.2767 , z:2.8830},
+//		  {timestamp: 1, x: -1.9229, y: 2.0743, z: 0.1582},
+//	    },
 };
 
 static lpsTdoa2AlgoOptions_t* options = &defaultOptions;
