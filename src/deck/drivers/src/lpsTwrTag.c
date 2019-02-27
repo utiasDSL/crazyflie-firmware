@@ -40,7 +40,7 @@
 
 #include "stabilizer_types.h"
 #include "estimator_kalman.h"
-#include "arm_math.h"
+#include "cf_math.h"
 
 #include "physicalConstants.h"
 #include "configblock.h"

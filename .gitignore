@@ -13,7 +13,7 @@ version.c
 tags
 
 /cf2.*
-/cf1.*
+/tag.*
 *.gch
 
 /generated-test/**
@@ -22,3 +22,5 @@ tags
 \.idea/
 
 *.pyc
+
+current_platform.mk

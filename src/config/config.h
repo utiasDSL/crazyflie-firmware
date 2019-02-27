@@ -49,9 +49,6 @@
 #define PROTOCOL_VERSION 4
 
 #ifdef STM32F4XX
-#ifndef P_NAME
-  #define P_NAME "Crazyflie 2.0"
-#endif
   #define QUAD_FORMATION_X
 
   #define CONFIG_BLOCK_ADDRESS    (2048 * (64-1))
@@ -157,7 +154,7 @@
 
 //The radio channel. From 0 to 125
 #define RADIO_CHANNEL 80
-#define RADIO_DATARATE RADIO_RATE_250K
+#define RADIO_DATARATE RADIO_RATE_2M
 #define RADIO_ADDRESS 0xE7E7E7E7E7ULL
 
 /**
