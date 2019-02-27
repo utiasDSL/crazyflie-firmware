@@ -201,7 +201,7 @@ bool getExtPosVelBC(state_t *state){
 
 		#ifndef PLATFORM_CF1
 		//    estimatorKalmanEnqueuePosition(&broadcast_pos);
-		estimatorKalmanEnqueuePosVel(&posvel);
+		//    estimatorKalmanEnqueuePosVel(&posvel);           //fusing the Vicon data
 		#endif
 		crtpExtPosCache.new_data = false;
 
