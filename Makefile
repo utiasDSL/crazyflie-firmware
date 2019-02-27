@@ -163,8 +163,8 @@ PROJ_OBJ += position_estimator_altitude.o position_controller_pid.o
 PROJ_OBJ += estimator.o estimator_complementary.o
 PROJ_OBJ += controller.o controller_pid.o controller_mellinger.o
 PROJ_OBJ += power_distribution_$(POWER_DISTRIBUTION).o
-PROJ_OBJ_CF2 += estimator_kalman.o
-PROJ_OBJ_CF2 += physical_constants_cf2.o 
+PROJ_OBJ += estimator_kalman.o
+PROJ_OBJ += physical_constants_cf2.o 
 
 # High-Level Commander
 PROJ_OBJ += crtp_commander_high_level.o planner.o pptraj.o
