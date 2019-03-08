@@ -70,7 +70,7 @@
 #include "param.h"
 
 #include "math.h"
-#include "arm_math.h"
+#include "cf_math.h"
 
 //#define KALMAN_USE_BARO_UPDATE
 //#define KALMAN_NAN_CHECK
@@ -1055,8 +1055,9 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
   // Extra logging variables
   twrDist = d->distance;
   anchorID = d->anchor_ID;
-
-  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+  if (S[STATE_Z] > UWB_MIN_HEIGHT){
+	  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+  }
 }
 
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)

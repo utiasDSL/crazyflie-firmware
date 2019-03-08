@@ -7,7 +7,7 @@
  *
  * Crazyflie control firmware
  *
- * Copyright (C) 2011-2016 Bitcraze AB
+ * Copyright (C) 2011-2018 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,9 +28,9 @@
 
 #include <math.h>
 
+#include "sensors_bmi088_bmp388.h"
 #include "stm32fxxx.h"
 
-#include "sensors.h"
 #include "imu.h"
 
 #include "zranger.h"
@@ -45,7 +45,6 @@
 #include "param.h"
 #include "log.h"
 #include "debug.h"
-#include "imu.h"
 #include "nvicconf.h"
 #include "ledseq.h"
 #include "sound.h"
@@ -167,7 +166,7 @@ static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out);
 static bstdr_ret_t bmi088_burst_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
 {
   /**< Burst read code comes here */
-  if (i2cdevRead(I2C3_DEV, dev_id, reg_addr, (uint16_t) len, reg_data))
+  if (i2cdevReadReg8(I2C3_DEV, dev_id, reg_addr, (uint16_t) len, reg_data))
   {
     return BSTDR_OK;
   }
@@ -187,7 +186,7 @@ static bstdr_ret_t bmi088_burst_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *
 static bstdr_ret_t bmi088_burst_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
 {
   /**< Burst write code comes here */
-  if (i2cdevWrite(I2C3_DEV, dev_id,reg_addr,(uint16_t) len, reg_data))
+  if (i2cdevWriteReg8(I2C3_DEV, dev_id,reg_addr,(uint16_t) len, reg_data))
   {
     return BSTDR_OK;
   }
@@ -229,27 +228,27 @@ static void sensorsScaleBaro(baro_t* baroScaled, float pressure,
       - 1.0f) * (25.0f + 273.15f)) / 0.0065f;
 }
 
-bool sensorsReadGyro(Axis3f *gyro)
+bool sensorsBmi088Bmp388ReadGyro(Axis3f *gyro)
 {
   return (pdTRUE == xQueueReceive(gyroDataQueue, gyro, 0));
 }
 
-bool sensorsReadAcc(Axis3f *acc)
+bool sensorsBmi088Bmp388ReadAcc(Axis3f *acc)
 {
   return (pdTRUE == xQueueReceive(accelerometerDataQueue, acc, 0));
 }
 
-bool sensorsReadMag(Axis3f *mag)
+bool sensorsBmi088Bmp388ReadMag(Axis3f *mag)
 {
   return (pdTRUE == xQueueReceive(magnetometerDataQueue, mag, 0));
 }
 
-bool sensorsReadBaro(baro_t *baro)
+bool sensorsBmi088Bmp388ReadBaro(baro_t *baro)
 {
   return (pdTRUE == xQueueReceive(barometerDataQueue, baro, 0));
 }
 
-void sensorsAcquire(sensorData_t *sensors, const uint32_t tick)
+void sensorsBmi088Bmp388Acquire(sensorData_t *sensors, const uint32_t tick)
 {
   sensorsReadGyro(&sensors->gyro);
   sensorsReadAcc(&sensors->acc);
@@ -261,7 +260,7 @@ void sensorsAcquire(sensorData_t *sensors, const uint32_t tick)
   sensors->interruptTimestamp = sensorData.interruptTimestamp;
 }
 
-bool sensorsAreCalibrated() 
+bool sensorsBmi088Bmp388AreCalibrated()
 {
   return gyroBiasFound;
 }
@@ -334,7 +333,7 @@ static void sensorsTask(void *param)
   }
 }
 
-void sensorsWaitDataReady(void)
+void sensorsBmi088Bmp388WaitDataReady(void)
 {
   xSemaphoreTake(dataReady, portMAX_DELAY);
 }
@@ -537,7 +536,7 @@ static void sensorsInterruptInit(void)
   portENABLE_INTERRUPTS();
 }
 
-void sensorsInit(void)
+void sensorsBmi088Bmp388Init(void)
 {
   if (isInit)
     {
@@ -553,7 +552,7 @@ void sensorsInit(void)
 }
 
 // TODO: Implement proper test
-bool sensorsTest(void)
+bool sensorsBmi088Bmp388Test(void)
 {
   bool testStatus = true;
 
@@ -766,7 +765,7 @@ static bool sensorsFindBiasValue(BiasObj* bias)
   return foundBias;
 }
 
-bool sensorsManufacturingTest(void)
+bool sensorsBmi088Bmp388ManufacturingTest(void)
 {
   return true;
 }
@@ -796,7 +795,7 @@ static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out)
   out->z = ry.z;
 }
 
-void sensorsSetAccMode(accModes accMode)
+void sensorsBmi088Bmp388SetAccMode(accModes accMode)
 {
   switch (accMode)
   {
@@ -840,7 +839,7 @@ static void applyAxis3fLpf(lpf2pData *data, Axis3f* in)
   }
 }
 
-void __attribute__((used)) EXTI14_Callback(void)
+void sensorsBmi088Bmp388DataAvailableCallback(void)
 {
   portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
   imuIntTimestamp = usecTimestamp();
