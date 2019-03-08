@@ -82,6 +82,7 @@ typedef struct tdoaMeasurement_s {
   point_t anchorPosition[2];
   float distanceDiff;
   float stdDev;
+  int anchor_id;
 } tdoaMeasurement_t;
 
 typedef struct baro_s {

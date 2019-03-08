@@ -76,7 +76,8 @@
 //#define KALMAN_NAN_CHECK
 
 #define UWB_MIN_HEIGHT 0.3f // minimum height before you start fusing UWB measurements into the EKF
-
+// #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
+// This method is proved to be not working.(flowdeck is the dominant sensor for now)
 
 /**
  * Primary Kalman filter functions
@@ -318,6 +319,9 @@ static uint32_t takeoffTime;
 static uint32_t tdoaCount;
 static float twrDist;
 static int anchorID;
+
+static float tdoaDist;
+static int tdoaID;
 
 /**
  * Supporting and utility functions
@@ -1109,11 +1113,15 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
       };
 
       bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
-      tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
+      tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
 
 
-      if (sampleIsGood && (estimatedPosition.z > UWB_MIN_HEIGHT)) {
+//      && (estimatedPosition.z > UWB_MIN_HEIGHT)
+
+      if (sampleIsGood&& (estimatedPosition.z > UWB_MIN_HEIGHT)) {   // measurements are good and above the limit height
         stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+        tdoaID = tdoa->anchor_id;
+        tdoaDist = tdoa->distanceDiff;
       }
     }
   }
@@ -1200,9 +1208,10 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
 
 static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
 {
-  // Updates the filter with a measured distance in the zb direction using the
-  float h[STATE_DIM] = {0};
-  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+  // Updates the filter with a measured distance in the z direction
+ //  if(tof->distance<ZRANGE_MAX_HEIGHT) {               //modified here, but it does not work
+	float h[STATE_DIM] = {0};
+	arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[2][2] -> 0)
   if (fabs(R[2][2]) > 0.1 && R[2][2] > 0){
@@ -1223,6 +1232,7 @@ static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
     // Scalar update
     stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, tof->stdDev);
   }
+// }
 }
 
 static void stateEstimatorFinalize(sensorData_t *sensors, uint32_t tick)
@@ -1590,6 +1600,11 @@ LOG_GROUP_START(twr_ekf)
   LOG_ADD(LOG_FLOAT, distance, &twrDist)
   LOG_ADD(LOG_UINT8, anchorID, &anchorID)
 LOG_GROUP_STOP(twr_ekf)
+
+LOG_GROUP_START(tdoa_ekf)
+  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
+  LOG_ADD(LOG_UINT8, anchorID, &tdoaID)
+LOG_GROUP_STOP(tdoa_ekf)
 
 // Stock log groups
 //LOG_GROUP_START(kalman)

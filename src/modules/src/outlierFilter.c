@@ -46,11 +46,11 @@ typedef struct {
 #define FILTER_LEVELS 5
 #define FILTER_NONE FILTER_LEVELS
 filterLevel_t filterLevels[FILTER_LEVELS] = {
-  {.acceptanceLevel = 0.4},
-  {.acceptanceLevel = 0.8},
-  {.acceptanceLevel = 1.2},
-  {.acceptanceLevel = 1.6},
-  {.acceptanceLevel = 2.0},
+  {.acceptanceLevel = 0.4, .bucket = 0},                // initialize the bucket here!
+  {.acceptanceLevel = 0.8, .bucket = 0},
+  {.acceptanceLevel = 1.2, .bucket = 0},
+  {.acceptanceLevel = 1.6, .bucket = 0},
+  {.acceptanceLevel = 2.0, .bucket = 0},
 };
 
 
@@ -75,7 +75,7 @@ bool outlierFilterVaildateTdoaSteps(const tdoaMeasurement_t* tdoa, const float e
     errorDistance = fabsf(error / errorBaseDistance);
 
     int filterIndex = updateBuckets(errorDistance);
-
+/// important part
     if (filterIndex > previousFilterIndex) {
       filterCloseDelayCounter = FILTER_CLOSE_DELAY_COUNT;
     } else if (filterIndex < previousFilterIndex) {
@@ -85,7 +85,7 @@ bool outlierFilterVaildateTdoaSteps(const tdoaMeasurement_t* tdoa, const float e
       }
     }
     previousFilterIndex = filterIndex;
-
+///
     if (filterIndex == FILTER_NONE) {
       // Lost tracking, open up to let the kalman filter converge
       acceptanceLevel = 100.0;
@@ -132,7 +132,7 @@ static int updateBuckets(float errorDistance) {
   int filterIndex = FILTER_NONE;
 
   for (int i = FILTER_LEVELS - 1; i >= 0; i--) {
-    filterLevel_t* filter = &filterLevels[i];
+    filterLevel_t* filter = &filterLevels[i];   //  in each loop, keep the bucket value and change the level values
 
     if (errorDistance < filter->acceptanceLevel) {
       removeFromBucket(filter);

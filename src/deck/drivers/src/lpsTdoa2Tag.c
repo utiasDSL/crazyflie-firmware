@@ -66,17 +66,41 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 
    // To set a static anchor position from startup, uncomment and modify the
    // following code:
-   //DSL
-    .anchorPosition = {
-	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
-	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
-	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
-	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
-	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
-	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
-	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
-	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
-    },
+
+   // UTIAS Hallway
+//   .anchorPosition = {
+//	  {timestamp: 1, x: 5.1003,   y: -1.0476,  z: 3.2269},     //  0
+//	  {timestamp: 1, x: -5.9734,  y: -1.0759,  z: 2.4768},      //  1
+//	  {timestamp: 1, x: 0.0256,   y: 1.0480,   z: 2.4664},       //  2
+//	  {timestamp: 1, x: -6.4853 , y: 1.0701,   z: 3.0526},     //  3
+//	  {timestamp: 1, x: -2.0851,  y: -1.1510,  z: 0.6345},     //  4
+//	  {timestamp: 1, x: 4.7092,   y: 1.0358,   z: 1.1657},      //  5
+//	  {timestamp: 1, x: 0.2384,   y: -0.7644,  z: 3.3861},        //  6
+//	  {timestamp: 1, x: 6.3978,   y: 0.8282,   z: 2.7255},      //  7
+//   },
+   //DSL-new
+   .anchorPosition = {
+	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},     // 0
+	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},      // 1
+	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},       // 5
+	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},     // 3
+	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},     // 4
+	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},      // 2
+	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},        // 6
+	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},      // 7
+   },
+
+   //DSL-old
+//    .anchorPosition = {
+//	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
+//	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
+//	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
+//	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
+//	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
+//	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
+//	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
+//	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
+//    },
 
 	// OPG
 //	.anchorPosition = {
@@ -159,7 +183,7 @@ static void enqueueTDOA(uint8_t anchorA, uint8_t anchorB, double distanceDiff) {
   tdoaMeasurement_t tdoa = {
     .stdDev = MEASUREMENT_NOISE_STD,
     .distanceDiff = distanceDiff,
-
+	.anchor_id = anchorB,
     .anchorPosition[0] = options->anchorPosition[anchorA],
     .anchorPosition[1] = options->anchorPosition[anchorB]
   };
