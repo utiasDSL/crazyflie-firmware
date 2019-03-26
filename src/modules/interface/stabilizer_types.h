@@ -122,6 +122,52 @@ typedef struct posvelMeasurement_s {
   float stdDev_vel;
 } posvelMeasurement_t;
 
+
+// [CHANGE] yaw estimation
+typedef struct posvelyawMeasurement_s {
+	union {
+	    struct {
+	      float x;
+	      float y;
+	      float z;
+	    };
+	    float pos[3];
+	  };
+	union {
+	    struct {
+	      float vx;
+	      float vy;
+	      float vz;
+	    };
+	    float vel[3];
+	  };
+
+	union {
+	    struct {
+	      float yaw;
+	    };
+	    float euler[1];
+	  };
+
+  float stdDev_pos;
+  float stdDev_vel;
+  float stdDev_yaw;
+} posvelyawMeasurement_t;
+
+typedef struct positionYawMeasurement_s {
+  union {
+    struct {
+      float x;
+      float y;
+      float z;
+    };
+    float pos[3];
+  };
+
+  float yaw;
+  float stdDev;
+} positionYawMeasurement_t;
+
 typedef struct distanceMeasurement_s {
   union {
     struct {

@@ -147,7 +147,7 @@ static void sitAwPreThrustUpdateCallOut(setpoint_t *setpoint)
  * Update setpoint according to current situation
  *
  * Called by the stabilizer after state and setpoint update. This function
- * should update the setpoint accordig to the current state situation
+ * should update the setpoint according to the current state situation
  */
 void sitAwUpdateSetpoint(setpoint_t *setpoint, const sensorData_t *sensorData,
                                                const state_t *state)

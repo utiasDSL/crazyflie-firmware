@@ -65,6 +65,7 @@ typedef struct data_vicon {
     posFixed24_t x; // m
     posFixed24_t y; // m
     posFixed24_t z; // m
+    posFixed24_t yaw; // rad [CHANGE] yaw estimation
   } __attribute__((packed)) pose[2];
 } __attribute__((packed)) crtp_vicon_t;
 

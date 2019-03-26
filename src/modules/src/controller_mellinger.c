@@ -80,7 +80,6 @@ static float i_range_m_z  = 1500;
 // roll and pitch angular velocity
 static float kd_omega_rp = 200; // D
 
-
 // Helper variables
 static float i_error_x = 0;
 static float i_error_y = 0;
@@ -120,8 +119,6 @@ bool stateControllerTest(void)
 {
   return true;
 }
-
-
 
 float clamp(float value, float min, float max) {
   if (value < min) return min;
@@ -257,12 +254,7 @@ void stateController(control_t *control, setpoint_t *setpoint,
 	  z_axis_desired.x = cosf(phi)*sinf(tht)*cosf(psi) + sinf(phi)*sinf(tht);
 	  z_axis_desired.y = cosf(phi)*sinf(tht)*sinf(psi) - sinf(phi)*cosf(psi);
 	  z_axis_desired.z = cosf(phi)*cosf(tht);
-
   }
-
-
-
-
 
 
   // [eR]
@@ -349,7 +341,6 @@ void stateController(control_t *control, setpoint_t *setpoint,
   }
 
   // log
-
   setpoint->acceleration.x = target_thrust.x/g_vehicleMass;
   setpoint->acceleration.y = target_thrust.y/g_vehicleMass;
   setpoint->acceleration.z = target_thrust.z/g_vehicleMass;
