@@ -1048,6 +1048,15 @@ static void stateEstimatorUpdateWithPosVelYaw(posvelyawMeasurement_t *posvelyaw,
 	  float yaw_error = posvelyaw->yaw - pred_yaw;
 	  yaw_error_logback = yaw_error;
 
+	  // check yaw_error value to avoid angle discontinuity issue
+	  if (yaw_error > PI){
+		  yaw_error -= (float) 2.0 * PI;
+	  }
+
+	  if (yaw_error <= -PI){
+		  yaw_error += (float) 2.0 * PI;
+	  }
+
 	  // wrap yaw_error between (-PI, PI]
 //	  while (yaw_error > PI){
 //		  yaw_error -= (float) 2.0 * PI;
