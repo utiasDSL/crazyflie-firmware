@@ -79,7 +79,7 @@
 #define UWB_MAX_HEIGHT 0.9f
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
-
+static bool TRI = true;
 /**
  * Primary Kalman filter functions
  *
@@ -156,6 +156,8 @@ static inline bool stateEstimatorHasTDOAPacket(tdoaMeasurement_t *uwb) {
   return (pdTRUE == xQueueReceive(tdoaDataQueue, uwb, 0));
 }
 
+// New functions for TWR trilateration
+static void stateEstimatorUpdateWithTri(distanceMeasurement_t *dist);
 
 // Measurements of flow (dnx, dny)
 static xQueueHandle flowDataQueue;
@@ -477,7 +479,6 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
   lastPNUpdate = osTick;
 
 
-
   /**
    * Update the state estimate with the barometer measurements
    */
@@ -521,11 +522,27 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
     doneUpdate = true;
   }
 
+//  major changes
+//  modify here for trilateration
   distanceMeasurement_t dist;
-  while (stateEstimatorHasDistanceMeasurement(&dist))
-  {
-    stateEstimatorUpdateWithDistance(&dist);
-    doneUpdate = true;
+  if(TRI){   // using trilateration
+	int	i=0;   // set local variable i
+	distanceMeasurement_t d[4];  // an array with type "distanceMeasurement_t"
+	while (stateEstimatorHasDistanceMeasurement(&dist))
+	  { if(i>3){  // receive for anchor distance
+			stateEstimatorUpdateWithTri(&d[0]);   // send all four distance into the tri-function
+			doneUpdate = true;
+			i=0;    // reset the flag
+		}else{
+			if(dist.anchor_ID !=d[i].anchor_ID){
+				d[i] = dist;  // send the twr info to d[i]
+				i++;}
+			}
+	   }
+  }else{      // using simple ranging measurements
+	while (stateEstimatorHasDistanceMeasurement(&dist))
+	stateEstimatorUpdateWithDistance(&dist);
+	doneUpdate = true;
   }
 
   positionMeasurement_t pos;
@@ -1027,41 +1044,49 @@ static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel, sensorDa
 	  }
 }
 //TWR
+// implement TWR-trilateration before fusing into EKF
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 {
-  // a measurement of distance to point (x, y, z)
-  float h[STATE_DIM] = {0};
-  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
-// d->x,y,z is the anchor's position
-  float dx = S[STATE_X] - d->x;
-  float dy = S[STATE_Y] - d->y;
-  float dz = S[STATE_Z] - d->z;
+	  // a measurement of distance to point (x, y, z)
+	  float h[STATE_DIM] = {0};
+	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+	  // d->x,y,z is the anchor's position
+	  float dx = S[STATE_X] - d->x;
+	  float dy = S[STATE_Y] - d->y;
+	  float dz = S[STATE_Z] - d->z;
 
-  float measuredDistance = d->distance;
+	  float measuredDistance = d->distance;
 
-  float predictedDistance = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2));
-  if (predictedDistance != 0.0f)
-  {
+	  float predictedDistance = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2));
+	  if (predictedDistance != 0.0f)
+	  {
     // The measurement is: z = sqrt(dx^2 + dy^2 + dz^2). The derivative dz/dX gives h.
-    h[STATE_X] = dx/predictedDistance;
-    h[STATE_Y] = dy/predictedDistance;
-    h[STATE_Z] = dz/predictedDistance;
-  }
-  else
-  {
-    // Avoid divide by zero
-    h[STATE_X] = 1.0f;
-    h[STATE_Y] = 0.0f;
-    h[STATE_Z] = 0.0f;
-  }
-
-  // Extra logging variables
-  twrDist = d->distance;
-  anchorID = d->anchor_ID;
-//  if (S[STATE_Z] > UWB_MIN_HEIGHT){
-	  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
-//  }
+		  h[STATE_X] = dx/predictedDistance;
+		  h[STATE_Y] = dy/predictedDistance;
+		  h[STATE_Z] = dz/predictedDistance;
+	  }
+	  else
+	  {
+		  // Avoid divide by zero
+		  h[STATE_X] = 1.0f;
+		  h[STATE_Y] = 0.0f;
+		  h[STATE_Z] = 0.0f;
+	  }
+	  // Extra logging variables
+	  twrDist = d->distance;
+	  anchorID = d->anchor_ID;
+	  //  if (S[STATE_Z] > UWB_MIN_HEIGHT){
+	  	  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+	  	  //  }
 }
+
+// major trilateration function
+static void stateEstimatorUpdateWithTri(distanceMeasurement_t *d){
+
+
+}
+
+
 //TDoA
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 {
