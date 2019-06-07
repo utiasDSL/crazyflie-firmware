@@ -78,29 +78,41 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //	  {timestamp: 1, x: 0.2384,   y: -0.7644,  z: 3.3861},        //  6
 //	  {timestamp: 1, x: 6.3978,   y: 0.8282,   z: 2.7255},      //  7
 //   },
-   //DSL-new
-   .anchorPosition = {
-	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},     // 0
-	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},      // 1
-	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},       // 5
-	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},     // 3
-	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},     // 4
-	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},      // 2
-	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},        // 6
-	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},      // 7
-   },
+   //DSL-on the ground
+//   .anchorPosition = {
+//	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},     //
+//	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},      //
+//	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},       //
+//	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},     //
+//	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},     //
+//	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},      //
+//	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},        //
+//	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},      //
+//   },
 
-   //DSL-old
-//    .anchorPosition = {
-//	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
-//	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
-//	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
-//	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
-//	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
-//	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
-//	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
-//	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
-//    },
+   //DSL-06
+   .anchorPosition = {
+   		  {timestamp: 1, x: -3.4838, y: -3.2145, z: 0.7981},   //0     gound
+   		  {timestamp: 1, x: -3.6562, y:  4.8784, z: 3.1854},   //1     top
+   		  {timestamp: 1, x:  3.3777, y:  4.4367, z: 0.9782},   //2     ground
+   		  {timestamp: 1, x:  4.1032, y: -3.5395, z: 3.4291},   //3     top
+   		  {timestamp: 1, x: -3.6263, y: -3.4597, z: 3.1376},   //4     top
+   		  {timestamp: 1, x:  2.9114, y: -3.2149, z: 0.9742},   //5     ground
+		  {timestamp: 1, x:  4.1181, y:  4.8492, z: 3.3681},   //6     top
+		  {timestamp: 1, x: -3.1064, y:  4.4783, z: 0.9758},   //7     ground
+       },
+
+//DSL-0507     set by testing in matlab, need to be recalibrate
+//   .anchorPosition = {
+//   		  {timestamp: 1, x: -3.0803, y: -3.5855, z: 0.7981},   //0     gound
+//   		  {timestamp: 1, x: -3.3889, y:  4.6313, z: 2.9012},   //1     top
+//   		  {timestamp: 1, x:  2.7742, y:  4.9177, z: 0.7682},   //2     ground
+//   		  {timestamp: 1, x:  4.0702, y: -3.0581, z: 2.9466},   //3     top
+//   		  {timestamp: 1, x: -3.4189, y: -3.4699, z: 2.8571},   //4     top
+//   		  {timestamp: 1, x:  3.2407, y: -2.8522, z: 0.9732},   //5     ground
+//		  {timestamp: 1, x:  3.7480, y:  4.7493, z: 2.9282},   //6     top
+//		  {timestamp: 1, x: -3.5952, y:  4.1491, z: 0.7702},   //7     ground
+//       },
 
 	// OPG
 //	.anchorPosition = {

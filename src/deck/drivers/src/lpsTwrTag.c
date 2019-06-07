@@ -77,17 +77,27 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 
    // To set a static anchor position from startup, uncomment and modify the
    // following code:
-    .anchorPosition = {
-	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
-	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
-	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
-	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
-	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
-	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
-	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
-	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
-    },
-
+//    .anchorPosition = {
+//	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
+//	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
+//	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
+//	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
+//	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
+//	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
+//	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
+//	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
+//    },
+  //DSL-06
+   .anchorPosition = {
+	   		  {timestamp: 1, x: -3.4838, y: -3.2145, z: 0.7981},   //0     gound
+	   		  {timestamp: 1, x: -3.6562, y:  4.8784, z: 3.1854},   //1     top
+	   		  {timestamp: 1, x:  3.3777, y:  4.4367, z: 0.9782},   //2     ground
+	   		  {timestamp: 1, x:  4.1032, y: -3.5395, z: 3.4291},   //3     top
+	   		  {timestamp: 1, x: -3.6263, y: -3.4597, z: 3.1376},   //4     top
+	   		  {timestamp: 1, x:  2.9114, y: -3.2149, z: 0.9742},   //5     ground
+			  {timestamp: 1, x:  4.1181, y:  4.8492, z: 3.3681},   //6     top
+			  {timestamp: 1, x: -3.1064, y:  4.4783, z: 0.9758},   //7     ground
+	       },
     .combinedAnchorPositionOk = true,
 };
 
@@ -255,6 +265,7 @@ static uint32_t rxcallback(dwDevice_t *dev) {
 
       rangingOk = true;
 
+/////
       if ((options->combinedAnchorPositionOk || options->anchorPosition[current_anchor].timestamp) &&
           (diff < (OUTLIER_TH*stddev))) {
         distanceMeasurement_t dist;
@@ -264,7 +275,7 @@ static uint32_t rxcallback(dwDevice_t *dev) {
         dist.z = options->anchorPosition[current_anchor].z;
         dist.stdDev = 0.25;
         dist.anchor_ID = current_anchor;
-        if (validAnchors[current_anchor] && false)
+        if (validAnchors[current_anchor])
         	estimatorKalmanEnqueueDistance(&dist);
       }
 

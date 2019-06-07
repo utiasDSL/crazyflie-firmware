@@ -72,10 +72,11 @@
 #include "math.h"
 #include "cf_math.h"
 
-//#define KALMAN_USE_BARO_UPDATE
+//#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
-#define UWB_MIN_HEIGHT 0.3f // minimum height before you start fusing UWB measurements into the EKF
+#define UWB_MIN_HEIGHT 0.9f // minimum height before you start fusing UWB measurements into the EKF
+#define UWB_MAX_HEIGHT 0.9f
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 
@@ -117,6 +118,7 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
 static xQueueHandle distDataQueue;
 #define DIST_QUEUE_LENGTH (10)
 
+// Measurements of a UWB TWR
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *dist);
 
 static inline bool stateEstimatorHasDistanceMeasurement(distanceMeasurement_t *dist) {
@@ -259,7 +261,7 @@ static float dragZ = 0.00f;
 // We track a TDOA skew as part of the Kalman filter
 static const float stdDevInitialSkew = 0.1;
 //static float procNoiseSkew = 10e-6f; // seconds per second^2 (is multiplied by dt to give skew noise)
-
+static float log_yaw = 0.0f;
 /**
  * Quadrocopter State
  *
@@ -1024,12 +1026,13 @@ static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel, sensorDa
 	    stateEstimatorScalarUpdate(&H, posvel->vel[i] - pred_vel_w, posvel->stdDev_vel);
 	  }
 }
+//TWR
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 {
   // a measurement of distance to point (x, y, z)
   float h[STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, STATE_DIM, h};
-
+// d->x,y,z is the anchor's position
   float dx = S[STATE_X] - d->x;
   float dy = S[STATE_Y] - d->y;
   float dz = S[STATE_Z] - d->z;
@@ -1055,11 +1058,11 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
   // Extra logging variables
   twrDist = d->distance;
   anchorID = d->anchor_ID;
-  if (S[STATE_Z] > UWB_MIN_HEIGHT){
+//  if (S[STATE_Z] > UWB_MIN_HEIGHT){
 	  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
-  }
+//  }
 }
-
+//TDoA
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 {
   if (tdoaCount >= 100)
@@ -1190,9 +1193,10 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
   hx[STATE_Z] = (Npix * flow->dt / thetapix) * ((R[2][2] * dx_g) / (-z_g * z_g));
   hx[STATE_PX] = (Npix * flow->dt / thetapix) * (R[2][2] / z_g);
 
-  //First update
-  stateEstimatorScalarUpdate(&Hx, measuredNX-predictedNX, flow->stdDevX);
-
+  // X update
+//  if(S[STATE_Z] < UWB_MAX_HEIGHT){
+	  stateEstimatorScalarUpdate(&Hx, measuredNX-predictedNX, flow->stdDevX);
+//  }
   // ~~~ Y velocity prediction and update ~~~
   float hy[STATE_DIM] = {0};
   arm_matrix_instance_f32 Hy = {1, STATE_DIM, hy};
@@ -1203,8 +1207,10 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
   hy[STATE_Z] = (Npix * flow->dt / thetapix) * ((R[2][2] * dy_g) / (-z_g * z_g));
   hy[STATE_PY] = (Npix * flow->dt / thetapix) * (R[2][2] / z_g);
 
-  // Second update
+//   Y update
+//  if(S[STATE_Z] < UWB_MAX_HEIGHT){
   stateEstimatorScalarUpdate(&Hy, measuredNY-predictedNY, flow->stdDevY);
+//  }
 }
 
 static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
@@ -1231,7 +1237,10 @@ static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
     //h[STATE_Z] = 1 / cosf(angle);
 
     // Scalar update
-    stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, tof->stdDev);
+    // Z update
+    if(S[STATE_Z]<UWB_MAX_HEIGHT){
+    	stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, tof->stdDev);
+     }
   }
 // }
 }
@@ -1401,6 +1410,8 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
       .pitch = -pitch*RAD_TO_DEG,
       .yaw = yaw*RAD_TO_DEG
   };
+
+  log_yaw = yaw*RAD_TO_DEG;  // save yaw angle for logging (testing)
 
   // Save quaternion, hopefully one day this could be used in a better controller.
   // Note that this is not adjusted for the legacy coordinate system
@@ -1600,12 +1611,13 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 LOG_GROUP_START(twr_ekf)
   LOG_ADD(LOG_FLOAT, distance, &twrDist)
   LOG_ADD(LOG_UINT8, anchorID, &anchorID)
+  LOG_ADD(LOG_FLOAT, yaw, &log_yaw)
 LOG_GROUP_STOP(twr_ekf)
 
-LOG_GROUP_START(tdoa_ekf)
-  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
-  LOG_ADD(LOG_UINT8, anchorID, &tdoaID)
-LOG_GROUP_STOP(tdoa_ekf)
+//LOG_GROUP_START(tdoa_ekf)
+//  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
+//  LOG_ADD(LOG_UINT8, anchorID, &tdoaID)
+//LOG_GROUP_STOP(tdoa_ekf)
 
 // Stock log groups
 //LOG_GROUP_START(kalman)
