@@ -72,6 +72,7 @@
 #include "math.h"
 #include "cf_math.h"
 
+#include "debug.h"
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
@@ -79,7 +80,9 @@
 #define UWB_MAX_HEIGHT 0.9f
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
-static bool TRI = true;
+static bool TRI = false;
+static bool Compensate = true;
+static bool enable_flow = false;
 /**
  * Primary Kalman filter functions
  *
@@ -324,8 +327,16 @@ static uint32_t tdoaCount;
 static float twrDist;
 static int anchorID;
 
+// log variable for Trilateration check
+static float logtri_x;
+static float logtri_y;
+static float logtri_z;
+//debug
+static int logtri_num=0;
+static int logcheck;
 static float tdoaDist;
 static int tdoaID;
+static float logzrange = 0.0f;
 
 /**
  * Supporting and utility functions
@@ -530,22 +541,49 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
 
 //  major changes
 //  modify here for trilateration
+//  need to look at the entire logic of the onboard code
   distanceMeasurement_t dist;
-  if(TRI){   // using trilateration
-	int	i=0;   // set local variable i
-	distanceMeasurement_t d[4];  // an array with type "distanceMeasurement_t"
-	while (stateEstimatorHasDistanceMeasurement(&dist))
-	  { if(i>3){  // receive for anchor distance
-			stateEstimatorUpdateWithTri(d,4.0);   // send all four distance into the tri-function
+  if(TRI)// using trilateration
+  {	  	int	i=0;   // set local variable i
+        bool check = true;
+		distanceMeasurement_t d[4];  // an array with type "distanceMeasurement_t"
+		while (stateEstimatorHasDistanceMeasurement(&dist))
+	   {
+		 twrDist = dist.distance;
+		 anchorID = dist.anchor_ID;
+		 // print out debug information
+
+		 // DEBUG_PRINT("anchorID: %0.2f\n",(double)anchorID);
+
+		 if(i > 3){  // receive for anchor distance
+			stateEstimatorUpdateWithTri(d,4.0);   // send all four distances into the tri-function
 			doneUpdate = true;
 			i=0;    // reset the flag
-		}else{
-			if(dist.anchor_ID !=d[i].anchor_ID){
-				d[i] = dist;  // send the twr info to d[i]
-				i++;}
+			check = true;
+			}
+		 else{
+				//  iterate all previous ranging data for the uwb anchor check
+				for(int j = 0; j < i ;j++){
+					if(dist.anchor_ID == d[j].anchor_ID){
+						check = false;
+					}  // if data is from the same uwb anchor before, check is false.
+				}
+				//  after the checking procedure, see if the new data is from a different anchor
+				//  Debug: check dist.anchor_ID ??
+				logcheck = check;     // check is always 1
+//				logcheck = d[0].anchor_ID;  // d[0].anchor_ID is always 0.0, the index is wrong
+				if(check){            // if passing the check process.
+						d[i] = dist;  // send the twr info to d[i]
+						i++;
+						logtri_num = i; // i is always 1 right now
+					}
+				else{
+					check = true;
+				}    //  if not passing the check process, reset the check label.
 			}
 	   }
-  }else{      // using simple ranging measurements
+    }
+  else{      // using simple ranging measurements
 	while (stateEstimatorHasDistanceMeasurement(&dist))
 	stateEstimatorUpdateWithDistance(&dist);
 	doneUpdate = true;
@@ -1060,9 +1098,40 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 	  float dx = S[STATE_X] - d->x;
 	  float dy = S[STATE_Y] - d->y;
 	  float dz = S[STATE_Z] - d->z;
-
-	  float measuredDistance = d->distance;
-
+	  float measuredDistance = 0.0f;
+	  if (Compensate){
+		  switch(d->anchor_ID){
+		  	  case 0:
+		  		 measuredDistance = d->distance + 0.2f;
+			  break;
+		  	  case 1:
+		  		 measuredDistance = d->distance + 0.4f;
+			  break;
+		  	  case 2:
+		  		 measuredDistance = d->distance + 0.2f;
+			  break;
+		  	  case 3:
+		  		 measuredDistance = d->distance + 0.4f;
+			  break;
+		  	  case 4:
+		  		 measuredDistance = d->distance + 0.3f;
+			  break;
+		  	  case 5:
+		  		 measuredDistance = d->distance + 0.28f;
+			  break;
+		  	  case 6:
+		  		 measuredDistance = d->distance + 0.46f;
+			  break;
+		  	  case 7:
+		  		 measuredDistance = d->distance + 0.23f;
+			  break;
+		  	  default :
+		  		break;
+		  }
+	  }
+	  else{
+		   measuredDistance = d->distance;
+	  }
 	  float predictedDistance = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2));
 	  if (predictedDistance != 0.0f)
 	  {
@@ -1089,6 +1158,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 // major trilateration function
 static void stateEstimatorUpdateWithTri(distanceMeasurement_t *d, float N)
 {
+	  //debug
 	  // computing matrices
 	  float a_f32[3]={0};
       arm_matrix_instance_f32 sum_a = {3, 1, a_f32};
@@ -1100,6 +1170,7 @@ static void stateEstimatorUpdateWithTri(distanceMeasurement_t *d, float N)
       arm_matrix_instance_f32 sum_H = {3, 3, H_f32};
       float sum_q1,sum_q2;             // Temporary variables
       sum_q1 = 0.0f; sum_q2 = 0.0f;
+
       for (int i=0; i<N; i++){
     	  float pi_f32[3] = {d[i].x, d[i].y, d[i].z};
     	  arm_matrix_instance_f32 pi = {3, 1, pi_f32};
@@ -1111,91 +1182,92 @@ static void stateEstimatorUpdateWithTri(distanceMeasurement_t *d, float N)
     	  /* calculation of pi transpose */
     	  mat_trans(&pi, &piT);
     	  // Temporary matrices for computing
-    	  static float tmp1_f32[9];
+    	  static float tmp1_f32[9]={0};
     	  static arm_matrix_instance_f32 tmp1 = {3, 3, tmp1_f32};
-    	  static float tmp2_f32[3];
+    	  static float tmp2_f32[3]={0};
     	  static arm_matrix_instance_f32 tmp2 = {3, 1, tmp2_f32};
 
-    	  static float tmp3_f32[3];
-    	  tmp3_f32[0]=-ri*ri*d[i].x;
-    	  tmp3_f32[0]=-ri*ri*d[i].y;
-    	  tmp3_f32[0]=-ri*ri*d[i].z;
-    	  static arm_matrix_instance_f32 tmp3 = {3, 1, tmp3_f32};
+    	  static float tmp3_f32[3]={0};
+    	  tmp3_f32[0] = -ri*ri*d[i].x;
+    	  tmp3_f32[1] = -ri*ri*d[i].y;
+    	  tmp3_f32[2] = -ri*ri*d[i].z;
+    	  static arm_matrix_instance_f32 tmp3 = {3, 1, tmp3_f32};  // tmp3 = - ri^2*pi
 
-    	  static float tmp4_f32[3];
+    	  static float tmp4_f32[3]={0};
     	  static arm_matrix_instance_f32 tmp4 = {3, 1, tmp4_f32};
-    	  static float tmp5_f32[1];
+    	  static float tmp5_f32[1]={0};
     	  static arm_matrix_instance_f32 tmp5 = {1, 1, tmp5_f32};
-    	  static float tmp6_f32[9];
+    	  static float tmp6_f32[9]={0};
     	  static arm_matrix_instance_f32 tmp6 = {3, 3, tmp6_f32};
     	  // matrix computation
     	  // compute sum_a
-    	  mat_mult(&pi, &piT, &tmp1);           //  pi*pi'
-    	  mat_mult(&tmp1, &pi, &tmp2);          //  pi*pi'*pi
-    	  mat_add(&tmp2, &tmp3,&tmp4);          //  pi*pi'*pi - ri^2*pi
+    	  mat_mult(&pi, &piT, &tmp1);           //  tmp1=pi*pi'
+    	  mat_mult(&tmp1, &pi, &tmp2);          //  tmp2=pi*pi'*pi
+    	  mat_add(&tmp2, &tmp3,&tmp4);          //  tmp5=pi*pi'*pi - ri^2*pi
     	  mat_add(&sum_a, &tmp4 ,&sum_a);       //  sum_a = sum_a + pi*pi'*pi - ri^2*pi;
           // compute sum_B
-    	  mat_scale(&tmp1, 2.0, &tmp1);         //  -2*pi*pi'   (tmp1)
-    	  mat_mult(&piT, &pi, &tmp5);                         //   pi'*pi
-    	  float eye1_f32[9]={1, 0, 0, 0, 1, 0, 0, 0, 1};      //  -tmp5[0]
-    	  arm_matrix_instance_f32 eye1 = {3, 3, eye1_f32};    //  -pi'*pi*eye(3)
-    	  //tmp5.pData[0]  ?? Is this the right index ??
-    	  mat_scale(&eye1, -tmp5.pData[0], &eye1);
+    	  mat_scale(&tmp1, 2.0, &tmp1);         //  tmp1=-2*pi*pi'
+    	  mat_mult(&piT, &pi, &tmp5);                      //   tmp5=pi'*pi
+    	  float eye1_f32[9]={1, 0, 0, 0, 1, 0, 0, 0, 1};   //
+    	  arm_matrix_instance_f32 eye1 = {3, 3, eye1_f32}; //   eye1=eye(3)
+    	  //  tmp5.pData[0]  ?? Is this the right index ??
+    	  //  tmp5_f32
+    	  mat_scale(&eye1, -tmp5_f32[0], &eye1);           //   eye1 = -pi'*pi*eye(3)
     	  float eye2_f32[9]={1, 0, 0, 0, 1, 0, 0, 0, 1};
-    	  arm_matrix_instance_f32 eye2 = {3, 3, eye2_f32};    //   ri^2*eye(3)
-    	  mat_scale(&eye2, ri*ri, &eye2);
-    	  mat_add(&tmp1, &eye1, &tmp6);
-    	  mat_add(&tmp6, &eye2, &tmp6);
-    	  mat_add(&sum_B, &tmp6,&sum_B);
+    	  arm_matrix_instance_f32 eye2 = {3, 3, eye2_f32}; //   eye2=eye(3)
+    	  mat_scale(&eye2, ri*ri, &eye2);                  //   eye2 = ri^2*eye(3)
+    	  mat_add(&tmp1, &eye1, &tmp6);                    //   tmp6=-2*pi*pi'-pi'*pi*eye(3)
+    	  mat_add(&tmp6, &eye2, &tmp6);                    //   tmp6=-2*pi*pi'-pi'*pi*eye(3)+ri^2*eye(3)
+    	  mat_add(&sum_B, &tmp6,&sum_B);                   //   sum_B=sum_B+tmp6
     	  // compute sum_c
     	  mat_add(&sum_c, &pi, &sum_c);
     	  // compute sum_H
-    	  mat_mult(&pi, &piT, &tmp1);           //  pi*pi'
-    	  mat_add(&sum_H, &tmp1, &sum_H);
+    	  mat_mult(&pi, &piT, &tmp1);           //  tmp1=pi*pi'
+    	  mat_add(&sum_H, &tmp1, &sum_H);       //  sum_H=sum_H+pi*pi'
     	  // compute sum_q1
-    	  mat_mult(&piT, &pi, &tmp5);           //  pi'*pi
-    	  sum_q1 += tmp5.pData[0];
+    	  mat_mult(&piT, &pi, &tmp5);           //  tmp5=pi'*pi
+    	  sum_q1 += tmp5_f32[0];
     	  // compute sum_q2
     	  sum_q2 += ri*ri;
       }
-      mat_scale(&sum_a, N, &sum_a);             // a
-      mat_scale(&sum_B, N, &sum_B);             // B
-      mat_scale(&sum_c, N, &sum_c);             // c
-	  static float cT_f32[3];
-	  static arm_matrix_instance_f32 cT = {3, 1, cT_f32};   //  c'
+      mat_scale(&sum_a, N, &sum_a);             // a=sum_a=(1/N)*sum_a
+      mat_scale(&sum_B, N, &sum_B);             // B=sum_B=(1/N)*sum_B
+      mat_scale(&sum_c, N, &sum_c);             // c=sum_c=(1/N)*sum_c
+	  static float cT_f32[3]={0};
+	  static arm_matrix_instance_f32 cT = {3, 1, cT_f32};   //  cT=c'
 	  mat_trans(&sum_c, &cT);
-	  static float tmp7_f32[3];
+	  static float tmp7_f32[3]={0};
 	  static arm_matrix_instance_f32 tmp7 = {3, 1, tmp7_f32};
 	  mat_mult(&sum_B, &sum_c, &tmp7);         // tmp7 = B*c
-	  static float tmp8_f32[9];
+	  static float tmp8_f32[9]={0};
 	  static arm_matrix_instance_f32 tmp8 = {3, 3, tmp8_f32};
-	  mat_mult(&sum_c, &cT, &tmp8);     // c*c'
-	  static float tmp9_f32[3];
+	  mat_mult(&sum_c, &cT, &tmp8);            // tmp8 = c*c'
+	  static float tmp9_f32[3]={0};
 	  static arm_matrix_instance_f32 tmp9 = {3, 1, tmp9_f32};
-	  mat_mult(&tmp8, &sum_c, &tmp9);
-	  mat_scale(&tmp9, 2.0, &tmp9);     //  tmp9 = 2*c*c'*c
-	  static float f_f32[3];
+	  mat_mult(&tmp8, &sum_c, &tmp9);          // tmp9 = c*c'*c
+	  mat_scale(&tmp9, 2.0, &tmp9);            // tmp9 = 2*c*c'*c
+	  static float f_f32[3]={0};
 	  static arm_matrix_instance_f32 f = {3, 1, f_f32};
-	  mat_add(&f, &sum_a, &f);
-	  mat_add(&f, &tmp7, &f);
-	  mat_add(&f, &tmp9, &f);              //f = a + B*c + 2*c*c'*c;
-	  mat_scale(&sum_H, -0.5 , &sum_H);   //(-2/N)*sum_H
-	  static float tmp10_f32[9];
-	  static arm_matrix_instance_f32 H_tmp = {3, 3, tmp10_f32};   // H_tmp = H
-	  mat_add(&H_tmp, &sum_H, &H_tmp);
-	  static float tmp11_f32[9];
+	  mat_add(&f, &sum_a, &f);                 // f = a
+	  mat_add(&f, &tmp7, &f);                  // f = a + B*c
+	  mat_add(&f, &tmp9, &f);                  // f = a + B*c + 2*c*c'*c;
+	  mat_scale(&sum_H, -0.5 , &sum_H);        // sum_H=(-2/N)*sum_H
+	  static float tmp10_f32[9]={0};
+	  static arm_matrix_instance_f32 H_tmp = {3, 3, tmp10_f32};   // H_tmp => H
+	  mat_add(&H_tmp, &sum_H, &H_tmp);         // H_tmp = (-2/N)*sum_H
+	  static float tmp11_f32[9]={0};
 	  static arm_matrix_instance_f32 tmp11 = {3, 3, tmp11_f32};
-	  mat_mult(&sum_c, &cT, &tmp11);       //  c*c'
-	  mat_scale(&tmp11, 2.0 , &tmp11);     //  2*c*c'
-	  mat_add(&H_tmp, &tmp11, &H_tmp);
-	  static float tmp12_f32[9];
+	  mat_mult(&sum_c, &cT, &tmp11);       //  tmp11 = c*c'
+	  mat_scale(&tmp11, 2.0 , &tmp11);     //  tmp11 = 2*c*c'
+	  mat_add(&H_tmp, &tmp11, &H_tmp);     //  H_tmp = (-2/N)*sum_H+2*c*c'
+	  static float tmp12_f32[9]={0};
 	  static arm_matrix_instance_f32 inv_H = {3, 3, tmp12_f32};
-	  mat_inv(&H_tmp,&inv_H);                  //  inv(H)
-	  mat_mult(&inv_H,&f,&f);               // f = inv(H)*f
-	  mat_scale(&f, -1.0, &f);             // f = -inv(H)*f = q
-	  static float po_f32[3];
+	  mat_inv(&H_tmp,&inv_H);              //  inv_H = H_tmp^(-1)
+	  mat_mult(&inv_H,&f,&f);              //  f = inv(H)*f
+	  mat_scale(&f, -1.0, &f);             //  f = -inv(H)*f = q
+	  static float po_f32[3]={0};
 	  static arm_matrix_instance_f32 po = {3, 1, po_f32};
-	  mat_add(&f, &sum_c, &po);
+	  mat_add(&f, &sum_c, &po);            //  po = f+sum_c = q + c
 	  // po are the esimated states x, y, and z
 	  // (this part follow the "stateEstimatorUpdateWithPosition" function)
 	  // do a scalar update for each state, since this should be faster than updating all together
@@ -1207,7 +1279,12 @@ static void stateEstimatorUpdateWithTri(distanceMeasurement_t *d, float N)
 	    float h[STATE_DIM] = {0};
 	    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 	    h[STATE_X+i] = 1;
-	    stateEstimatorScalarUpdate(&H, po.pData[i] - S[STATE_X+i], std[i]);
+	    // use po_f32[i] instead of po.pData[i]
+	    // log back the tri results
+	    logtri_x = po_f32[0];
+	    logtri_y = po_f32[1];
+		logtri_z = po_f32[2];
+	    stateEstimatorScalarUpdate(&H, po_f32[i] - S[STATE_X+i], std[i]);
 	  }
 }
 
@@ -1297,7 +1374,7 @@ static float measuredNY;
 static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *sensors)
 {
   // Inclusion of flow measurements in the EKF done by two scalar updates
-
+  if (enable_flow){    // if enable flow when using flowdeck.
   // ~~~ Camera constants ~~~
   // The angle of aperture is guessed from the raw data register and thankfully look to be symmetric
   float Npix = 30.0;                      // [pixels] (same in x and y)
@@ -1361,6 +1438,7 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
 //  if(S[STATE_Z] < UWB_MAX_HEIGHT){
   stateEstimatorScalarUpdate(&Hy, measuredNY-predictedNY, flow->stdDevY);
 //  }
+  }
 }
 
 static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
@@ -1385,12 +1463,12 @@ static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
     // h = z/((R*z_b)\dot z_b) = z/cos(alpha)
     h[STATE_Z] = 1 / R[2][2];
     //h[STATE_Z] = 1 / cosf(angle);
-
+    logzrange = measuredDistance;     // log the zrange
     // Scalar update
     // Z update
-    if(S[STATE_Z]<UWB_MAX_HEIGHT){
+    //if(S[STATE_Z]<UWB_MAX_HEIGHT){
     	stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, tof->stdDev);
-     }
+    // }
   }
 // }
 }
@@ -1762,6 +1840,12 @@ LOG_GROUP_START(twr_ekf)
   LOG_ADD(LOG_FLOAT, distance, &twrDist)
   LOG_ADD(LOG_UINT8, anchorID, &anchorID)
   LOG_ADD(LOG_FLOAT, yaw, &log_yaw)
+  LOG_ADD(LOG_FLOAT, zrange, &logzrange)
+//  LOG_ADD(LOG_FLOAT, tri_x, &logtri_x)
+//  LOG_ADD(LOG_FLOAT, tri_y, &logtri_y)
+//  LOG_ADD(LOG_FLOAT, tri_z, &logtri_z)
+//  LOG_ADD(LOG_UINT8, tri_num, &logtri_num)    // tri_num is always 1
+//  LOG_ADD(LOG_UINT8, tri_check, &logcheck)    // log back the check
 LOG_GROUP_STOP(twr_ekf)
 
 //LOG_GROUP_START(tdoa_ekf)
