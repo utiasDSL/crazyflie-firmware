@@ -81,7 +81,7 @@
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool TRI = false;
-static bool Compensate = true;
+static bool Compensate = false;
 static bool enable_flow = false;
 /**
  * Primary Kalman filter functions
@@ -973,6 +973,7 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
     K[i] = PHTd[i]/HPHR; // kalman gain = (PH' (HPH' + R )^-1)
     S[i] = S[i] + K[i] * error; // state update
   }
+//    S[0] = S[0]/(float) 0.65;     // Myhal x state compensate
   stateEstimatorAssertNotNaN();
 
   // ====== COVARIANCE UPDATE ======
@@ -1132,27 +1133,29 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 	  else{
 		   measuredDistance = d->distance;
 	  }
-	  float predictedDistance = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2));
-	  if (predictedDistance != 0.0f)
+	  //do not fuse "0" measurement
+	  if (measuredDistance >= 0.001f)
 	  {
-    // The measurement is: z = sqrt(dx^2 + dy^2 + dz^2). The derivative dz/dX gives h.
-		  h[STATE_X] = dx/predictedDistance;
-		  h[STATE_Y] = dy/predictedDistance;
-		  h[STATE_Z] = dz/predictedDistance;
-	  }
-	  else
-	  {
+		  float predictedDistance = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2));
+		  if (predictedDistance != 0.0f)
+		  {
+		  // The measurement is: z = sqrt(dx^2 + dy^2 + dz^2). The derivative dz/dX gives h.
+			  h[STATE_X] = dx/predictedDistance;
+			  h[STATE_Y] = dy/predictedDistance;
+			  h[STATE_Z] = dz/predictedDistance;
+		  }
+		  else
+		  {
 		  // Avoid divide by zero
-		  h[STATE_X] = 1.0f;
-		  h[STATE_Y] = 0.0f;
-		  h[STATE_Z] = 0.0f;
-	  }
-	  // Extra logging variables
-	  twrDist = d->distance;
-	  anchorID = d->anchor_ID;
-	  //  if (S[STATE_Z] > UWB_MIN_HEIGHT){
+			  h[STATE_X] = 1.0f;
+			  h[STATE_Y] = 0.0f;
+			  h[STATE_Z] = 0.0f;
+		  }
+		  // Extra logging variables
+		  twrDist = d->distance;
+		  anchorID = d->anchor_ID;
 	  	  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
-	  	  //  }
+	  }
 }
 
 // major trilateration function
@@ -1298,7 +1301,6 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
      * Measurement equation:
      * dR = dT + d1 - d0
      */
-
     float measurement = tdoa->distanceDiff;
 
     // predict based on current state
@@ -1346,17 +1348,13 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
       bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
       tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
 
-
-//      && (estimatedPosition.z > UWB_MIN_HEIGHT)
-
-      if (sampleIsGood&& (estimatedPosition.z > UWB_MIN_HEIGHT)) {   // measurements are good and above the limit height
+      if (sampleIsGood) {   // measurements are good and above the limit height
         stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
         tdoaID = tdoa->anchor_id;
         tdoaDist = tdoa->distanceDiff;
       }
     }
   }
-
   tdoaCount++;
 }
 
@@ -1571,6 +1569,7 @@ static void stateEstimatorFinalize(sensorData_t *sensors, uint32_t tick)
   S[STATE_D2] = 0;
 
   // constrain the states
+//  S[STATE_X]=S[STATE_X] /(float) 0.65;   //Myhal
   for (int i=0; i<3; i++)
   {
     if (S[STATE_X+i] < -MAX_POSITION) { S[STATE_X+i] = -MAX_POSITION; }
@@ -1600,10 +1599,11 @@ static void stateEstimatorFinalize(sensorData_t *sensors, uint32_t tick)
 
 static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors, uint32_t tick)
 {
+//	S[STATE_X]=S[STATE_X] /(float) 0.65;   //Myhal
   // position state is already in world frame
   state->position = (point_t){
       .timestamp = tick,
-      .x = S[STATE_X],
+      .x = S[STATE_X]/(float) 0.65,
       .y = S[STATE_Y],
       .z = S[STATE_Z]
   };
@@ -1837,9 +1837,9 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 //LOG_GROUP_STOP(kalman_pred)
 
 LOG_GROUP_START(twr_ekf)
-  LOG_ADD(LOG_FLOAT, distance, &twrDist)
-  LOG_ADD(LOG_UINT8, anchorID, &anchorID)
-  LOG_ADD(LOG_FLOAT, yaw, &log_yaw)
+//  LOG_ADD(LOG_FLOAT, distance, &twrDist)
+//  LOG_ADD(LOG_UINT8, anchorID, &anchorID)
+//  LOG_ADD(LOG_FLOAT, yaw, &log_yaw)
   LOG_ADD(LOG_FLOAT, zrange, &logzrange)
 //  LOG_ADD(LOG_FLOAT, tri_x, &logtri_x)
 //  LOG_ADD(LOG_FLOAT, tri_y, &logtri_y)

@@ -88,16 +88,27 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 //	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
 //    },
   //DSL-06
-   .anchorPosition = {
-	   		  {timestamp: 1, x: -3.4838, y: -3.2145, z: 0.7981},   //0     gound
-	   		  {timestamp: 1, x: -3.6562, y:  4.8784, z: 3.1854},   //1     top
-	   		  {timestamp: 1, x:  3.3777, y:  4.4367, z: 0.9782},   //2     ground
-	   		  {timestamp: 1, x:  4.1032, y: -3.5395, z: 3.4291},   //3     top
-	   		  {timestamp: 1, x: -3.6263, y: -3.4597, z: 3.1376},   //4     top
-	   		  {timestamp: 1, x:  2.9114, y: -3.2149, z: 0.9742},   //5     ground
-			  {timestamp: 1, x:  4.1181, y:  4.8492, z: 3.3681},   //6     top
-			  {timestamp: 1, x: -3.1064, y:  4.4783, z: 0.9758},   //7     ground
-	       },
+//   .anchorPosition = {
+//	   		  {timestamp: 1, x: -3.4838, y: -3.2145, z: 0.7981},   //0     gound
+//	   		  {timestamp: 1, x: -3.6562, y:  4.8784, z: 3.1854},   //1     top
+//	   		  {timestamp: 1, x:  3.3777, y:  4.4367, z: 0.9782},   //2     ground
+//	   		  {timestamp: 1, x:  4.1032, y: -3.5395, z: 3.4291},   //3     top
+//	   		  {timestamp: 1, x: -3.6263, y: -3.4597, z: 3.1376},   //4     top
+//	   		  {timestamp: 1, x:  2.9114, y: -3.2149, z: 0.9742},   //5     ground
+//			  {timestamp: 1, x:  4.1181, y:  4.8492, z: 3.3681},   //6     top
+//			  {timestamp: 1, x: -3.1064, y:  4.4783, z: 0.9758},   //7     ground
+//	       },
+   // Myhal test
+		   .anchorPosition = {
+		   		  {timestamp: 1, x: -5.5176, y:  -3.0824, z: 2.5423},   //0
+		   		  {timestamp: 1, x:  4.7321, y:  4.1792, z: 3.8515},   //1
+		   		  {timestamp: 1, x: -4.6201, y: -8.3778, z: 3.7547},   //2
+		   		  {timestamp: 1, x: -5.3503, y:  3.3756, z: 3.8346},   //3
+		   		  {timestamp: 1, x:  5.4170, y: -1.3350, z: 2.3026},   //4
+		   		  {timestamp: 1, x:  5.7755, y: -7.5067, z: 3.9289},   //5
+				  {timestamp: 1, x:  0.5562, y: -7.7084, z: 2.6202},   //4
+				  {timestamp: 1, x: -0.7685, y:  3.7364, z: 2.5402},   //5
+		       },
     .combinedAnchorPositionOk = true,
 };
 
@@ -568,20 +579,20 @@ uwbAlgorithm_t uwbTwrTagAlgorithm = {
   .getAnchorIdList = getAnchorIdList,
   .getActiveAnchorIdList = getActiveAnchorIdList,
 };
-
+// Do not log back too many parameters
 LOG_GROUP_START(twr)
-LOG_ADD(LOG_UINT8, rangingSuccessRate0, &rangingSuccessRate[0])
-LOG_ADD(LOG_UINT8, rangingPerSec0, &rangingPerSec[0])
-LOG_ADD(LOG_UINT8, rangingSuccessRate1, &rangingSuccessRate[1])
-LOG_ADD(LOG_UINT8, rangingPerSec1, &rangingPerSec[1])
-LOG_ADD(LOG_UINT8, rangingSuccessRate2, &rangingSuccessRate[2])
-LOG_ADD(LOG_UINT8, rangingPerSec2, &rangingPerSec[2])
-LOG_ADD(LOG_UINT8, rangingSuccessRate3, &rangingSuccessRate[3])
-LOG_ADD(LOG_UINT8, rangingPerSec3, &rangingPerSec[3])
-LOG_ADD(LOG_UINT8, rangingSuccessRate4, &rangingSuccessRate[4])
-LOG_ADD(LOG_UINT8, rangingPerSec4, &rangingPerSec[4])
-LOG_ADD(LOG_UINT8, rangingSuccessRate5, &rangingSuccessRate[5])
-LOG_ADD(LOG_UINT8, rangingPerSec5, &rangingPerSec[5])
+//LOG_ADD(LOG_UINT8, rangingSuccessRate0, &rangingSuccessRate[0])
+//LOG_ADD(LOG_UINT8, rangingPerSec0, &rangingPerSec[0])
+//LOG_ADD(LOG_UINT8, rangingSuccessRate1, &rangingSuccessRate[1])
+//LOG_ADD(LOG_UINT8, rangingPerSec1, &rangingPerSec[1])
+//LOG_ADD(LOG_UINT8, rangingSuccessRate2, &rangingSuccessRate[2])
+//LOG_ADD(LOG_UINT8, rangingPerSec2, &rangingPerSec[2])
+//LOG_ADD(LOG_UINT8, rangingSuccessRate3, &rangingSuccessRate[3])
+//LOG_ADD(LOG_UINT8, rangingPerSec3, &rangingPerSec[3])
+//LOG_ADD(LOG_UINT8, rangingSuccessRate4, &rangingSuccessRate[4])
+//LOG_ADD(LOG_UINT8, rangingPerSec4, &rangingPerSec[4])
+//LOG_ADD(LOG_UINT8, rangingSuccessRate5, &rangingSuccessRate[5])
+//LOG_ADD(LOG_UINT8, rangingPerSec5, &rangingPerSec[5])
 LOG_GROUP_STOP(twr)
 
 LOG_GROUP_START(ranging)

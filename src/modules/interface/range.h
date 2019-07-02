@@ -52,3 +52,6 @@ void rangeSet(rangeDirection_t direction, float range_m);
  * @return Distance to an object in meter
  */
 float rangeGet(rangeDirection_t direction);
+
+
+
