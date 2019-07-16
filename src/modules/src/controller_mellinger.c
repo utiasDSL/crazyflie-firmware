@@ -161,7 +161,7 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
 
   // Update errors only in PosSet mode
   if(setpoint->mode.x == modeAbs && setpoint->mode.y == modeAbs && setpoint->mode.z == modeAbs){
-	  // Position Error (ep)
+	    // Position Error (ep)
 	    r_error = vsub(setpointPos, statePos);
 
 	    // Velocity Error (ev)
@@ -258,10 +258,6 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
 	  z_axis_desired.z = cosf(phi)*cosf(tht);
 
   }
-
-
-
-
 
 
   // [eR]

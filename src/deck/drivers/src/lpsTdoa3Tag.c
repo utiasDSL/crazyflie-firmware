@@ -133,7 +133,6 @@ static int updateRemoteData(tdoaAnchorContext_t* anchorCtx, const void* payload)
           stats->tof = (uint16_t)tof;
         }
       }
-
       anchorDataPtr += sizeof(remoteAnchorDataFull_t);
     } else {
       anchorDataPtr += sizeof(remoteAnchorDataShort_t);

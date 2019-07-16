@@ -41,7 +41,7 @@ void controllerPid(control_t *control, setpoint_t *setpoint,
                                          const uint32_t tick)
 {
   if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
-    // Rate-controled YAW is moving YAW angle setpoint
+    // Rate-controlled YAW is moving YAW angle setpoint
     if (setpoint->mode.yaw == modeVelocity) {
        attitudeDesired.yaw += setpoint->attitudeRate.yaw * ATTITUDE_UPDATE_DT;
       while (attitudeDesired.yaw > 180.0f)

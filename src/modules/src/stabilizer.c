@@ -37,6 +37,8 @@
 #include "motors.h"
 #include "pm.h"
 
+#include "config.h"
+
 #include "stabilizer.h"
 
 #include "sensors.h"
@@ -152,7 +154,7 @@ static void stabilizerTask(void* param)
   // Wait for sensors to be calibrated
   lastWakeTime = xTaskGetTickCount ();
   while(!sensorsAreCalibrated()) {
-    vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
+    vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));     // make the 1000 HZ working
   }
   // Initialize tick to something else then 0
   tick = 1;
@@ -163,7 +165,7 @@ static void stabilizerTask(void* param)
     #ifndef BROADCAST_ENABLE
     getExtPosition(&state);
     #else
-    getExtPosVelBC(&state);
+    getExtPosVelBC(&state);    // We are using this for Vicon broadcasting
     #endif
 
     if (startPropTest != false) {
@@ -188,6 +190,7 @@ static void stabilizerTask(void* param)
       }
 
       stateEstimator(&state, &sensorData, &control, tick);
+      // Create a trilateration function and call it in here.
       
       commanderGetSetpoint(&setpoint, &state);
 

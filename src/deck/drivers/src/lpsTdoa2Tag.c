@@ -67,29 +67,6 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
    // To set a static anchor position from startup, uncomment and modify the
    // following code:
 
-   // UTIAS Hallway
-//   .anchorPosition = {
-//	  {timestamp: 1, x: 5.1003,   y: -1.0476,  z: 3.2269},     //  0
-//	  {timestamp: 1, x: -5.9734,  y: -1.0759,  z: 2.4768},      //  1
-//	  {timestamp: 1, x: 0.0256,   y: 1.0480,   z: 2.4664},       //  2
-//	  {timestamp: 1, x: -6.4853 , y: 1.0701,   z: 3.0526},     //  3
-//	  {timestamp: 1, x: -2.0851,  y: -1.1510,  z: 0.6345},     //  4
-//	  {timestamp: 1, x: 4.7092,   y: 1.0358,   z: 1.1657},      //  5
-//	  {timestamp: 1, x: 0.2384,   y: -0.7644,  z: 3.3861},        //  6
-//	  {timestamp: 1, x: 6.3978,   y: 0.8282,   z: 2.7255},      //  7
-//   },
-   //DSL-on the ground
-//   .anchorPosition = {
-//	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},     //
-//	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},      //
-//	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},       //
-//	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},     //
-//	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},     //
-//	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},      //
-//	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},        //
-//	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},      //
-//   },
-
    //DSL-06
 //   .anchorPosition = {
 //   		  {timestamp: 1, x: -3.4838, y: -3.2145, z: 0.7981},   //0     gound
@@ -102,29 +79,17 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //		  {timestamp: 1, x: -3.1064, y:  4.4783, z: 0.9758},   //7     ground
 //       },
 
-   // Myhal test
-   .anchorPosition = {
-   		  {timestamp: 1, x: -5.5176, y:  -3.0824, z: 2.5423},   //0
-   		  {timestamp: 1, x:  4.7321, y:  4.1792, z: 3.8515},   //1
-   		  {timestamp: 1, x: -4.6201, y: -8.3778, z: 3.7547},   //2
-   		  {timestamp: 1, x: -5.3503, y:  3.3756, z: 3.8346},   //3
-   		  {timestamp: 1, x:  5.4170, y: -1.3350, z: 2.3026},   //4
-   		  {timestamp: 1, x:  5.7755, y: -7.5067, z: 3.9289},   //5
-		  {timestamp: 1, x:  0.5562, y: -7.7084, z: 2.6202},   //6
-		  {timestamp: 1, x: -0.7685, y:  3.7364, z: 2.5402},   //7
-       },
-
-//DSL-0507     set by testing in matlab, need to be recalibrate
-//   .anchorPosition = {
-//   		  {timestamp: 1, x: -3.0803, y: -3.5855, z: 0.7981},   //0     gound
-//   		  {timestamp: 1, x: -3.3889, y:  4.6313, z: 2.9012},   //1     top
-//   		  {timestamp: 1, x:  2.7742, y:  4.9177, z: 0.7682},   //2     ground
-//   		  {timestamp: 1, x:  4.0702, y: -3.0581, z: 2.9466},   //3     top
-//   		  {timestamp: 1, x: -3.4189, y: -3.4699, z: 2.8571},   //4     top
-//   		  {timestamp: 1, x:  3.2407, y: -2.8522, z: 0.9732},   //5     ground
-//		  {timestamp: 1, x:  3.7480, y:  4.7493, z: 2.9282},   //6     top
-//		  {timestamp: 1, x: -3.5952, y:  4.1491, z: 0.7702},   //7     ground
-//       },
+	   // Myhal 07
+			   .anchorPosition = {
+			   		  {timestamp: 1, x: -4.6085, y: -5.8757, z: 0.1597},   //0
+			   		  {timestamp: 1, x:  6.3778, y:  4.7231, z: 4.6324},   //1
+			   		  {timestamp: 1, x: -4.6412, y: -6.4999, z: 3.9363},   //2
+			   		  {timestamp: 1, x:  6.3615, y:  4.5488, z: 0.1575},   //3
+			   		  {timestamp: 1, x: -3.5016, y:  5.2513, z: 4.6285},   //4
+			   		  {timestamp: 1, x:  5.7683, y: -6.4352, z: 0.1635},   //5
+					  {timestamp: 1, x: -4.0118, y:  5.1086, z: 0.1606},   //4
+					  {timestamp: 1, x:  6.1108, y: -7.0779, z: 3.9419},   //5
+			       },
 
 	// OPG
 //	.anchorPosition = {
@@ -152,7 +117,7 @@ typedef struct {
 
 static uint8_t previousAnchor;
 // Holds data for the latest packet from all anchors
-static history_t history[LOCODECK_NR_OF_TDOA2_ANCHORS];
+static history_t history[LOCODECK_NR_OF_TDOA2_ANCHORS];    // where does history[8] get values??
 
 
 // LPP packet handling
@@ -203,6 +168,7 @@ static uint64_t truncateToAnchorTimeStamp(uint64_t fullTimeStamp) {
   return fullTimeStamp & 0x00FFFFFFFFul;
 }
 
+// send measurements into Kalman filter
 static void enqueueTDOA(uint8_t anchorA, uint8_t anchorB, double distanceDiff) {
   tdoaMeasurement_t tdoa = {
     .stdDev = MEASUREMENT_NOISE_STD,
@@ -256,7 +222,7 @@ static bool calcClockCorrection(double* clockCorrection, const uint8_t anchor, c
 static bool calcDistanceDiff(float* tdoaDistDiff, const uint8_t previousAnchor, const uint8_t anchor, const rangePacket2_t* packet, const dwTime_t* arrival) {
   const bool isSeqNrInTagOk = isSeqNrConsecutive(history[anchor].packet.sequenceNrs[previousAnchor], packet->sequenceNrs[previousAnchor]);
   const bool isSeqNrInAnchorOk = isSeqNrConsecutive(history[anchor].packet.sequenceNrs[anchor], packet->sequenceNrs[anchor]);
-  if (! (isSeqNrInTagOk && isSeqNrInAnchorOk)) {
+  if (! (isSeqNrInTagOk && isSeqNrInAnchorOk)) {   // calculate TDoA only in round-robbin fashion (7-0,0-1, ... ,6-7)
     return false;
   }
   stats.packetsSeqNrPass++;
@@ -287,8 +253,8 @@ static bool calcDistanceDiff(float* tdoaDistDiff, const uint8_t previousAnchor, 
 }
 
 static void addToLog(const uint8_t anchor, const uint8_t previousAnchor, const float tdoaDistDiff, const rangePacket2_t* packet) {
-  // Only store diffs for anchors when we have consecutive anchor ids. In case of packet
-  // loss we can get ranging between any anchors and that messes up the graphs.
+  // Only store diffs for anchors when we have consecutive anchor ids (round-robbin fashion (7-0,0-1, ... ,6-7)).
+  //  In case of packet loss, we can get ranging between any anchors and that messes up the graphs.
   if (((previousAnchor + 1) & 0x07) == anchor) {
     logUwbTdoaDistDiff[anchor] = tdoaDistDiff;
     logAnchorDistance[anchor] = packet->distances[previousAnchor];
@@ -342,18 +308,19 @@ static void sendLppShort(dwDevice_t *dev, lpsLppShortPacket_t *packet)
   dwStartTransmit(dev);
 }
 
+// receive information form UWB anchors and calculate TDoA
 static bool rxcallback(dwDevice_t *dev) {
   stats.packetsReceived++;
 
   int dataLength = dwGetDataLength(dev);
   packet_t rxPacket;
 
-  dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
+  dwGetData(dev, (uint8_t*)&rxPacket, dataLength);                    // get the information from DW1000 UWB anchors
   const rangePacket2_t* packet = (rangePacket2_t*)rxPacket.payload;
 
   bool lppSent = false;
   if (packet->type == PACKET_TYPE_TDOA2) {
-    const uint8_t anchor = rxPacket.sourceAddress & 0xff;
+    const uint8_t anchor = rxPacket.sourceAddress & 0xff;             // get the anchor information
 
     // Check if we need to send the current LPP packet
     if (lppPacketToSend && lppPacket.dest == anchor) {
@@ -381,8 +348,8 @@ static bool rxcallback(dwDevice_t *dev) {
         float tdoaDistDiff = 0.0;
         if (calcDistanceDiff(&tdoaDistDiff, previousAnchor, anchor, packet, &arrival)) {
           rangingOk = true;
-          enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);
-          addToLog(anchor, previousAnchor, tdoaDistDiff, packet);
+          enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);        // update measurements
+          addToLog(anchor, previousAnchor, tdoaDistDiff, packet);   // recall the measurements in round-robbin fashion (7-0,0-1, ... ,6-7)
         }
       }
 
@@ -406,14 +373,14 @@ static void setRadioInReceiveMode(dwDevice_t *dev) {
   dwStartReceive(dev);
 }
 
+// The major working function in UWB algorithm (state machine)
 static uint32_t onEvent(dwDevice_t *dev, uwbEvent_t event) {
   switch(event) {
     case eventPacketReceived:
-      if (rxcallback(dev)) {
+      if (rxcallback(dev)) {  //  receive information from anchor
         lppPacketToSend = false;
       } else {
         setRadioInReceiveMode(dev);
-
         // Discard lpp packet if we cannot send it for too long
         if (++lppPacketSendTryCounter >= TDOA2_LPP_PACKET_SEND_TIMEOUT) {
           lppPacketToSend = false;

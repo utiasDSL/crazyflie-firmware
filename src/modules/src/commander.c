@@ -63,7 +63,7 @@ void commanderInit(void)
     bcCmdInit();
   #else
     crtpCommanderInit();
-  crtpCommanderHighLevelInit();
+    crtpCommanderHighLevelInit();
   #endif
   lastUpdate = xTaskGetTickCount();
 

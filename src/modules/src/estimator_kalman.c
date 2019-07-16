@@ -82,7 +82,9 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool TRI = false;
 static bool Compensate = false;
+static bool Compen_tdoa = false;
 static bool enable_flow = false;
+static bool enable_zrange = true;
 /**
  * Primary Kalman filter functions
  *
@@ -541,47 +543,48 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
 
 //  major changes
 //  modify here for trilateration
-//  need to look at the entire logic of the onboard code
+
   distanceMeasurement_t dist;
   if(TRI)// using trilateration
   {	  	int	i=0;   // set local variable i
+        bool tri = true;
         bool check = true;
 		distanceMeasurement_t d[4];  // an array with type "distanceMeasurement_t"
-		while (stateEstimatorHasDistanceMeasurement(&dist))
-	   {
-		 twrDist = dist.distance;
-		 anchorID = dist.anchor_ID;
-		 // print out debug information
-
-		 // DEBUG_PRINT("anchorID: %0.2f\n",(double)anchorID);
-
+        while(tri)
+        {
 		 if(i > 3){  // receive for anchor distance
 			stateEstimatorUpdateWithTri(d,4.0);   // send all four distances into the tri-function
 			doneUpdate = true;
 			i=0;    // reset the flag
 			check = true;
+			tri = false;
 			}
 		 else{
-				//  iterate all previous ranging data for the uwb anchor check
-				for(int j = 0; j < i ;j++){
+			 while (stateEstimatorHasDistanceMeasurement(&dist)){
+				 twrDist = dist.distance;
+				 anchorID = dist.anchor_ID;
+					//  iterate all previous ranging data for the uwb anchor check
+				 for(int j = 0; j <= i ;j++){
 					if(dist.anchor_ID == d[j].anchor_ID){
-						check = false;
-					}  // if data is from the same uwb anchor before, check is false.
-				}
-				//  after the checking procedure, see if the new data is from a different anchor
-				//  Debug: check dist.anchor_ID ??
-				logcheck = check;     // check is always 1
-//				logcheck = d[0].anchor_ID;  // d[0].anchor_ID is always 0.0, the index is wrong
-				if(check){            // if passing the check process.
-						d[i] = dist;  // send the twr info to d[i]
-						i++;
-						logtri_num = i; // i is always 1 right now
+							check = false;
+						}  // if data is from the same uwb anchor before, check is false.
 					}
-				else{
-					check = true;
-				}    //  if not passing the check process, reset the check label.
+					//  after the checking procedure, see if the new data is from a different anchor
+					//  Debug: check dist.anchor_ID ??
+					logcheck = check;     // check is always 1
+					logcheck = d[0].anchor_ID;  // d[0].anchor_ID is always 0.0, the index is wrong
+					if(check){            // if passing the check process.
+							d[i] = dist;  // send the twr info to d[i]
+							i++;
+							logtri_num = i; // i is always 1 right now
+						}
+					else{
+						check = true;
+					}
+			 }
+   //  if not passing the check process, reset the check label.
 			}
-	   }
+        }
     }
   else{      // using simple ranging measurements
 	while (stateEstimatorHasDistanceMeasurement(&dist))
@@ -973,7 +976,6 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
     K[i] = PHTd[i]/HPHR; // kalman gain = (PH' (HPH' + R )^-1)
     S[i] = S[i] + K[i] * error; // state update
   }
-//    S[0] = S[0]/(float) 0.65;     // Myhal x state compensate
   stateEstimatorAssertNotNaN();
 
   // ====== COVARIANCE UPDATE ======
@@ -1100,6 +1102,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 	  float dy = S[STATE_Y] - d->y;
 	  float dz = S[STATE_Z] - d->z;
 	  float measuredDistance = 0.0f;
+	  // TWR: constant bias compensation
 	  if (Compensate){
 		  switch(d->anchor_ID){
 		  	  case 0:
@@ -1301,8 +1304,41 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
      * Measurement equation:
      * dR = dT + d1 - d0
      */
-    float measurement = tdoa->distanceDiff;
+	  float measurement=0.0f;
+	// tdoa constant bias compensation
+	if(Compen_tdoa){
+		  switch(tdoa->anchor_id){
+		  	  case 0:
+		  		measurement = tdoa->distanceDiff - 0.20f;
+			  break;
+		  	  case 1:
+		  		measurement = tdoa->distanceDiff + 0.35f;
+			  break;
+		  	  case 2:
+		  		measurement = tdoa->distanceDiff - 0.30f;
+			  break;
+		  	  case 3:
+		  		measurement = tdoa->distanceDiff + 0.80f;
+			  break;
+		  	  case 4:
+		  		measurement = tdoa->distanceDiff - 0.20f;
+			  break;
+		  	  case 5:
+		  		measurement = tdoa->distanceDiff + 0.00f;
+			  break;
+		  	  case 6:
+		  		measurement = tdoa->distanceDiff + 0.18f;
+			  break;
+		  	  case 7:
+		  		measurement = tdoa->distanceDiff - 0.20f;
+			  break;
+		  	  default :
+		  		break;
+		  }
 
+	} else{
+          measurement = tdoa->distanceDiff;
+	}
     // predict based on current state
     float x = S[STATE_X];
     float y = S[STATE_Y];
@@ -1348,7 +1384,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
       bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
       tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
 
-      if (sampleIsGood) {   // measurements are good and above the limit height
+      if (sampleIsGood) {   // measurements are good
         stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
         tdoaID = tdoa->anchor_id;
         tdoaDist = tdoa->distanceDiff;
@@ -1464,9 +1500,9 @@ static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
     logzrange = measuredDistance;     // log the zrange
     // Scalar update
     // Z update
-    //if(S[STATE_Z]<UWB_MAX_HEIGHT){
+    if (enable_zrange){   // if enable zrange when using flowdeck.
     	stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, tof->stdDev);
-    // }
+     }
   }
 // }
 }
@@ -1569,7 +1605,7 @@ static void stateEstimatorFinalize(sensorData_t *sensors, uint32_t tick)
   S[STATE_D2] = 0;
 
   // constrain the states
-//  S[STATE_X]=S[STATE_X] /(float) 0.65;   //Myhal
+
   for (int i=0; i<3; i++)
   {
     if (S[STATE_X+i] < -MAX_POSITION) { S[STATE_X+i] = -MAX_POSITION; }
@@ -1599,11 +1635,11 @@ static void stateEstimatorFinalize(sensorData_t *sensors, uint32_t tick)
 
 static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors, uint32_t tick)
 {
-//	S[STATE_X]=S[STATE_X] /(float) 0.65;   //Myhal
+
   // position state is already in world frame
   state->position = (point_t){
       .timestamp = tick,
-      .x = S[STATE_X]/(float) 0.65,
+      .x = S[STATE_X],
       .y = S[STATE_Y],
       .z = S[STATE_Z]
   };
@@ -1848,10 +1884,10 @@ LOG_GROUP_START(twr_ekf)
 //  LOG_ADD(LOG_UINT8, tri_check, &logcheck)    // log back the check
 LOG_GROUP_STOP(twr_ekf)
 
-//LOG_GROUP_START(tdoa_ekf)
-//  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
-//  LOG_ADD(LOG_UINT8, anchorID, &tdoaID)
-//LOG_GROUP_STOP(tdoa_ekf)
+LOG_GROUP_START(tdoa_ekf)
+  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
+  LOG_ADD(LOG_UINT8, anchorID, &tdoaID)
+LOG_GROUP_STOP(tdoa_ekf)
 
 // Stock log groups
 //LOG_GROUP_START(kalman)

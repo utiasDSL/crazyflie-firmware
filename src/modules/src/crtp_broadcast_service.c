@@ -191,7 +191,7 @@ bool getExtPosVelBC(state_t *state){
 		else if(dt > 0.1f)
 			dt = 0.1f;
 
-		// dp/dt
+		// dp/dt  calculate the velocity in here
 
 		posvel.vx =  (crtpExtPosCache.currVal[crtpExtPosCache.activeSide].x - crtpExtPosCache.currVal[!crtpExtPosCache.activeSide].x)/dt;
 		posvel.vy =  (crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y - crtpExtPosCache.currVal[!crtpExtPosCache.activeSide].y)/dt;
@@ -201,7 +201,7 @@ bool getExtPosVelBC(state_t *state){
 
 		#ifndef PLATFORM_CF1
 		//    estimatorKalmanEnqueuePosition(&broadcast_pos);
-		    estimatorKalmanEnqueuePosVel(&posvel);           //fusing the Vicon data
+//		    estimatorKalmanEnqueuePosVel(&posvel);           //fusing the Vicon data
 		#endif
 		crtpExtPosCache.new_data = false;
 
