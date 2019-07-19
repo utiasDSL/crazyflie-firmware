@@ -80,7 +80,6 @@ static float i_range_m_z  = 1500;
 // roll and pitch angular velocity
 static float kd_omega_rp = 200; // D
 
-
 // Helper variables
 static float i_error_x = 0;
 static float i_error_y = 0;
@@ -119,8 +118,6 @@ bool controllerMellingerTest(void)
 {
   return true;
 }
-
-
 
 float clamp(float value, float min, float max) {
   if (value < min) return min;
@@ -344,7 +341,6 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   }
 
   // log
-
   setpoint->acceleration.x = target_thrust.x/g_vehicleMass;
   setpoint->acceleration.y = target_thrust.y/g_vehicleMass;
   setpoint->acceleration.z = target_thrust.z/g_vehicleMass;

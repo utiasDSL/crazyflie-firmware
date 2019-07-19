@@ -9,6 +9,7 @@ struct CrtpExtPosition
   float x; // in m
   float y; // in m
   float z; // in m
+  float yaw; // in rad [CHANGE] yaw estimation
 } __attribute__((packed));
 
 void bcPosInit(void);
@@ -17,5 +18,6 @@ void bcCmdInit(void);
 // Get the current position from the cache
 bool getExtPositionBC(state_t *state);
 bool getExtPosVelBC(state_t *state);
+bool getExtPosVelYawBC(state_t *state); // [CHANGE] yaw estimation
 
 #endif /* _CRTP_BROADCAST_H_ */

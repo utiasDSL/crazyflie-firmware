@@ -728,7 +728,7 @@ void ledring12Worker(void * data)
   static int current_effect = 0;
   static uint8_t buffer[NBR_LEDS][3];
   bool reset = true;
-
+//  effect = 7;
   if (/*!pmIsDischarging() ||*/ (effect > neffect)) {
     ws2812Send(black, NBR_LEDS);
     return;
@@ -739,8 +739,8 @@ void ledring12Worker(void * data)
   } else {
     reset = false;
   }
-  //current_effect = effect;
-  current_effect = 0;
+  current_effect = effect;
+//  current_effect = 7;
   effectsFct[current_effect](buffer, reset);
   ws2812Send(buffer, NBR_LEDS);
 }

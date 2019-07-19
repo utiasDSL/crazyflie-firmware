@@ -150,6 +150,15 @@ static inline bool stateEstimatorHasPosVelMeasurement(posvelMeasurement_t *posve
   return (pdTRUE == xQueueReceive(posvelDataQueue, posvel, 0));
 }
 
+// [CHANGE] yaw estimation. Direct measurements of Crazyflie position, velocity, and yaw
+static xQueueHandle posvelyawDataQueue;
+#define POSVELYAW_QUEUE_LENGTH (10)
+
+static void stateEstimatorUpdateWithPosVelYaw(posvelyawMeasurement_t *posvelyaw, sensorData_t *sensors);
+
+static inline bool stateEstimatorHasPosVelYawMeasurement(posvelyawMeasurement_t *posvelyaw) {
+  return (pdTRUE == xQueueReceive(posvelyawDataQueue, posvelyaw, 0));
+}
 
 // Measurements of a UWB Tx/Rx
 static xQueueHandle tdoaDataQueue;
@@ -328,6 +337,8 @@ static uint32_t takeoffTime;
 static uint32_t tdoaCount;
 static float twrDist;
 static int anchorID;
+static float yaw_logback;
+static float yaw_error_logback;
 
 // log variable for Trilateration check
 static float logtri_x;
@@ -411,7 +422,7 @@ static void decoupleState(stateIdx_t state)
 
 // --------------------------------------------------
 
-
+// main function
 void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, const uint32_t tick)
 {
   // If the client (via a parameter update) triggers an estimator reset:
@@ -472,7 +483,7 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
     thrustAccumulator /= thrustAccumulatorCount;
 
     float dt = (float)(osTick-lastPrediction)/configTICK_RATE_HZ;
-    stateEstimatorPredict(thrustAccumulator, &accAccumulator, &gyroAccumulator, dt);
+    stateEstimatorPredict(thrustAccumulator, &accAccumulator, &gyroAccumulator, dt); // prediction
 
     if (!quadIsFlying) { // accelerometers give us information about attitude on slanted ground
       stateEstimatorUpdateWithAccOnGround(&accAccumulator);
@@ -609,6 +620,13 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
   posvelMeasurement_t posvel;
   while(stateEstimatorHasPosVelMeasurement(&posvel)){
 	  stateEstimatorUpdateWithPosVel(&posvel,sensors);
+	  doneUpdate = true;
+  }
+
+  // [CHANGE] yaw estimation
+  posvelyawMeasurement_t posvelyaw;
+  while(stateEstimatorHasPosVelYawMeasurement(&posvelyaw)){
+	  stateEstimatorUpdateWithPosVelYaw(&posvelyaw,sensors);
 	  doneUpdate = true;
   }
 
@@ -1090,6 +1108,55 @@ static void stateEstimatorUpdateWithPosVel(posvelMeasurement_t *posvel, sensorDa
 	    stateEstimatorScalarUpdate(&H, posvel->vel[i] - pred_vel_w, posvel->stdDev_vel);
 	  }
 }
+
+// [CHANGE] yaw estimation
+static void stateEstimatorUpdateWithPosVelYaw(posvelyawMeasurement_t *posvelyaw, sensorData_t *sensors){
+	  // a direct measurement of states x, y, and z
+	  // do a scalar update for each state, since this should be faster than updating all together
+	  for (int i=0; i<3; i++) {
+	    float h[STATE_DIM] = {0};
+	    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+	    h[STATE_X+i] = 1;
+	    stateEstimatorScalarUpdate(&H, posvelyaw->pos[i] - S[STATE_X+i], posvelyaw->stdDev_pos);
+	  }
+
+	  // Measurement model of velocity as measured in world frame
+	  // v_w = R(P + omega^x x)
+	  for (int i=0; i<3; i++) {
+	    float h[STATE_DIM] = {0};
+	    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+
+	    h[STATE_PX] = R[i][0];
+	    h[STATE_PY] = R[i][1];
+	    h[STATE_PZ] = R[i][2];
+	    float pred_vel_w = R[i][0] * S[STATE_PX] + R[i][1] * S[STATE_PY] + R[i][2] * S[STATE_PZ];
+
+	    stateEstimatorScalarUpdate(&H, posvelyaw->vel[i] - pred_vel_w, posvelyaw->stdDev_vel);
+	  }
+
+	  // direct measurement of yaw (yaw error STATE_D2)
+	  float h[STATE_DIM] = {0};
+	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+	  h[STATE_D2] = 1; // the Jacobian
+	  float pred_yaw = atan2f(2*(q[1]*q[2]+q[0]*q[3]) , q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3]);
+	  float yaw_error = posvelyaw->yaw - pred_yaw;
+	  yaw_error_logback = yaw_error;
+
+	  // wrap yaw_error between (-PI, PI]
+	  while (yaw_error > PI){
+		  yaw_error -= (float) 2.0 * PI;
+	  }
+
+	  while (yaw_error <= -PI){
+		  yaw_error += (float) 2.0 * PI;
+	  }
+
+	  // Add yaw measurement to Kalman filter if yaw estimate is valid (i.e., in (-PI, PI])
+	  if ((posvelyaw->yaw > -PI) && (posvelyaw->yaw <= PI)){
+		  stateEstimatorScalarUpdate(&H, yaw_error, posvelyaw->stdDev_yaw);
+	  }
+}
+
 //TWR
 // implement TWR-trilateration before fusing into EKF
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
@@ -1443,7 +1510,7 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
   }
 
   // ~~~ X velocity prediction and update ~~~
-  // predics the number of accumulated pixels in the x-direction
+  // predicts the number of accumulated pixels in the x-direction
   float omegaFactor = 1.25f;
   float hx[STATE_DIM] = {0};
   arm_matrix_instance_f32 Hx = {1, STATE_DIM, hx};
@@ -1667,6 +1734,9 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
   float pitch = asinf(-2*(q[1]*q[3] - q[0]*q[2]));
   float roll = atan2f(2*(q[2]*q[3]+q[0]*q[1]) , q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]);
 
+  // [CHANGE] yaw estimate
+  yaw_logback = yaw;
+
   // Save attitude, adjusted for the legacy CF2 body coordinate system
   state->attitude = (attitude_t){
       .timestamp = tick,
@@ -1695,6 +1765,7 @@ void estimatorKalmanInit(void) {
     distDataQueue = xQueueCreate(DIST_QUEUE_LENGTH, sizeof(distanceMeasurement_t));
     posDataQueue = xQueueCreate(POS_QUEUE_LENGTH, sizeof(positionMeasurement_t));
     posvelDataQueue = xQueueCreate(POSVEL_QUEUE_LENGTH, sizeof(posvelMeasurement_t));
+    posvelyawDataQueue = xQueueCreate(POSVELYAW_QUEUE_LENGTH, sizeof(posvelyawMeasurement_t)); // [CHANGE] yaw estimation
     tdoaDataQueue = xQueueCreate(UWB_QUEUE_LENGTH, sizeof(tdoaMeasurement_t));
     flowDataQueue = xQueueCreate(FLOW_QUEUE_LENGTH, sizeof(flowMeasurement_t));
     tofDataQueue = xQueueCreate(TOF_QUEUE_LENGTH, sizeof(tofMeasurement_t));
@@ -1705,6 +1776,7 @@ void estimatorKalmanInit(void) {
     xQueueReset(distDataQueue);
     xQueueReset(posDataQueue);
     xQueueReset(posvelDataQueue);
+    xQueueReset(posvelyawDataQueue); // [CHANGE] yaw estimate
     xQueueReset(tdoaDataQueue);
     xQueueReset(flowDataQueue);
     xQueueReset(tofDataQueue);
@@ -1810,6 +1882,11 @@ bool estimatorKalmanEnqueuePosVel(posvelMeasurement_t *posvel)
   return stateEstimatorEnqueueExternalMeasurement(posvelDataQueue, (void *)posvel);
 }
 
+bool estimatorKalmanEnqueuePosVelYaw(posvelyawMeasurement_t *posvelyaw) // [CHANGE] yaw estimation
+{
+  ASSERT(isInit);
+  return stateEstimatorEnqueueExternalMeasurement(posvelyawDataQueue, (void *)posvelyaw);
+}
 
 bool estimatorKalmanEnqueueDistance(distanceMeasurement_t *dist)
 {
@@ -1890,33 +1967,35 @@ LOG_GROUP_START(tdoa_ekf)
 LOG_GROUP_STOP(tdoa_ekf)
 
 // Stock log groups
-//LOG_GROUP_START(kalman)
-//  LOG_ADD(LOG_UINT8, inFlight, &quadIsFlying)
-//  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
-//  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
-//  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
-//  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
-//  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
-//  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
-//  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
-//  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
-//  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
-//  LOG_ADD(LOG_FLOAT, stateSkew, &stateSkew)
-//  LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
-//  LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
-//  LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
-//  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
-//  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
-//  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
-//  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
-//  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
-//  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
-//  LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
-//  LOG_ADD(LOG_FLOAT, q0, &q[0])
-//  LOG_ADD(LOG_FLOAT, q1, &q[1])
-//  LOG_ADD(LOG_FLOAT, q2, &q[2])
-//  LOG_ADD(LOG_FLOAT, q3, &q[3])
-//LOG_GROUP_STOP(kalman)
+LOG_GROUP_START(kalman)
+  LOG_ADD(LOG_UINT8, inFlight, &quadIsFlying)
+  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
+  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
+  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
+  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
+  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
+  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
+  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
+  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
+  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
+  //LOG_ADD(LOG_FLOAT, stateSkew, &stateSkew)
+  LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
+  LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
+  LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
+  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
+  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
+  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
+  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
+  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
+  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
+  //LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
+  LOG_ADD(LOG_FLOAT, q0, &q[0])
+  LOG_ADD(LOG_FLOAT, q1, &q[1])
+  LOG_ADD(LOG_FLOAT, q2, &q[2])
+  LOG_ADD(LOG_FLOAT, q3, &q[3])
+  LOG_ADD(LOG_FLOAT, yaw, &yaw_logback)
+  LOG_ADD(LOG_FLOAT, yaw_error, &yaw_error_logback)
+LOG_GROUP_STOP(kalman)
 
 PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_FLOAT, init_x, &initialX)

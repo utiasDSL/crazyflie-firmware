@@ -44,6 +44,7 @@
 #include "sensors.h"
 #include "commander.h"
 
+// note: BROADCAST_ENABLE is set in config.mk
 #ifdef BROADCAST_ENABLE
 #include "crtp_broadcast_service.h"
 #else
@@ -162,10 +163,14 @@ static void stabilizerTask(void* param)
   while(1) {
     // The sensor should unlock at 1kHz
     sensorsWaitDataReady();
+    //vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
+    // ifndef here, ifdef above
     #ifndef BROADCAST_ENABLE
     getExtPosition(&state);
     #else
-    getExtPosVelBC(&state);    // We are using this for Vicon broadcasting
+//    getExtPositionBC(&state);
+//    getExtPosVelBC(&state); // we are currently here
+    getExtPosVelYawBC(&state); // [CHANGE] yaw estimation
     #endif
 
     if (startPropTest != false) {
