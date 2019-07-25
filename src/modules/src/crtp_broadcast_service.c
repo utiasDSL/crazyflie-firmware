@@ -36,6 +36,7 @@ typedef struct{
 static ExtPositionCache crtpExtPosCache;
 static bool isInit_pos = false;
 static bool isInit_cmd = false;
+static bool useVicon = false;  // fuse the vicon data in estimator, if available
 
 static uint8_t my_id;
 static uint8_t bc_id;
@@ -178,7 +179,8 @@ bool getExtPositionBC(state_t *state){
 
 #ifndef PLATFORM_CF1
 //    estimatorKalmanEnqueuePosition(&broadcast_pos);
-    estimatorKalmanEnqueuePosVel(&posvel);
+    if (useVicon)
+        estimatorKalmanEnqueuePosVel(&posvel);
 #endif
 
     return true;
@@ -215,7 +217,8 @@ bool getExtPosVelBC(state_t *state){
 
 		#ifndef PLATFORM_CF1
 		//    estimatorKalmanEnqueuePosition(&broadcast_pos);
-//		    estimatorKalmanEnqueuePosVel(&posvel);           //fusing the Vicon data
+        if (useVicon)
+            estimatorKalmanEnqueuePosVel(&posvel);
 		#endif
 		crtpExtPosCache.new_data = false;
 
@@ -259,7 +262,8 @@ bool getExtPosVelYawBC(state_t *state){
 
 		#ifndef PLATFORM_CF1
 		//    estimatorKalmanEnqueuePosition(&broadcast_pos);
-			estimatorKalmanEnqueuePosVelYaw(&posvelyaw);
+			if (useVicon)
+                estimatorKalmanEnqueuePosVelYaw(&posvelyaw);
 		#endif
 		crtpExtPosCache.new_data = false;
 
@@ -354,4 +358,8 @@ LOG_ADD(LOG_FLOAT, mnRFC, &cmdRxFreq.min)
 LOG_ADD(LOG_FLOAT, sRFP, &posRxFreq.stddev)
 //LOG_ADD(LOG_FLOAT, sRFC, &cmdRxFreq.stddev)
 LOG_GROUP_STOP(broadcast_test)
+
+PARAM_GROUP_START(broadcast_flags)
+PARAM_ADD(PARAM_UINT8, use_vicon, &useVicon)
+PARAM_GROUP_STOP(broadcast_flags)
 
