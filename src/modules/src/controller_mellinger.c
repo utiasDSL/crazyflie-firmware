@@ -61,9 +61,9 @@ static float i_range_xy = 2.0;
 
 // Z Position
 static float kp_z = 1.25;       // P
-static float kd_z = 0.4;      // D
+static float kd_z = 0.5;      // D
 static float ki_z = 0.05;       // I
-static float i_range_z  = 0.5;
+static float i_range_z  = 0.15;
 
 // Attitude
 static float kR_xy = 70000; // P
@@ -97,6 +97,13 @@ static float i_error_m_z = 0;
 // Logging variables
 static struct vec z_axis_desired;
 static acc_t acc_desired;
+
+static float log_mx = 0;
+static float log_my = 0;
+static float log_mz = 0;
+
+float clamp_val = 32000.0; // originally 32000
+
 
 
 void controllerMellingerReset(void)
@@ -320,6 +327,10 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   M.y = -kR_xy * eR.y + kw_xy * ew.y + ki_m_xy * i_error_m_y + kd_omega_rp * err_d_pitch;
   M.z = -kR_z  * eR.z + kw_z  * ew.z + ki_m_z  * i_error_m_z;
 
+  log_mx = M.x;
+  log_my = M.y;
+  log_mz = M.z;
+
   // Output
   if (setpoint->mode.z == modeDisable) {
     control->thrust = setpoint->thrust;
@@ -330,9 +341,9 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   }
 
   if (control->thrust > 0) {
-    control->roll = clamp(M.x, -32000, 32000);
-    control->pitch = clamp(M.y, -32000, 32000);
-    control->yaw = clamp(-M.z, -32000, 32000);
+    control->roll = clamp(M.x, -clamp_val, clamp_val);
+    control->pitch = clamp(M.y, -clamp_val, clamp_val);
+    control->yaw = clamp(-M.z, -clamp_val, clamp_val);
   } else {
     control->roll = 0;
     control->pitch = 0;
@@ -381,4 +392,7 @@ LOG_ADD(LOG_FLOAT, zdz, &z_axis_desired.z)
 LOG_ADD(LOG_FLOAT, i_err_x, &i_error_x)
 LOG_ADD(LOG_FLOAT, i_err_y, &i_error_y)
 LOG_ADD(LOG_FLOAT, i_err_z, &i_error_z)
+LOG_ADD(LOG_FLOAT, Mx, &log_mx)
+LOG_ADD(LOG_FLOAT, My, &log_my)
+LOG_ADD(LOG_FLOAT, Mz, &log_mz)
 LOG_GROUP_STOP(ctrlMel)
