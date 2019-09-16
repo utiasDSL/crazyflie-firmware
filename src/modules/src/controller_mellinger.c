@@ -61,7 +61,7 @@ static float i_range_xy = 2.0;
 
 // Z Position
 static float kp_z = 1.25;       // P
-static float kd_z = 0.4;      // D
+static float kd_z = 0.4;        // D
 static float ki_z = 0.05;       // I
 static float i_range_z  = 0.5;
 
@@ -98,6 +98,21 @@ static float i_error_m_z = 0;
 static struct vec z_axis_desired;
 static acc_t acc_desired;
 
+static bool flagtest = false;
+static int internalstate = 0;
+static float spz = 0;
+static float tx = 0;
+//static float ty = 0;
+static float tz = 0;
+static float tau_xy = 0.35;
+static float tau_z = 0.7;
+//static float tau_v = 0.5;
+static float boxlen_x = 0.5;
+static float boxlen_y = 0.5;
+static float boxlen_z = 0.5;
+static float vnom_x = 0;
+static float vnom_y = 0;
+static float vnom_z = 0;
 
 void controllerMellingerReset(void)
 {
@@ -156,6 +171,129 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   struct vec statePos = mkvec(state->position.x, state->position.y, state->position.z);
   struct vec stateVel = mkvec(state->velocity.x, state->velocity.y, state->velocity.z);
 
+  spz = setpoint->position.z;
+  if (flagtest && setpoint->position.z != 0.0f)  // Use motion primitive formulation
+  {
+      /*
+      kp_xy = 1.0f / tau_xy / tau_xy;
+      kd_xy = 1.414f / tau_xy;
+      kp_z = 1.0f / tau_z / tau_z;
+      kd_z = 1.414f / tau_z;
+      vnom_x = boxlen_x / tau_xy / 1.414f / 2.0f;
+      vnom_y = boxlen_y / tau_xy / 1.414f / 2.0f;
+      vnom_z = boxlen_z / tau_z / 1.414f / 2.0f;
+       */
+      vnom_x = 0.25;
+      vnom_y = 0.25;
+      vnom_z = 0.25;
+      float tvx = 2.0f * vnom_x / boxlen_x;
+      //float tvy = 2.0f * vnom_y / boxlen_y;
+      float tvz = 2.0f * vnom_z / boxlen_z;
+
+      if (internalstate == 0)
+          internalstate = 1;
+
+      if (internalstate == 1)
+      {
+
+          setpointPos.x = 0;  // hold
+          setpointVel.x = 0;
+          setpointPos.y = 0;  // hold
+          setpointVel.y = 0;
+          setpointPos.z = 0.0f + vnom_z * tz - (boxlen_z/2.0f)*(1.0f - expf(-tz/tvz));
+          setpointVel.z = (1.0f - expf(-tz/tvz)) * vnom_z;
+          tz += dt;
+          /*
+          tz += vnom_z * dt;
+          setpointPos.x = 0;  // hold
+          setpointVel.x = 0;
+          setpointPos.y = 0;  // hold
+          setpointVel.y = 0;
+          setpointPos.z = tz;
+          setpointVel.z = vnom_z;
+*/
+
+          if (statePos.z > 0.75f)
+          {
+              internalstate = 2;
+              tz = 0;
+          }
+
+
+          /*
+          setpointPos.x = 0;  // hold
+          setpointVel.x = 0;
+          setpointPos.y = 0;  // hold
+          setpointVel.y = 0;
+          setpointPos.z = statePos.z;  // forw
+          setpointVel.z = (1.0f - expf(-tz / tau_v)) * vnom_z;
+          tz += dt;
+           */
+
+      }
+
+      if (internalstate == 2)
+      {
+          if (statePos.x > 0.75f)
+          {
+              internalstate = 3;
+              tx = 0;
+              tz = 0;
+          }
+
+          setpointPos.x = 0 + vnom_x * tx - (boxlen_x/2.0f)*(1.0f - expf(-tx/tvx)); // forw
+          setpointVel.x = (1.0f - expf(-tx/tvx)) * vnom_x;//(1.0f - expf(-tx / tau_v)) * vnom_x;
+          setpointPos.y = 0;  // hold
+          setpointVel.y = 0;
+          setpointPos.z = 0.75f + (boxlen_z/2.0f)*(1.0f - expf(-tz/tvz));  // hold
+          setpointVel.z = expf(-tz/tvz) * vnom_z;
+          tx += dt;
+          tz += dt;
+
+          /*
+          setpointPos.x = tx; //statePos.x;  // forw
+          setpointVel.x = vnom_x;//(1.0f - expf(-tx / tau_v)) * vnom_x;
+          setpointPos.y = 0;  // hold
+          setpointVel.y = 0;
+          setpointPos.z = 1.0;  // hold
+          setpointVel.z = 0;
+          tx += dt*vnom_x; //dt;
+           */
+      }
+
+      if (internalstate == 3)
+      {
+          if (statePos.z < 0.08f)
+          {
+              internalstate = 4;
+              tx = 1.0f; //0;
+              tz = 1.0f; // 0;
+          }
+
+          setpointPos.x = 0.75f + (boxlen_x/2.0f)*(1.0f - expf(-tx/tvx));  // hold
+          setpointVel.x = expf(-tx/tvx) * vnom_x;
+          setpointPos.y = 0; //ty; //statePos.y;  // forw
+          setpointVel.y = 0; //vnom_y; //(1.0f - expf(-ty / tau_v)) * vnom_y;
+          setpointPos.z = 1.0f + (-vnom_z) * tz - (-boxlen_z/2.0f)*(1.0f - expf(-tz/tvz));  // hold
+          setpointVel.z = (1.0f - expf(-tz/tvz)) * (-vnom_z);
+          tx += dt;
+          tz += dt;
+          //ty += vnom_y*dt; //dt;
+      }
+
+
+      if (internalstate == 4)
+      {
+          setpoint->mode.z = modeDisable;
+          setpoint->thrust = 0.0f;
+          setpointPos.x = 0;  // hold
+          setpointVel.x = 0;
+          setpointPos.y = 0;  // hold
+          setpointVel.y = 0;
+          setpointPos.z = 0;  // hold
+          setpointVel.z = 0;
+      }
+  }
   // Update errors only in PosSet mode
   if(setpoint->mode.x == modeAbs && setpoint->mode.y == modeAbs && setpoint->mode.z == modeAbs){
 	    // Position Error (ep)
@@ -346,7 +484,6 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   setpoint->acceleration.z = target_thrust.z/g_vehicleMass;
 
   memcpy(&acc_desired, &setpoint->acceleration, sizeof(acc_desired));
-
 }
 
 PARAM_GROUP_START(ctrlMel)
@@ -374,6 +511,14 @@ PARAM_ADD(PARAM_FLOAT, c1, &c_1)
 PARAM_ADD(PARAM_FLOAT, c, &c)
 PARAM_GROUP_STOP(ctrlMel)
 
+PARAM_GROUP_START(ctrlMel2)
+PARAM_ADD(PARAM_FLOAT, tau_xy, &tau_xy)
+PARAM_ADD(PARAM_FLOAT, tau_z, &tau_z)
+PARAM_ADD(PARAM_FLOAT, boxlen_x, &boxlen_x)
+PARAM_ADD(PARAM_FLOAT, boxlen_y, &boxlen_y)
+PARAM_ADD(PARAM_FLOAT, boxlen_z, &boxlen_z)
+PARAM_GROUP_STOP(ctrlMel2)
+
 LOG_GROUP_START(ctrlMel)
 LOG_ADD(LOG_FLOAT, zdx, &z_axis_desired.x)
 LOG_ADD(LOG_FLOAT, zdy, &z_axis_desired.y)
@@ -382,3 +527,8 @@ LOG_ADD(LOG_FLOAT, i_err_x, &i_error_x)
 LOG_ADD(LOG_FLOAT, i_err_y, &i_error_y)
 LOG_ADD(LOG_FLOAT, i_err_z, &i_error_z)
 LOG_GROUP_STOP(ctrlMel)
+
+LOG_GROUP_START(ctrlMel2)
+LOG_ADD(LOG_INT8, state, &internalstate)
+LOG_ADD(LOG_FLOAT, spz, &spz)
+LOG_GROUP_STOP(ctrlMel2)

@@ -76,7 +76,7 @@
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
-#define UWB_MIN_HEIGHT 0.9f // minimum height before you start fusing UWB measurements into the EKF
+#define UWB_MIN_HEIGHT 0.0f // minimum height before you start fusing UWB measurements into the EKF
 #define UWB_MAX_HEIGHT 0.9f
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
@@ -1224,7 +1224,8 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 		  // Extra logging variables
 		  twrDist = d->distance;
 		  anchorID = d->anchor_ID;
-	  	  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+		  if (S[STATE_Z] > UWB_MIN_HEIGHT)
+	  	      stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
 	  }
 }
 

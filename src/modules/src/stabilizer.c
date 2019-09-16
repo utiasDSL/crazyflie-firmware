@@ -53,6 +53,7 @@
 
 #include "sitaw.h"
 #include "controller.h"
+#include "controller_primitives.h"
 #include "power_distribution.h"
 
 #include "estimator_kalman.h"
@@ -69,6 +70,7 @@ uint32_t inToOutLatency;
 
 // State variables for the stabilizer
 static setpoint_t setpoint;
+static setpoint_t setpoint2;
 static sensorData_t sensorData;
 static state_t state;
 static control_t control;
@@ -199,9 +201,11 @@ static void stabilizerTask(void* param)
       
       commanderGetSetpoint(&setpoint, &state);
 
-      sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
+      controllerPrimitives(&setpoint2, &setpoint, &state);
 
-      controller(&control, &setpoint, &sensorData, &state, tick);
+      sitAwUpdateSetpoint(&setpoint2, &sensorData, &state);
+
+      controller(&control, &setpoint2, &sensorData, &state, tick);
 
       checkEmergencyStopTimeout();
 
