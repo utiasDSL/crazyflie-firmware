@@ -78,6 +78,7 @@ static setpoint_t setpoint_record;
 
 static StateEstimatorType estimatorType;
 static ControllerType controllerType;
+static uint8_t usePrimitives = 0;
 
 typedef enum { configureAcc, measureNoiseFloor, measureProp, testBattery, restartBatTest, evaluateResult, testDone } TestState;
 #ifdef RUN_PROP_TEST_AT_STARTUP
@@ -201,11 +202,17 @@ static void stabilizerTask(void* param)
       
       commanderGetSetpoint(&setpoint, &state);
 
-      controllerPrimitives(&setpoint2, &setpoint, &state);
-
-      sitAwUpdateSetpoint(&setpoint2, &sensorData, &state);
-
-      controller(&control, &setpoint2, &sensorData, &state, tick);
+      if (usePrimitives)
+      {
+          controllerPrimitives(&setpoint2, &setpoint, &state);
+          sitAwUpdateSetpoint(&setpoint2, &sensorData, &state);
+          controller(&control, &setpoint2, &sensorData, &state, tick);
+      }
+      else
+      {
+          sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
+          controller(&control, &setpoint, &sensorData, &state, tick);
+      }
 
       checkEmergencyStopTimeout();
 
@@ -449,6 +456,7 @@ PARAM_GROUP_STOP(health)
 PARAM_GROUP_START(stabilizer)
 PARAM_ADD(PARAM_UINT8, estimator, &estimatorType)
 PARAM_ADD(PARAM_UINT8, controller, &controllerType)
+PARAM_ADD(PARAM_UINT8, usePrims, &usePrimitives)
 PARAM_GROUP_STOP(stabilizer)
 
 LOG_GROUP_START(ctrltarget)

@@ -87,6 +87,7 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 //	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
 //	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
 //    },
+        /*
   //DSL-06
    .anchorPosition = {
 	   		  {timestamp: 1, x: -3.4838, y: -3.2145, z: 0.7981},   //0     gound
@@ -99,7 +100,6 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 			  {timestamp: 1, x: -3.1064, y:  4.4783, z: 0.9758},   //7     ground
 	       },
    // Myhal 07
-/*
 		   .anchorPosition = {
 		   		  {timestamp: 1, x: -4.2672, y: -6.0962, z: 0.1597},   //0
 		   		  {timestamp: 1, x:  6.3778, y:  4.7231, z: 4.6324},   //1
@@ -109,8 +109,18 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 		   		  {timestamp: 1, x:  6.0962, y: -6.0962, z: 0.1635},   //5
 				  {timestamp: 1, x: -4.2672, y:  5.1086, z: 0.1606},   //6
 				  {timestamp: 1, x:  6.1108, y: -7.0779, z: 3.9419},   //7
-		       },
-*/
+		       },*/
+    .anchorPosition = {
+                 {timestamp: 1, x: -3.1705, y: -3.0053, z: 0.1609},   //0     gound
+                 {timestamp: 1, x: -3.6488, y:  4.8475, z: 3.1726},   //1     top
+                 {timestamp: 1, x:  3.1479, y:  4.5671, z: 0.1664},   //2     ground
+                 {timestamp: 1, x:  4.1447, y: -3.4773, z: 3.4064},   //3     top
+                 {timestamp: 1, x: -3.5868, y: -3.4973, z: 3.1405},   //4     top
+                 {timestamp: 1, x:  3.0684, y: -3.0724, z: 0.1579},   //5     ground
+              {timestamp: 1, x:  4.0379, y:  4.9047, z: 3.3585},   //6     top
+              {timestamp: 1, x: -3.1476, y:  4.4244, z: 0.1586},   //7     ground
+           },
+
     .combinedAnchorPositionOk = true,
 };
 
