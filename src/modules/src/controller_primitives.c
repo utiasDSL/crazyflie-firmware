@@ -82,31 +82,21 @@ void box_idxs(int *idxs, const float *pos3_cur)
 }
 
 // For backwards, put the negative of vel_nom
-void ctr_forw(float *pos_sp, float *vel_sp, const float t, const float pos_0, const float vel_0,
+void ctr_forw(float *p_sp, float *v_sp, const float t, const float pos_0, const float vel_0,
           const float tau, const float vel_nom)
 {
     float lam = expf(-t / tau);
-    *pos_sp = pos_0 + vel_nom * t + tau * (vel_0 - vel_nom) * (1.0f - lam);
-    *vel_sp = vel_nom + (vel_0 - vel_nom) * lam;
+    *p_sp = pos_0 + vel_nom * t + tau * (vel_0 - vel_nom) * (1.0f - lam);
+    *v_sp = vel_nom + (vel_0 - vel_nom) * lam;
 }
 
-void ctr_hold(float *pos_sp, float *vel_sp, const float t, const float pos_0, const float pos_mid,
+void ctr_hold(float *p_sp, float *v_sp, const float t, const float pos_0, const float pos_mid,
               const float tau)
 {
     float lam = expf(-t / tau);
-    *pos_sp = pos_mid + lam * (pos_0 - pos_mid);
-    *vel_sp = lam * (pos_mid - pos_0) / tau;
+    *p_sp = pos_mid + lam * (pos_0 - pos_mid);
+    *v_sp = lam * (pos_mid - pos_0) / tau;
 }
-
-/*
-void ctr_hold(float *pos_sp, float *vel_sp, const float t, const float pos_0, const float vel_0,
-          const float tau)
-{
-    float lam = expf(-t / tau);
-    *pos_sp = pos_0 + tau * vel_0 * (1.0f - lam);
-    *vel_sp = vel_0 * lam;
-}
- */
 
 // 0 = landed, 1 = hold, 2 = forward, 3 = backwards
 bool verify_prims(const int *prims)
@@ -212,7 +202,6 @@ void computeSetpoints(setpoint_t *setpoint2, const state_t *state, const int *pr
                 pos_0[i] = pos_mid[i];
                 vel_0[i] = 0;
                 taus[i] = 1.0f;  // any nonzero dummy value
-                //vel_0[i] = 0.01f; //10.0f*vel_noms[i];  // enforce movement initially
             }
         }
 
@@ -262,15 +251,14 @@ void controllerPrimitives(setpoint_t *setpoint2, const setpoint_t *setpoint,
     memcpy(primcur, prims, 3*sizeof(int));  // update latest primitives
 }
 
-/*
 PARAM_GROUP_START(prims)
-PARAM_ADD(PARAM_FLOAT, tau_xy, &tau_xy)
-PARAM_ADD(PARAM_FLOAT, tau_z, &tau_z)
-PARAM_ADD(PARAM_FLOAT, boxlen_x, &boxlen_x)
-PARAM_ADD(PARAM_FLOAT, boxlen_y, &boxlen_y)
-PARAM_ADD(PARAM_FLOAT, boxlen_z, &boxlen_z)
+PARAM_ADD(PARAM_FLOAT, vx, &(vel_noms[0]))
+PARAM_ADD(PARAM_FLOAT, vy, &(vel_noms[1]))
+PARAM_ADD(PARAM_FLOAT, vz, &(vel_noms[2]))
+PARAM_ADD(PARAM_FLOAT, bx, &(box_lens[0]))
+PARAM_ADD(PARAM_FLOAT, by, &(box_lens[1]))
+PARAM_ADD(PARAM_FLOAT, bz, &(box_lens[2]))
 PARAM_GROUP_STOP(prims)
-*/
 
 LOG_GROUP_START(prims)
 LOG_ADD(LOG_INT8, px, &(primcur[0]))
