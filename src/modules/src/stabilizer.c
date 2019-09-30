@@ -70,7 +70,7 @@ uint32_t inToOutLatency;
 
 // State variables for the stabilizer
 static setpoint_t setpoint;
-static setpoint_t setpoint2;
+static setpoint_t setpoint2;  // only use for onboard primitives
 static sensorData_t sensorData;
 static state_t state;
 static control_t control;
@@ -78,7 +78,7 @@ static setpoint_t setpoint_record;
 
 static StateEstimatorType estimatorType;
 static ControllerType controllerType;
-static uint8_t usePrimitives = 0;
+static uint8_t usePrimitives = 0;  // 0 - normal, 1 - use onboard primitives
 
 typedef enum { configureAcc, measureNoiseFloor, measureProp, testBattery, restartBatTest, evaluateResult, testDone } TestState;
 #ifdef RUN_PROP_TEST_AT_STARTUP
@@ -204,12 +204,15 @@ static void stabilizerTask(void* param)
 
       if (usePrimitives)
       {
+          // setpoint has the primitive commands
+          // setpoint2 will have the position commands
           controllerPrimitives(&setpoint2, &setpoint, &state);
           sitAwUpdateSetpoint(&setpoint2, &sensorData, &state);
           controller(&control, &setpoint2, &sensorData, &state, tick);
       }
       else
       {
+          // the normal set-up, setpoint has the (position) commands
           sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
           controller(&control, &setpoint, &sensorData, &state, tick);
       }

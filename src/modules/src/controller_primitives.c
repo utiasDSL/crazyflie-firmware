@@ -23,10 +23,30 @@ SOFTWARE.
 */
 
 /*
-This controller is based on the following publication:
+This controller is based on the ideas in:
 
-TO DO
+"A modular framework for motion planning using safe-by-design motion primitives"
+M. Vukosavljev, Z. Kroeze, A. P. Schoellig, and M. E. Broucke
+IEEE Transactions on Robotics, 2019.
+
+Some changes include that the motion primitives are now timed trajectories.
+Equations are briefly explained in the wiki.
+Informally forward/backward (per dimension) have constant speed setpoints
+and hold has constant position setpoints.
+Some interpolation is added for continuity up to the velocity.
+Motion primitives commands are sent from offboard, or internally hardcoded
+Per xyz dimension: 0 - off, 1 - hold, 2 - forward, 3 - backward
+We only use deterministic primitives (at most one non-hold prim over xyz)
+Any component with off will turn off motors
+Motion primitives can only change when a transition to a new box is completed
+The grid is defined by the box lengths, a lattice of points defines the centers
+of the boxes.
+The speed during forward/backward may be chosen freely, but generally larger
+boxes work better with larger speeds.
+
+Contact: mario.vukosavljev@robotics.utias.utoronto.ca
 */
+
 #include <string.h>
 #include <math.h>
 
@@ -48,8 +68,9 @@ TO DO
 
 static int counter = 0;
 
-// Harded-coded motion primitive plan
-// The second last primitive should be going down at z = 0 box (landing)
+// Harded-coded motion primitive plan, only if internal plan is true
+// If false, then the input setpoint encodes the motion primitives from offboard
+// The second last primitive should be going down at z = 0 box or holding (landing)
 // The last primitive should be "off", activated with landing threshold
 static bool internalplan = false;
 static int planlen = PLANLEN;
@@ -63,12 +84,12 @@ static int curidxs[3] = {0, 0, 0}; // current box indices
 static bool initbox = false;  // true when initialized
 
 static float dt = 0.001f;  // update rate is 1000Hz
-static float pos_mid[3] = {0, 0, 0};
-static float pos_sp[3] = {0, 0, 0};
-static float vel_sp[3] = {0, 0, 0};
-static float t_0[3] = {0, 0, 0};  // time elapsed [s]
-static float pos_0[3] = {0, 0, 0};  // start position in [m]
-static float vel_0[3] = {0, 0, 0};  // start velocity in [m/s]
+static float pos_mid[3] = {0, 0, 0};  // position of middle of current box
+static float pos_sp[3] = {0, 0, 0};  // latest position setpoint
+static float vel_sp[3] = {0, 0, 0};  // latest velocity setpoint
+static float t_0[3] = {0, 0, 0};  // time elapsed [s], since new box per dimension
+static float pos_0[3] = {0, 0, 0};  // start position in [m], since new box...
+static float vel_0[3] = {0, 0, 0};  // start velocity in [m/s], since new box...
 static float taus[3] = {0.2f, 0.2f, 0.2f}; //{1.0f, 1.0f, 1.0f};
 
 static float box_lens[3] = {1.0f, 1.0f, 1.0f};  // box lengths in [m]
