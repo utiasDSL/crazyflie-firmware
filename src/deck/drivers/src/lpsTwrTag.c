@@ -77,16 +77,7 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 
    // To set a static anchor position from startup, uncomment and modify the
    // following code:
-//    .anchorPosition = {
-//	  {timestamp: 1, x: -3.1845, y: -2.9914, z: 0.1523},
-//	  {timestamp: 1, x: -3.5415, y: 4.9369, z: 3.2063},
-//	  {timestamp: 1, x: 3.0565, y: -3.0967, z: 0.1513},
-//	  {timestamp: 1, x: 4.0599 , y: -3.5101, z: 3.3284},
-//	  {timestamp: 1, x: -3.5851, y: -3.3776, z: 3.1397},
-//	  {timestamp: 1, x: 3.1642, y: 4.5569, z: 0.1584},
-//	  {timestamp: 1, x: 4.0904, y:4.8346 , z:3.3616},
-//	  {timestamp: 1, x: -3.1111, y: 4.5942, z: 0.1533},
-//    },
+
   //DSL-08vicon
    .anchorPosition = {
 	   		  {timestamp: 1, x: -3.1705, y: -3.0053, z: 0.1609},   //0     gound
@@ -98,27 +89,6 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 			  {timestamp: 1, x:  4.0379, y:  4.9047, z: 3.3585},   //6     top
 			  {timestamp: 1, x: -3.1476, y:  4.4244, z: 0.1586},   //7     ground
 	       },
-   // Myhal 07
-		   .anchorPosition = {
-		   		  {timestamp: 1, x: -4.2672, y: -6.0962, z: 0.1597},   //0
-		   		  {timestamp: 1, x:  6.3778, y:  4.7231, z: 4.6324},   //1
-		   		  {timestamp: 1, x: -4.6412, y: -6.4999, z: 3.9363},   //2
-		   		  {timestamp: 1, x:  6.0962, y:  5.1086, z: 0.1575},   //3
-		   		  {timestamp: 1, x: -3.5016, y:  5.2513, z: 4.6285},   //4
-		   		  {timestamp: 1, x:  6.0962, y: -6.0962, z: 0.1635},   //5
-				  {timestamp: 1, x: -4.2672, y:  5.1086, z: 0.1606},   //6
-				  {timestamp: 1, x:  6.1108, y: -7.0779, z: 3.9419},   //7
-		       },*/
-    .anchorPosition = {
-                 {timestamp: 1, x: -3.1705, y: -3.0053, z: 0.1609},   //0     gound
-                 {timestamp: 1, x: -3.6488, y:  4.8475, z: 3.1726},   //1     top
-                 {timestamp: 1, x:  3.1479, y:  4.5671, z: 0.1664},   //2     ground
-                 {timestamp: 1, x:  4.1447, y: -3.4773, z: 3.4064},   //3     top
-                 {timestamp: 1, x: -3.5868, y: -3.4973, z: 3.1405},   //4     top
-                 {timestamp: 1, x:  3.0684, y: -3.0724, z: 0.1579},   //5     ground
-              {timestamp: 1, x:  4.0379, y:  4.9047, z: 3.3585},   //6     top
-              {timestamp: 1, x: -3.1476, y:  4.4244, z: 0.1586},   //7     ground
-           },
 
     .combinedAnchorPositionOk = true,
 };

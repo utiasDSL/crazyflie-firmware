@@ -78,41 +78,6 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
  			  {timestamp: 1, x:  4.0379, y:  4.9047, z: 3.3585},   //6     top
  			  {timestamp: 1, x: -3.1476, y:  4.4244, z: 0.1586},   //7     ground
    },
-
-	   // Myhal 07
-//			   .anchorPosition = {
-//			   		  {timestamp: 1, x: -4.6085, y: -5.8757, z: 0.1597},   //0
-//			   		  {timestamp: 1, x:  6.3778, y:  4.7231, z: 4.6324},   //1
-//			   		  {timestamp: 1, x: -4.6412, y: -6.4999, z: 3.9363},   //2
-//			   		  {timestamp: 1, x:  6.3615, y:  4.5488, z: 0.1575},   //3
-//			   		  {timestamp: 1, x: -3.5016, y:  5.2513, z: 4.6285},   //4
-//			   		  {timestamp: 1, x:  5.7683, y: -6.4352, z: 0.1635},   //5
-//					  {timestamp: 1, x: -4.0118, y:  5.1086, z: 0.1606},   //4
-//					  {timestamp: 1, x:  6.1108, y: -7.0779, z: 3.9419},   //5
-//			       },
-
-	// OPG
-//	.anchorPosition = {
-//		  {timestamp: 1, x: -1.7911, y: -1.8757, z: 0.1545},
-//		  {timestamp: 1, x: -1.9517, y: 2.1574, z: 2.6899},
-//		  {timestamp: 1, x: 2.3122, y: -2.3496, z: 0.1533},
-//		  {timestamp: 1, x: 2.2837 , y: -2.4442, z: 2.7443},
-//		  {timestamp: 1, x: -2.1887, y: -2.5725, z: 2.7729},
-//		  {timestamp: 1, x: 2.2656, y: 2.1935, z: 0.1502},
-//		  {timestamp: 1, x: 2.4215, y: 2.2767 , z:2.8830},
-//		  {timestamp: 1, x: -1.9229, y: 2.0743, z: 0.1582},
-//	    },
-
-        .anchorPosition = {
-                {timestamp: 1, x: -3.1705, y: -3.0053, z: 0.1609},   //0     gound
-                {timestamp: 1, x: -3.6488, y:  4.8475, z: 3.1726},   //1     top
-                {timestamp: 1, x:  3.1479, y:  4.5671, z: 0.1664},   //2     ground
-                {timestamp: 1, x:  4.1447, y: -3.4773, z: 3.4064},   //3     top
-                {timestamp: 1, x: -3.5868, y: -3.4973, z: 3.1405},   //4     top
-                {timestamp: 1, x:  3.0684, y: -3.0724, z: 0.1579},   //5     ground
-                {timestamp: 1, x:  4.0379, y:  4.9047, z: 3.3585},   //6     top
-                {timestamp: 1, x: -3.1476, y:  4.4244, z: 0.1586},   //7     ground
-        },
 };
 
 static lpsTdoa2AlgoOptions_t* options = &defaultOptions;
