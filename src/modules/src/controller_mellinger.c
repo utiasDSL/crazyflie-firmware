@@ -61,7 +61,7 @@ static float i_range_xy = 2.0;
 
 // Z Position
 static float kp_z = 1.25;       // P
-static float kd_z = 0.4;      // D
+static float kd_z = 0.4;        // D
 static float ki_z = 0.05;       // I
 static float i_range_z  = 0.5;
 
@@ -97,7 +97,6 @@ static float i_error_m_z = 0;
 // Logging variables
 static struct vec z_axis_desired;
 static acc_t acc_desired;
-
 
 void controllerMellingerReset(void)
 {
@@ -346,7 +345,6 @@ void controllerMellinger(control_t *control, setpoint_t *setpoint,
   setpoint->acceleration.z = target_thrust.z/g_vehicleMass;
 
   memcpy(&acc_desired, &setpoint->acceleration, sizeof(acc_desired));
-
 }
 
 PARAM_GROUP_START(ctrlMel)
@@ -374,6 +372,7 @@ PARAM_ADD(PARAM_FLOAT, c1, &c_1)
 PARAM_ADD(PARAM_FLOAT, c, &c)
 PARAM_GROUP_STOP(ctrlMel)
 
+/*
 LOG_GROUP_START(ctrlMel)
 LOG_ADD(LOG_FLOAT, zdx, &z_axis_desired.x)
 LOG_ADD(LOG_FLOAT, zdy, &z_axis_desired.y)
@@ -382,3 +381,4 @@ LOG_ADD(LOG_FLOAT, i_err_x, &i_error_x)
 LOG_ADD(LOG_FLOAT, i_err_y, &i_error_y)
 LOG_ADD(LOG_FLOAT, i_err_z, &i_error_z)
 LOG_GROUP_STOP(ctrlMel)
+*/
