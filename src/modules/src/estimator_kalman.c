@@ -80,11 +80,9 @@
 #define UWB_MAX_HEIGHT 0.9f
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
-static bool TRI = false;
-static bool Compensate = false;
-static bool Compen_tdoa = false;
-static bool enable_flow = false;
+static bool enable_flow = true;
 static bool enable_zrange = true;
+static bool enable_UWB = true;
 /**
  * Primary Kalman filter functions
  *
@@ -169,9 +167,6 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *uwb);
 static inline bool stateEstimatorHasTDOAPacket(tdoaMeasurement_t *uwb) {
   return (pdTRUE == xQueueReceive(tdoaDataQueue, uwb, 0));
 }
-
-// New functions for TWR trilateration, send an array inside
-static void stateEstimatorUpdateWithTri(distanceMeasurement_t *dist, float N);
 
 // Measurements of flow (dnx, dny)
 static xQueueHandle flowDataQueue;
@@ -340,13 +335,7 @@ static int anchorID;
 static float yaw_logback;
 static float yaw_error_logback;
 
-// log variable for Trilateration check
-static float logtri_x;
-static float logtri_y;
-static float logtri_z;
 //debug
-static int logtri_num=0;
-static int logcheck;
 static float tdoaDist;
 static int tdoaID;
 static float logzrange = 0.0f;
@@ -556,49 +545,7 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
 //  modify here for trilateration
 
   distanceMeasurement_t dist;
-  if(TRI)// using trilateration
-  {	  	int	i=0;   // set local variable i
-        bool tri = true;
-        bool check = true;
-		distanceMeasurement_t d[4];  // an array with type "distanceMeasurement_t"
-        while(tri)
-        {
-		 if(i > 3){  // receive for anchor distance
-			stateEstimatorUpdateWithTri(d,4.0);   // send all four distances into the tri-function
-			doneUpdate = true;
-			i=0;    // reset the flag
-			check = true;
-			tri = false;
-			}
-		 else{
-			 while (stateEstimatorHasDistanceMeasurement(&dist)){
-				 twrDist = dist.distance;
-				 anchorID = dist.anchor_ID;
-					//  iterate all previous ranging data for the uwb anchor check
-				 for(int j = 0; j <= i ;j++){
-					if(dist.anchor_ID == d[j].anchor_ID){
-							check = false;
-						}  // if data is from the same uwb anchor before, check is false.
-					}
-					//  after the checking procedure, see if the new data is from a different anchor
-					//  Debug: check dist.anchor_ID ??
-					logcheck = check;     // check is always 1
-					logcheck = d[0].anchor_ID;  // d[0].anchor_ID is always 0.0, the index is wrong
-					if(check){            // if passing the check process.
-							d[i] = dist;  // send the twr info to d[i]
-							i++;
-							logtri_num = i; // i is always 1 right now
-						}
-					else{
-						check = true;
-					}
-			 }
-   //  if not passing the check process, reset the check label.
-			}
-        }
-    }
-  else{      // using simple ranging measurements
-	while (stateEstimatorHasDistanceMeasurement(&dist))
+  while (stateEstimatorHasDistanceMeasurement(&dist)){
 	stateEstimatorUpdateWithDistance(&dist);
 	doneUpdate = true;
   }
@@ -1169,40 +1116,9 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 	  float dy = S[STATE_Y] - d->y;
 	  float dz = S[STATE_Z] - d->z;
 	  float measuredDistance = 0.0f;
-	  // TWR: constant bias compensation
-	  if (Compensate){
-		  switch(d->anchor_ID){
-		  	  case 0:
-		  		 measuredDistance = d->distance + 0.2f;
-			  break;
-		  	  case 1:
-		  		 measuredDistance = d->distance + 0.4f;
-			  break;
-		  	  case 2:
-		  		 measuredDistance = d->distance + 0.2f;
-			  break;
-		  	  case 3:
-		  		 measuredDistance = d->distance + 0.4f;
-			  break;
-		  	  case 4:
-		  		 measuredDistance = d->distance + 0.3f;
-			  break;
-		  	  case 5:
-		  		 measuredDistance = d->distance + 0.28f;
-			  break;
-		  	  case 6:
-		  		 measuredDistance = d->distance + 0.46f;
-			  break;
-		  	  case 7:
-		  		 measuredDistance = d->distance + 0.23f;
-			  break;
-		  	  default :
-		  		break;
-		  }
-	  }
-	  else{
-		   measuredDistance = d->distance;
-	  }
+
+	  measuredDistance = d->distance;
+
 	  //do not fuse "0" measurement
 	  if (measuredDistance >= 0.001f)
 	  {
@@ -1228,140 +1144,6 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 	  }
 }
 
-// major trilateration function
-static void stateEstimatorUpdateWithTri(distanceMeasurement_t *d, float N)
-{
-	  //debug
-	  // computing matrices
-	  float a_f32[3]={0};
-      arm_matrix_instance_f32 sum_a = {3, 1, a_f32};
-      float b_f32[9]={0};
-      arm_matrix_instance_f32 sum_B = {3, 3, b_f32};
-      float c_f32[3]={0};
-      arm_matrix_instance_f32 sum_c = {3, 1, c_f32};
-      float H_f32[9]={0};
-      arm_matrix_instance_f32 sum_H = {3, 3, H_f32};
-      float sum_q1,sum_q2;             // Temporary variables
-      sum_q1 = 0.0f; sum_q2 = 0.0f;
-
-      for (int i=0; i<N; i++){
-    	  float pi_f32[3] = {d[i].x, d[i].y, d[i].z};
-    	  arm_matrix_instance_f32 pi = {3, 1, pi_f32};
-
-    	  float piT_f32[3] = {0};
-    	  arm_matrix_instance_f32 piT = {1, 3, piT_f32};
-
-    	  float ri = d[i].distance;
-    	  /* calculation of pi transpose */
-    	  mat_trans(&pi, &piT);
-    	  // Temporary matrices for computing
-    	  static float tmp1_f32[9]={0};
-    	  static arm_matrix_instance_f32 tmp1 = {3, 3, tmp1_f32};
-    	  static float tmp2_f32[3]={0};
-    	  static arm_matrix_instance_f32 tmp2 = {3, 1, tmp2_f32};
-
-    	  static float tmp3_f32[3]={0};
-    	  tmp3_f32[0] = -ri*ri*d[i].x;
-    	  tmp3_f32[1] = -ri*ri*d[i].y;
-    	  tmp3_f32[2] = -ri*ri*d[i].z;
-    	  static arm_matrix_instance_f32 tmp3 = {3, 1, tmp3_f32};  // tmp3 = - ri^2*pi
-
-    	  static float tmp4_f32[3]={0};
-    	  static arm_matrix_instance_f32 tmp4 = {3, 1, tmp4_f32};
-    	  static float tmp5_f32[1]={0};
-    	  static arm_matrix_instance_f32 tmp5 = {1, 1, tmp5_f32};
-    	  static float tmp6_f32[9]={0};
-    	  static arm_matrix_instance_f32 tmp6 = {3, 3, tmp6_f32};
-    	  // matrix computation
-    	  // compute sum_a
-    	  mat_mult(&pi, &piT, &tmp1);           //  tmp1=pi*pi'
-    	  mat_mult(&tmp1, &pi, &tmp2);          //  tmp2=pi*pi'*pi
-    	  mat_add(&tmp2, &tmp3,&tmp4);          //  tmp5=pi*pi'*pi - ri^2*pi
-    	  mat_add(&sum_a, &tmp4 ,&sum_a);       //  sum_a = sum_a + pi*pi'*pi - ri^2*pi;
-          // compute sum_B
-    	  mat_scale(&tmp1, 2.0, &tmp1);         //  tmp1=-2*pi*pi'
-    	  mat_mult(&piT, &pi, &tmp5);                      //   tmp5=pi'*pi
-    	  float eye1_f32[9]={1, 0, 0, 0, 1, 0, 0, 0, 1};   //
-    	  arm_matrix_instance_f32 eye1 = {3, 3, eye1_f32}; //   eye1=eye(3)
-    	  //  tmp5.pData[0]  ?? Is this the right index ??
-    	  //  tmp5_f32
-    	  mat_scale(&eye1, -tmp5_f32[0], &eye1);           //   eye1 = -pi'*pi*eye(3)
-    	  float eye2_f32[9]={1, 0, 0, 0, 1, 0, 0, 0, 1};
-    	  arm_matrix_instance_f32 eye2 = {3, 3, eye2_f32}; //   eye2=eye(3)
-    	  mat_scale(&eye2, ri*ri, &eye2);                  //   eye2 = ri^2*eye(3)
-    	  mat_add(&tmp1, &eye1, &tmp6);                    //   tmp6=-2*pi*pi'-pi'*pi*eye(3)
-    	  mat_add(&tmp6, &eye2, &tmp6);                    //   tmp6=-2*pi*pi'-pi'*pi*eye(3)+ri^2*eye(3)
-    	  mat_add(&sum_B, &tmp6,&sum_B);                   //   sum_B=sum_B+tmp6
-    	  // compute sum_c
-    	  mat_add(&sum_c, &pi, &sum_c);
-    	  // compute sum_H
-    	  mat_mult(&pi, &piT, &tmp1);           //  tmp1=pi*pi'
-    	  mat_add(&sum_H, &tmp1, &sum_H);       //  sum_H=sum_H+pi*pi'
-    	  // compute sum_q1
-    	  mat_mult(&piT, &pi, &tmp5);           //  tmp5=pi'*pi
-    	  sum_q1 += tmp5_f32[0];
-    	  // compute sum_q2
-    	  sum_q2 += ri*ri;
-      }
-      mat_scale(&sum_a, N, &sum_a);             // a=sum_a=(1/N)*sum_a
-      mat_scale(&sum_B, N, &sum_B);             // B=sum_B=(1/N)*sum_B
-      mat_scale(&sum_c, N, &sum_c);             // c=sum_c=(1/N)*sum_c
-	  static float cT_f32[3]={0};
-	  static arm_matrix_instance_f32 cT = {3, 1, cT_f32};   //  cT=c'
-	  mat_trans(&sum_c, &cT);
-	  static float tmp7_f32[3]={0};
-	  static arm_matrix_instance_f32 tmp7 = {3, 1, tmp7_f32};
-	  mat_mult(&sum_B, &sum_c, &tmp7);         // tmp7 = B*c
-	  static float tmp8_f32[9]={0};
-	  static arm_matrix_instance_f32 tmp8 = {3, 3, tmp8_f32};
-	  mat_mult(&sum_c, &cT, &tmp8);            // tmp8 = c*c'
-	  static float tmp9_f32[3]={0};
-	  static arm_matrix_instance_f32 tmp9 = {3, 1, tmp9_f32};
-	  mat_mult(&tmp8, &sum_c, &tmp9);          // tmp9 = c*c'*c
-	  mat_scale(&tmp9, 2.0, &tmp9);            // tmp9 = 2*c*c'*c
-	  static float f_f32[3]={0};
-	  static arm_matrix_instance_f32 f = {3, 1, f_f32};
-	  mat_add(&f, &sum_a, &f);                 // f = a
-	  mat_add(&f, &tmp7, &f);                  // f = a + B*c
-	  mat_add(&f, &tmp9, &f);                  // f = a + B*c + 2*c*c'*c;
-	  mat_scale(&sum_H, -0.5 , &sum_H);        // sum_H=(-2/N)*sum_H
-	  static float tmp10_f32[9]={0};
-	  static arm_matrix_instance_f32 H_tmp = {3, 3, tmp10_f32};   // H_tmp => H
-	  mat_add(&H_tmp, &sum_H, &H_tmp);         // H_tmp = (-2/N)*sum_H
-	  static float tmp11_f32[9]={0};
-	  static arm_matrix_instance_f32 tmp11 = {3, 3, tmp11_f32};
-	  mat_mult(&sum_c, &cT, &tmp11);       //  tmp11 = c*c'
-	  mat_scale(&tmp11, 2.0 , &tmp11);     //  tmp11 = 2*c*c'
-	  mat_add(&H_tmp, &tmp11, &H_tmp);     //  H_tmp = (-2/N)*sum_H+2*c*c'
-	  static float tmp12_f32[9]={0};
-	  static arm_matrix_instance_f32 inv_H = {3, 3, tmp12_f32};
-	  mat_inv(&H_tmp,&inv_H);              //  inv_H = H_tmp^(-1)
-	  mat_mult(&inv_H,&f,&f);              //  f = inv(H)*f
-	  mat_scale(&f, -1.0, &f);             //  f = -inv(H)*f = q
-	  static float po_f32[3]={0};
-	  static arm_matrix_instance_f32 po = {3, 1, po_f32};
-	  mat_add(&f, &sum_c, &po);            //  po = f+sum_c = q + c
-	  // po are the esimated states x, y, and z
-	  // (this part follow the "stateEstimatorUpdateWithPosition" function)
-	  // do a scalar update for each state, since this should be faster than updating all together
-	  // stdDev of trilateration. tuning parameter
-	  float std_xy_trilat = 0.02;
-	  float std_z_trilat = 0.03;
-	  float std[3]={std_xy_trilat,std_xy_trilat,std_z_trilat};
-	  for (int i=0; i<3; i++) {
-	    float h[STATE_DIM] = {0};
-	    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
-	    h[STATE_X+i] = 1;
-	    // use po_f32[i] instead of po.pData[i]
-	    // log back the tri results
-	    logtri_x = po_f32[0];
-	    logtri_y = po_f32[1];
-		logtri_z = po_f32[2];
-	    stateEstimatorScalarUpdate(&H, po_f32[i] - S[STATE_X+i], std[i]);
-	  }
-}
-
-
 //TDoA
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 {
@@ -1371,41 +1153,9 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
      * Measurement equation:
      * dR = dT + d1 - d0
      */
-	  float measurement=0.0f;
-	// tdoa constant bias compensation
-	if(Compen_tdoa){
-		  switch(tdoa->anchor_id){
-		  	  case 0:
-		  		measurement = tdoa->distanceDiff - 0.20f;
-			  break;
-		  	  case 1:
-		  		measurement = tdoa->distanceDiff + 0.35f;
-			  break;
-		  	  case 2:
-		  		measurement = tdoa->distanceDiff - 0.30f;
-			  break;
-		  	  case 3:
-		  		measurement = tdoa->distanceDiff + 0.80f;
-			  break;
-		  	  case 4:
-		  		measurement = tdoa->distanceDiff - 0.20f;
-			  break;
-		  	  case 5:
-		  		measurement = tdoa->distanceDiff + 0.00f;
-			  break;
-		  	  case 6:
-		  		measurement = tdoa->distanceDiff + 0.18f;
-			  break;
-		  	  case 7:
-		  		measurement = tdoa->distanceDiff - 0.20f;
-			  break;
-		  	  default :
-		  		break;
-		  }
+	float measurement=0.0f;
 
-	} else{
-          measurement = tdoa->distanceDiff;
-	}
+    measurement = tdoa->distanceDiff;
     // predict based on current state
     float x = S[STATE_X];
     float y = S[STATE_Y];
@@ -1452,7 +1202,9 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
       tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
 
       if (sampleIsGood) {   // measurements are good
-        stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+    	  if(enable_UWB){   // only log the TDoA data, but not using uwb data for EKF
+    		  stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+    	  }
         tdoaID = tdoa->anchor_id;
         tdoaDist = tdoa->distanceDiff;
       }

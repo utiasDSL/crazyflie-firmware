@@ -98,6 +98,17 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 			  {timestamp: 1, x:  4.0379, y:  4.9047, z: 3.3585},   //6     top
 			  {timestamp: 1, x: -3.1476, y:  4.4244, z: 0.1586},   //7     ground
 	       },
+  //Dome
+//    .anchorPosition = {
+//		 	   {timestamp: 1, x:  5.5809, y:  0.6503, z: 0.0000},   //0     gound
+//		 	   {timestamp: 1, x: -5.8006, y:  2.4887, z: 2.3158},   //1     top
+//			   {timestamp: 1, x:  6.0266, y: -2.5635, z: 2.1721},   //2     ground
+//			   {timestamp: 1, x: -6.1147, y: -4.3497, z: 0.5575},   //3     top
+//			   {timestamp: 1, x: -2.6659, y: -6.0257, z: 2.2943},   //4     top
+//			   {timestamp: 1, x: -0.2303, y:  6.6155, z: 0.0145},   //5     ground
+//			   {timestamp: 1, x:  0.6049, y: -7.9539, z: 0.3435},   //6     top
+//			   {timestamp: 1, x:  4.6354, y:  6.1290, z: 2.3855},   //7     ground
+//		 	       },
    // Myhal 07
 /*
 		   .anchorPosition = {
@@ -133,7 +144,7 @@ static struct {
 
 // Extra variable
 static bool validAnchors[LOCODECK_NR_OF_TWR_ANCHORS];
-// Rangin statistics
+// Ranging statistics
 static uint8_t rangingPerSec[LOCODECK_NR_OF_TWR_ANCHORS];
 static uint8_t rangingSuccessRate[LOCODECK_NR_OF_TWR_ANCHORS];
 // Used to calculate above values
