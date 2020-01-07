@@ -1109,6 +1109,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 {
 	  // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
+	  // The H matrix need to be organized dynamically!!!!!!!
 	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 	  // d->x,y,z is the anchor's position
 	  float dx = S[STATE_X] - d->x;
