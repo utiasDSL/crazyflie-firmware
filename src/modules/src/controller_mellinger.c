@@ -60,7 +60,7 @@ static float ki_xy = 0.05;      // I
 static float i_range_xy = 2.0;
 
 // Z Position
-static float kp_z = 1.25;       // P
+static float kp_z = 0.75;       // P
 static float kd_z = 0.4;        // D
 static float ki_z = 0.05;       // I
 static float i_range_z  = 0.5;

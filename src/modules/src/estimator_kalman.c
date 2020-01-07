@@ -80,9 +80,9 @@
 #define UWB_MAX_HEIGHT 0.9f
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
-static bool enable_flow = true;
+static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = true;
+static bool enable_UWB = false;
 /**
  * Primary Kalman filter functions
  *
@@ -1140,8 +1140,9 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 		  // Extra logging variables
 		  twrDist = d->distance;
 		  anchorID = d->anchor_ID;
-		 // if (S[STATE_Z] > UWB_MIN_HEIGHT)
+		  if(enable_UWB){
 	  	      stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+		  }
 	  }
 }
 
@@ -1706,12 +1707,9 @@ LOG_GROUP_START(twr_ekf)
 //  LOG_ADD(LOG_FLOAT, distance, &twrDist)
 //  LOG_ADD(LOG_UINT8, anchorID, &anchorID)
 //  LOG_ADD(LOG_FLOAT, yaw, &log_yaw)
+  LOG_ADD(LOG_FLOAT, dx, &measuredNX)
+  LOG_ADD(LOG_FLOAT, dy, &measuredNY)
   LOG_ADD(LOG_FLOAT, zrange, &logzrange)
-//  LOG_ADD(LOG_FLOAT, tri_x, &logtri_x)
-//  LOG_ADD(LOG_FLOAT, tri_y, &logtri_y)
-//  LOG_ADD(LOG_FLOAT, tri_z, &logtri_z)
-//  LOG_ADD(LOG_UINT8, tri_num, &logtri_num)    // tri_num is always 1
-//  LOG_ADD(LOG_UINT8, tri_check, &logcheck)    // log back the check
 LOG_GROUP_STOP(twr_ekf)
 
 LOG_GROUP_START(tdoa_ekf)
