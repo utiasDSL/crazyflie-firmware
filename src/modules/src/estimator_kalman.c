@@ -76,13 +76,12 @@
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
-#define UWB_MIN_HEIGHT 0.0f // minimum height before you start fusing UWB measurements into the EKF
-#define UWB_MAX_HEIGHT 0.9f
 // #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = false;
+static bool enable_UWB = true;
+static bool OUTLIER_REJ = true;
 /**
  * Primary Kalman filter functions
  *
@@ -122,7 +121,7 @@ static xQueueHandle distDataQueue;
 #define DIST_QUEUE_LENGTH (10)
 
 // Measurements of a UWB TWR
-static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *dist);
+static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *dist, float dt);
 
 static inline bool stateEstimatorHasDistanceMeasurement(distanceMeasurement_t *dist) {
   return (pdTRUE == xQueueReceive(distDataQueue, dist, 0));
@@ -261,7 +260,7 @@ static float procNoiseAtt = 0;
 static float measNoiseGyro_rollpitch = 0.1f; // radians per second
 static float measNoiseGyro_yaw = 0.1f; // radians per second
 
-static float initialX = 0.0;
+static float initialX = 1.5;
 static float initialY = 0.0;
 static float initialZ = 0.0;
 
@@ -543,10 +542,10 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
 
 //  major changes
 //  modify here for trilateration
-
+  float dt_uwb = (float)(osTick-lastPrediction)/configTICK_RATE_HZ;     // re-check about this dt
   distanceMeasurement_t dist;
   while (stateEstimatorHasDistanceMeasurement(&dist)){
-	stateEstimatorUpdateWithDistance(&dist);
+	stateEstimatorUpdateWithDistance(&dist,dt_uwb);
 	doneUpdate = true;
   }
 
@@ -1106,7 +1105,7 @@ static void stateEstimatorUpdateWithPosVelYaw(posvelyawMeasurement_t *posvelyaw,
 
 //TWR
 // implement TWR-trilateration before fusing into EKF
-static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
+static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 {
 	  // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
@@ -1140,8 +1139,24 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d)
 		  // Extra logging variables
 		  twrDist = d->distance;
 		  anchorID = d->anchor_ID;
-		  if(enable_UWB){
-	  	      stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+		  if (OUTLIER_REJ){
+			  float vx = S[STATE_PX];
+			  float vy = S[STATE_PY];
+			  float vz = S[STATE_PZ];
+			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
+			  float T_max = 40.0;
+			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
+			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
+			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
+			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
+			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
+			  if((enable_UWB) && (fabsf(measuredDistance-predictedDistance) <= r_max)){
+		  	      stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+			  }
+		  }else{
+			  if(enable_UWB){
+				  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+			  }
 		  }
 	  }
 }
