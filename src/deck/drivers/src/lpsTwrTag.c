@@ -80,14 +80,14 @@ static lpsTwrAlgoOptions_t defaultOptions = {
 
   //DSL-08vicon
    .anchorPosition = {
-        {timestamp: 1, x: -3.1705, y: -3.0053, z: 0.16087},   //0
-        {timestamp: 1, x: -3.6488, y: 4.8475, z: 3.1726},   //1
-        {timestamp: 1, x: 3.1479, y: 4.5671, z: 0.16637},   //2
-        {timestamp: 1, x: 4.1447, y: -3.4773, z: 3.4064},   //3
-        {timestamp: 1, x: -3.5868, y: -3.4973, z: 3.1405},   //4
-        {timestamp: 1, x: 3.0684, y: -3.0724, z: 0.15787},   //5
-        {timestamp: 1, x: 4.0379, y: 4.9047, z: 3.3585},   //6
-        {timestamp: 1, x: -3.1476, y: 4.4244, z: 0.15857},   //7
+        {timestamp: 1, x: -3.1705, y: -4.0053, z: 0.16087},   //0
+        {timestamp: 1, x: -3.6488, y: 3.8475, z: 3.1726},   //1
+        {timestamp: 1, x: 3.1479, y: 3.5671, z: 0.16637},   //2
+        {timestamp: 1, x: 4.1447, y: -4.4773, z: 3.4064},   //3
+        {timestamp: 1, x: -3.5868, y: -4.4973, z: 3.1405},   //4
+        {timestamp: 1, x: 3.0684, y: -4.0724, z: 0.15787},   //5
+        {timestamp: 1, x: 4.0379, y: 3.9047, z: 3.3585},   //6
+        {timestamp: 1, x: -3.1476, y: 3.4244, z: 0.15857},   //7
 	       },
 
     .combinedAnchorPositionOk = true,

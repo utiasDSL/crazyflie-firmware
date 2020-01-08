@@ -82,6 +82,7 @@ static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
 static bool OUTLIER_REJ = true;
+static bool Constant_Bias = true;
 /**
  * Primary Kalman filter functions
  *
@@ -333,6 +334,9 @@ static float twrDist;
 static int anchorID;
 static float yaw_logback;
 static float yaw_error_logback;
+
+static float r_max_log;
+static float innovation;
 
 //debug
 static float tdoaDist;
@@ -1109,16 +1113,20 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 {
 	  // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
-	  // The H matrix need to be organized dynamically!!!!!!!
 	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 	  // d->x,y,z is the anchor's position
 	  float dx = S[STATE_X] - d->x;
 	  float dy = S[STATE_Y] - d->y;
 	  float dz = S[STATE_Z] - d->z;
 	  float measuredDistance = 0.0f;
-
-	  measuredDistance = d->distance;
-
+	  float con_bias[1][8]={{-0.298, -0.232, -0.196, -0.109, -0.184, -0.216, -0.169, -0.288}};
+	  if(Constant_Bias){
+		  int Anchor_ID = d->anchor_ID;
+		  measuredDistance = d->distance + con_bias[0][Anchor_ID];
+	  }
+	  else{
+		  measuredDistance = d->distance;
+	  }
 	  //do not fuse "0" measurement
 	  if (measuredDistance >= 0.001f)
 	  {
@@ -1151,7 +1159,11 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
 			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
 			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
-			  if((enable_UWB) && (fabsf(measuredDistance-predictedDistance) <= r_max)){
+
+			  r_max_log = r_max;    //debug
+			  innovation = measuredDistance-predictedDistance;
+
+			  if((enable_UWB) && (measuredDistance-predictedDistance <= r_max)){
 		  	      stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
 			  }
 		  }else{
@@ -1719,10 +1731,15 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 //  LOG_ADD(LOG_FLOAT, measNY, &measuredNY)
 //LOG_GROUP_STOP(kalman_pred)
 
-LOG_GROUP_START(twr_ekf)
+
 //  LOG_ADD(LOG_FLOAT, distance, &twrDist)
 //  LOG_ADD(LOG_UINT8, anchorID, &anchorID)
 //  LOG_ADD(LOG_FLOAT, yaw, &log_yaw)
+
+//debug param
+LOG_GROUP_START(twr_ekf)
+  LOG_ADD(LOG_FLOAT,r_max,&r_max_log)
+  LOG_ADD(LOG_FLOAT,innovation_term,&innovation)
   LOG_ADD(LOG_FLOAT, dx, &measuredNX)
   LOG_ADD(LOG_FLOAT, dy, &measuredNY)
   LOG_ADD(LOG_FLOAT, zrange, &logzrange)
