@@ -110,6 +110,25 @@ endif
 VPATH += src/init src/hal/src src/modules/src src/utils/src src/drivers/bosch/src src/drivers/src src/platform
 
 
+############### TF Micro Compilation ############### 
+# Need to compile TF Micro with some limited C++-11 support 
+# and standard libraries for math
+# Add all subdirectories to the include path
+VPATH += tfmicro
+VPATH += tfmicro/third_party
+VPATH += tfmicro/third_party/flatbuffers
+VPATH += tfmicro/third_party/gemmlowp
+VPATH += tfmicro/tensorflow/lite/core/api
+VPATH += tfmicro/tensorflow/lite/c
+VPATH += tfmicro/tensorflow/lite/experimental/micro/examples/micro_speech
+VPATH += tfmicro/tensorflow/lite/experimental/micro/examples
+VPATH += tfmicro/tensorflow/lite/experimental/micro/testing
+VPATH += tfmicro/tensorflow/lite/experimental/micro
+VPATH += tfmicro/tensorflow/lite/experimental/micro/kernels
+VPATH += tfmicro/tensorflow/lite/kernels/internal
+VPATH += tfmicro/tensorflow/lite/kernels
+
+
 ############### Source files configuration ################
 
 # Init
@@ -198,6 +217,63 @@ PROJ_OBJ += oa.o
 PROJ_OBJ += multiranger.o
 PROJ_OBJ += lighthouse.o
 
+
+######################### TF Micro Compilation ##################
+# Add custom user files, essentially your "main" function for
+# the tfmicro crazyflie application.
+#
+#PROJ_OBJ += tfmicrobenchmark.o      # deck name: tfMicroBench
+#PROJ_OBJ += tfmicrodebug.o           # deck name: tfMicroDebug
+#PROJ_OBJ += tfmicrodemo.o           # deck name: tfMicroDemo
+
+
+# Adjust this flag to "force run" the file that you created in the
+# src/deck/drivers/src folder. This overrides the default loading
+# sequence for the Crazyflie so you can run your code there. For some
+# examples look at tfmicrodemo.c or tfmicrobenchmark.c and change the
+# following -DDECK_FORCE flag to your file. 
+
+#CFLAGS += -DDECK_FORCE = tfMicroDemo
+
+# Put the name of the model you want to put in here!
+CFLAGS += -D TFMICRO_MODEL = nn_model_tflite
+
+######################### TF Micro Compilation ##################
+# Need to compile TF Micro with some limited C++-11 support
+# and standard libraries for math. Add all objects needed for compile.
+TF_SRCS := \
+c_api_internal.o \
+debug_log.o \
+micro_error_reporter.o \
+micro_mutable_op_resolver.o \
+simple_tensor_allocator.o \
+debug_log_numbers.o \
+micro_interpreter.o \
+depthwise_conv.o \
+softmax.o \
+all_ops_resolver.o \
+fully_connected.o \
+error_reporter.o \
+flatbuffer_conversions.o \
+op_resolver.o \
+kernel_util.o \
+quantization_util.o \
+model_settings.o \
+audio_provider.o \
+feature_provider.o \
+preprocessor.o \
+no_features_data.o \
+yes_features_data.o \
+tiny_conv_model_data.o \
+recognize_commands.o \
+machinelearning.o \
+tfmicro_models.o \
+sensor.o
+
+PROJ_OBJ += $(TF_SRCS)
+
+######################### end of TF Micro Compilation ##################
+
 ifeq ($(LPS_TDOA_ENABLE), 1)
 CFLAGS += -DLPS_TDOA_ENABLE
 endif
@@ -244,7 +320,11 @@ OBJ = $(FREERTOS_OBJ) $(PORT_OBJ) $(ST_OBJ) $(PROJ_OBJ) $(CRT0)
 ############### Compilation configuration ################
 AS = $(CROSS_COMPILE)as
 CC = $(CROSS_COMPILE)gcc
-LD = $(CROSS_COMPILE)gcc
+# TFMicro - used to use gcc linker but we need the c++ math library during
+# link time :O
+CXX = $(CROSS_COMPILE)g++
+LD = $(CROSS_COMPILE)g++
+#################################
 SIZE = $(CROSS_COMPILE)size
 OBJCOPY = $(CROSS_COMPILE)objcopy
 GDB = $(CROSS_COMPILE)gdb
@@ -266,6 +346,16 @@ INCLUDES += -Ivendor/libdw1000/inc
 INCLUDES += -I$(LIB)/FatFS
 INCLUDES += -I$(LIB)/vl53l1
 INCLUDES += -I$(LIB)/vl53l1/core/inc
+
+# Add our tfmicro library!
+INCLUDES += -Itfmicro/
+INCLUDES += -Itfmicro
+INCLUDES += -Itfmicro/third_party/flatbuffers
+INCLUDES += -Itfmicro/third_party/flatbuffers/include
+INCLUDES += -Itfmicro/third_party
+INCLUDES += -Itfmicro/third_party/gemmlowp
+#######
+
 
 ifeq ($(DEBUG), 1)
   CFLAGS += -O0 -g3 -DDEBUG

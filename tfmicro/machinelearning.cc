@@ -69,27 +69,35 @@ extern "C"{
 			uint8_t* tensor, int alloc_size, uint8_t* input, int* result) {
 		tflite::MicroErrorReporter micro_error_reporter;
 		tflite::ErrorReporter* error_reporter = &micro_error_reporter;
+
+		// Pull in all the operation implementations we need
 		::tflite::ops::micro::AllOpsResolver resolver;
-
+		// Load a model using the self-defined wrap function 'reinterpret_cast'
 		const tflite::Model* model = reinterpret_cast<const tflite::Model*>(c_model);
+		// Create an area of memory to use for input, output, and intermediate arrays
 		tflite::SimpleTensorAllocator tensor_allocator(tensor, alloc_size);
+		// Build an interpreter to run the model with
 		tflite::MicroInterpreter interpreter(model, resolver, &tensor_allocator, error_reporter);
+		// Get information about the memory area to use for the model's input
 		TfLiteTensor* model_input = interpreter.input(0);
-
+		// ?? send the input as the input features into the nn ??
 		memcpy(model_input->data.uint8, input, 50 * sizeof(uint8_t));    // here changed 20 to 50
-
+		// Run the model
 		TfLiteStatus invoke_status = interpreter.Invoke();
+
 		if (invoke_status != kTfLiteOk) {
 			return;
 		}
-
+		// Get the inference results from the nn
 		TfLiteTensor* output = interpreter.output(0);
 
-		int NUM_CLASSES = 3;
-		for (int i = 0; i < NUM_CLASSES; i++) {
+		result = static_cast<int>(output->data.uint8[0]);
 
-			result[i] = static_cast<int>(output->data.uint8[i]);
-		}
+//		int NUM_CLASSES = 3;
+//		for (int i = 0; i < NUM_CLASSES; i++) {
+//
+//			result[i] = static_cast<int>(output->data.uint8[i]);
+//		}
 	}
 
 	void CTfInterpreter_simple_conv(const CTfLiteModel* c_model, uint8_t* tensor, size_t alloc_size,

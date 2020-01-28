@@ -73,6 +73,8 @@
 #include "cf_math.h"
 
 #include "debug.h"
+
+#include "machinelearning.h"
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
@@ -80,9 +82,12 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = false;
+static bool enable_UWB = true;
+static bool NN_COM =true;
 static bool OUTLIER_REJ = true;
-static bool Constant_Bias = true;
+static bool Constant_Bias = false;
+
+#define TENSOR_ALLOC_SIZE 6000   // how to decide this size???
 /**
  * Primary Kalman filter functions
  *
@@ -297,6 +302,9 @@ static float S[STATE_DIM];
 // We store as a quaternion to allow easy normalization (in comparison to a rotation matrix),
 // while also being robust against singularities (in comparison to euler angles)
 static float q[4] = {1,0,0,0};
+static float roll;
+static float pitch;
+static float yaw;
 
 // The quad's attitude as a rotation matrix (used by the prediction, updated by the finalization)
 static float R[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
@@ -1114,19 +1122,30 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 	  // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
 	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
-	  // d->x,y,z is the anchor's position
-	  float dx = S[STATE_X] - d->x;
-	  float dy = S[STATE_Y] - d->y;
-	  float dz = S[STATE_Z] - d->z;
 	  float measuredDistance = 0.0f;
 	  float con_bias[1][8]={{-0.298, -0.232, -0.196, -0.109, -0.184, -0.216, -0.169, -0.288}};
-	  if(Constant_Bias){
+	  if(Constant_Bias){  // constant bias compensation
 		  int Anchor_ID = d->anchor_ID;
 		  measuredDistance = d->distance + con_bias[0][Anchor_ID];
 	  }
 	  else{
 		  measuredDistance = d->distance;
 	  }
+
+	  if (NN_COM){  // nn bias compensation
+		  const CTfLiteModel* model = CTfLiteModel_create();
+		  uint8_t tensor_alloc[TENSOR_ALLOC_SIZE];
+		  DEBUG_PRINT("Starting the DSL machine learning...\n");
+		  int bias;
+		  // d->x,y,z is the anchor's position
+		  float dx = S[STATE_X] - d->x;
+		  float dy = S[STATE_Y] - d->y;
+		  float dz = S[STATE_Z] - d->z;
+		  uint8_t feature[6] = {dx, dy, dz, yaw, roll, pitch};
+		  CTfInterpreter_simple_fc(model, tensor_alloc, TENSOR_ALLOC_SIZE, feature, bias);   // get the results in bias
+		  measuredDistance = d->distance + (float) bias;
+	  }
+
 	  //do not fuse "0" measurement
 	  if (measuredDistance >= 0.001f)
 	  {
@@ -1512,9 +1531,10 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
   };
 
   // convert the new attitude into Euler YPR
-  float yaw = atan2f(2*(q[1]*q[2]+q[0]*q[3]) , q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3]);
-  float pitch = asinf(-2*(q[1]*q[3] - q[0]*q[2]));
-  float roll = atan2f(2*(q[2]*q[3]+q[0]*q[1]) , q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]);
+  // [Change] change the roll, pitch and yaw into a static value (so that can be used in the NN_COM)
+  yaw = atan2f(2*(q[1]*q[2]+q[0]*q[3]) , q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3]);
+  pitch = asinf(-2*(q[1]*q[3] - q[0]*q[2]));
+  roll = atan2f(2*(q[2]*q[3]+q[0]*q[1]) , q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]);
 
   // [CHANGE] yaw estimate
   yaw_logback = yaw;
