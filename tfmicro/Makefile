@@ -66,7 +66,7 @@ INCLUDES := \
 -I. \
 -I./third_party/gemmlowp \
 -I./third_party/flatbuffers/include \
--I../src/utils/interface\
+-I../src/utils/interface \
 -I../src/modules/interface
 
 

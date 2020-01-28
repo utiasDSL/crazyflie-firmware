@@ -84,7 +84,7 @@
 static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
-static bool NN_COM =true;
+static bool NN_COM = true;
 static bool OUTLIER_REJ = true;
 static bool Constant_Bias = false;
 
@@ -1141,10 +1141,10 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  const CTfLiteModel* model = CTfLiteModel_create();
 		  uint8_t tensor_alloc[TENSOR_ALLOC_SIZE];
 		  DEBUG_PRINT("Starting the DSL machine learning...\n");
-		  int bias;
+		  int bias[1];
 		  uint8_t feature[6] = {dx, dy, dz, yaw, roll, pitch};
 		  CTfInterpreter_simple_fc(model, tensor_alloc, TENSOR_ALLOC_SIZE, feature, bias);   // get the results in bias
-		  measuredDistance = d->distance + (float) bias;
+		  measuredDistance = d->distance + (float)bias[0];
 	  }
 
 	  //do not fuse "0" measurement

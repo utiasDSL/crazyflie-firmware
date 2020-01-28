@@ -26,6 +26,19 @@ CC_COMMAND_SILENT="  CC    $@"
 	@$(if $(QUIET), ,echo $(CC_COMMAND$(VERBOSE)) )
 	@$(CC_COMMAND)
 
+# [change]
+# Add new C++ command
+CXX_COMMAND=$(CXX) $(CXXFLAGS) -fpermissive $(INCLUDES) -c $< -o $(BIN)/$@
+CXX_COMMAND_SILENT="  CXX    $@"
+%.o: %.cc
+	@$(if $(QUIET), ,echo $(CXX_COMMAND$(VERBOSE)) )
+	@$(CXX_COMMAND)
+%.o: %.cpp
+	@$(if $(QUIET), ,echo $(CXX_COMMAND$(VERBOSE)) )
+	@$(CXX_COMMAND)
+#######################
+
+
 CCS_COMMAND=$(CC) $(CSFLAGS) -c $< -o $(BIN)/$@
 CCS_COMMAND_SILENT="  CCS   $@"
 .S.o:
@@ -36,6 +49,7 @@ LD_COMMAND=$(LD) $(LDFLAGS) $(foreach o,$(OBJ),$(BIN)/$(o)) -lm -o $@
 LD_COMMAND_SILENT="  LD    $@"
 $(PROG).elf: $(OBJ)
 	@$(if $(QUIET), ,echo $(LD_COMMAND$(VERBOSE)) )
+	@$(if $(QUIET), ,echo $(LD_COMMAND))
 	@$(LD_COMMAND)
 
 HEX_COMMAND=$(OBJCOPY) $< -O ihex $@
