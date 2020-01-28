@@ -75,6 +75,7 @@
 #include "debug.h"
 
 #include "machinelearning.h"
+
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
@@ -1121,6 +1122,10 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 {
 	  // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
+	  // d->x,y,z is the anchor's position
+	  float dx = S[STATE_X] - d->x;
+	  float dy = S[STATE_Y] - d->y;
+	  float dz = S[STATE_Z] - d->z;
 	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 	  float measuredDistance = 0.0f;
 	  float con_bias[1][8]={{-0.298, -0.232, -0.196, -0.109, -0.184, -0.216, -0.169, -0.288}};
@@ -1137,10 +1142,6 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  uint8_t tensor_alloc[TENSOR_ALLOC_SIZE];
 		  DEBUG_PRINT("Starting the DSL machine learning...\n");
 		  int bias;
-		  // d->x,y,z is the anchor's position
-		  float dx = S[STATE_X] - d->x;
-		  float dy = S[STATE_Y] - d->y;
-		  float dz = S[STATE_Z] - d->z;
 		  uint8_t feature[6] = {dx, dy, dz, yaw, roll, pitch};
 		  CTfInterpreter_simple_fc(model, tensor_alloc, TENSOR_ALLOC_SIZE, feature, bias);   // get the results in bias
 		  measuredDistance = d->distance + (float) bias;

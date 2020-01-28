@@ -267,8 +267,8 @@ yes_features_data.o \
 tiny_conv_model_data.o \
 recognize_commands.o \
 machinelearning.o \
-tfmicro_models.o \
-sensor.o
+tfmicro_models.o 
+
 
 PROJ_OBJ += $(TF_SRCS)
 
@@ -320,6 +320,7 @@ OBJ = $(FREERTOS_OBJ) $(PORT_OBJ) $(ST_OBJ) $(PROJ_OBJ) $(CRT0)
 ############### Compilation configuration ################
 AS = $(CROSS_COMPILE)as
 CC = $(CROSS_COMPILE)gcc
+#LD = $(CROSS_COMPILE)GCC
 # TFMicro - used to use gcc linker but we need the c++ math library during
 # link time :O
 CXX = $(CROSS_COMPILE)g++
