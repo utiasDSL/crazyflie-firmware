@@ -8,7 +8,7 @@
 #ifndef _DSL_NN_H_
 #define _DSL_NN_H_
 
-float float_inference(float* input, int size);
+float nn_inference(float* input, int size);
 void float_matmul(float* input, int input_size, float* matrix, int matrix_size, float* output, int output_size);
 void float_bias_add(float* input, int input_size, float* matrix);
 void float_relu(float* input, int input_size);

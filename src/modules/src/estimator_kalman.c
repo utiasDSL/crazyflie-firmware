@@ -1139,7 +1139,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 	  if (NN_COM){  // nn bias compensation
 		  float feature[6] = {dx, dy, dz, yaw, roll, pitch};
 		  xStart = xTaskGetTickCount();
-		  float bias = float_inference(feature, 6);  // get the results in bias
+		  float bias = nn_inference(feature, 6);  // get the results in bias
 		  xEnd = xTaskGetTickCount();
 		  xDifference = xEnd - xStart;
 		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
