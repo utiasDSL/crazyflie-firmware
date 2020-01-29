@@ -73,6 +73,8 @@
 #include "cf_math.h"
 
 #include "debug.h"
+// [change] include the nn model
+#include "dsl_nn.h"
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
@@ -80,7 +82,8 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = false;
+static bool enable_UWB = true;
+static bool NN_COM = true;
 static bool OUTLIER_REJ = true;
 static bool Constant_Bias = true;
 /**
@@ -300,6 +303,10 @@ static float q[4] = {1,0,0,0};
 
 // The quad's attitude as a rotation matrix (used by the prediction, updated by the finalization)
 static float R[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
+// [change] define static variables of yaw, roll, pitch
+static float roll;
+static float pitch;
+static float yaw;
 
 // The covariance matrix
 static float P[STATE_DIM][STATE_DIM];
@@ -1111,7 +1118,8 @@ static void stateEstimatorUpdateWithPosVelYaw(posvelyawMeasurement_t *posvelyaw,
 // implement TWR-trilateration before fusing into EKF
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 {
-	  // a measurement of distance to point (x, y, z)
+	  int xStart, xEnd, xDifference;
+	 // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
 	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 	  // d->x,y,z is the anchor's position
@@ -1127,6 +1135,18 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 	  else{
 		  measuredDistance = d->distance;
 	  }
+
+	  if (NN_COM){  // nn bias compensation
+		  float feature[6] = {dx, dy, dz, yaw, roll, pitch};
+		  xStart = xTaskGetTickCount();
+		  float bias = float_inference(feature, 6);  // get the results in bias
+		  xEnd = xTaskGetTickCount();
+		  xDifference = xEnd - xStart;
+		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
+		  measuredDistance = d->distance + bias;
+	  }
+
+
 	  //do not fuse "0" measurement
 	  if (measuredDistance >= 0.001f)
 	  {
@@ -1512,9 +1532,10 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
   };
 
   // convert the new attitude into Euler YPR
-  float yaw = atan2f(2*(q[1]*q[2]+q[0]*q[3]) , q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3]);
-  float pitch = asinf(-2*(q[1]*q[3] - q[0]*q[2]));
-  float roll = atan2f(2*(q[2]*q[3]+q[0]*q[1]) , q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]);
+  // [Change] change the roll, pitch and yaw into a static value (so that can be used in the NN_COM)
+  yaw = atan2f(2*(q[1]*q[2]+q[0]*q[3]) , q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3]);
+  pitch = asinf(-2*(q[1]*q[3] - q[0]*q[2]));
+  roll = atan2f(2*(q[2]*q[3]+q[0]*q[1]) , q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]);
 
   // [CHANGE] yaw estimate
   yaw_logback = yaw;

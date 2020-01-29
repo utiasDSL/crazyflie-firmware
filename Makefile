@@ -147,7 +147,9 @@ PROJ_OBJ += vl53l1_register_funcs.o vl53l1_wait.o vl53l1_core_support.o
 PROJ_OBJ += system.o comm.o console.o pid.o crtpservice.o param.o
 PROJ_OBJ += log.o worker.o trigger.o sitaw.o queuemonitor.o msp.o
 PROJ_OBJ += platformservice.o sound_cf2.o extrx.o sysload.o mem_cf2.o
-PROJ_OBJ += range.o
+PROJ_OBJ += range.o 
+# [change]
+PROJ_OBJ += dsl_nn.o 
 
 # Stabilizer modules
 PROJ_OBJ += commander.o crtp_commander.o crtp_commander_rpyt.o
