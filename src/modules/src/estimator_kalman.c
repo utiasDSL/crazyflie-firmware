@@ -222,7 +222,6 @@ static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
 #define METERS_PER_TDOATICK (4.691763979e-3f)
 #define SECONDS_PER_TDOATICK (15.650040064e-12f)
 
-
 /**
  * Tuning parameters
  */
@@ -420,7 +419,6 @@ static void decoupleState(stateIdx_t state)
 #endif
 
 // --------------------------------------------------
-
 // main function
 void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, const uint32_t tick)
 {
@@ -1138,12 +1136,20 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 
 	  if (NN_COM){  // nn bias compensation
 		  float feature[6] = {dx, dy, dz, yaw, roll, pitch};
+
+		  // normalize the feature elements
+		  for(int idx=0; idx<6; idx++){
+			  feature[idx] = scaler_normalize(feature[idx], uwb_feature_min[idx], uwb_feature_max[idx]);
+		  }
 		  xStart = xTaskGetTickCount();
+		  // use hand-written nn for inference
 		  float bias = nn_inference(feature, 6);  // get the results in bias
 		  xEnd = xTaskGetTickCount();
 		  xDifference = xEnd - xStart;
 		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
-		  measuredDistance = d->distance + bias;
+		  //  denormalize the predicted bias
+		  float Bias = scaler_denormalize(bias,uwb_err_min, uwb_err_max);
+		  measuredDistance = d->distance + Bias;
 	  }
 
 

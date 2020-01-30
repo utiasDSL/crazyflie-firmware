@@ -19,6 +19,31 @@ float layer_1[LAYER_1_SIZE] = {0};
 float layer_2[LAYER_2_SIZE] = {0};
 float layer_3[LAYER_3_SIZE] = {0};
 
+
+// normalization
+float scaler_normalize(float x, float x_min, float x_max){
+	float min_range = 0.0;  float max_range = 1.0;
+	float scale = (max_range-min_range) / (x_max - x_min);
+	float x_scaled = scale * x + min_range - x_min *scale;
+
+	return x_scaled;
+}
+
+//denormalization
+float scaler_denormalize(float x, float x_min, float x_max){
+	float min_range = 0.0;  float max_range = 1.0;
+	float scale = (max_range-min_range) / (x_max - x_min);
+	float x_unscaled = (x + x_min * scale - min_range) / scale;
+	if (x_unscaled > x_max){
+		x_unscaled = x_max;
+	}
+	if (x_unscaled < x_min){
+		x_unscaled = x_min;
+	}
+	return x_unscaled;
+}
+
+
 float nn_inference(float* input, int size){
 
 	int weight_size1 = size * LAYER_1_SIZE;
