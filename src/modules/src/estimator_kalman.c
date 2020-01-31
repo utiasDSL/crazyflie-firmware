@@ -82,10 +82,19 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = true;
+static bool enable_UWB = false;
 static bool NN_COM = true;
 static bool OUTLIER_REJ = true;
 static bool Constant_Bias = true;
+/**
+ *   normalization range (put here to avoid warnings)
+ */
+
+static float uwb_feature_max[6] = {6.21573126, 6.8558558, 1.96787431, 3.6977465, 0.56576387, 0.58581404};
+static float uwb_feature_min[6] = {-6.47791386, -6.28997147, -3.37768704, -3.4279357, -0.50756258, -0.51739977};
+static float uwb_err_max =  0.19264864;
+static float uwb_err_min = -0.69999307;
+
 /**
  * Primary Kalman filter functions
  *
@@ -340,14 +349,18 @@ static float twrDist;
 static int anchorID;
 static float yaw_logback;
 static float yaw_error_logback;
-
-static float r_max_log;
-static float innovation;
-
 //debug
+//static float r_max_log;
+//static float innovation;
+static float nn_Bias_log;
+static float log_feature_yaw;
+static float log_feature_roll;
+static float log_feature_pitch;
+
 static float tdoaDist;
 static int tdoaID;
 static float logzrange = 0.0f;
+
 
 /**
  * Supporting and utility functions
@@ -1116,7 +1129,7 @@ static void stateEstimatorUpdateWithPosVelYaw(posvelyawMeasurement_t *posvelyaw,
 // implement TWR-trilateration before fusing into EKF
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 {
-	  int xStart, xEnd, xDifference;
+//	  int xStart, xEnd, xDifference;
 	 // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
 	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
@@ -1133,23 +1146,34 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 	  else{
 		  measuredDistance = d->distance;
 	  }
-
+      // About the time: 1 tick is 1 ms
 	  if (NN_COM){  // nn bias compensation
-		  float feature[6] = {dx, dy, dz, yaw, roll, pitch};
-
+		  float f_yaw = wrap_angle(yaw);
+		  float f_roll = wrap_angle(roll);
+		  float f_pitch = wrap_angle(pitch);
+		  float feature[6] = {dx, dy, dz, f_yaw, f_roll, f_pitch};
+		  log_feature_yaw = f_yaw;
+		  log_feature_roll = f_roll;
+		  log_feature_pitch = f_pitch;
 		  // normalize the feature elements
 		  for(int idx=0; idx<6; idx++){
 			  feature[idx] = scaler_normalize(feature[idx], uwb_feature_min[idx], uwb_feature_max[idx]);
 		  }
-		  xStart = xTaskGetTickCount();
+
 		  // use hand-written nn for inference
+//		  xStart = xTaskGetTickCount();
 		  float bias = nn_inference(feature, 6);  // get the results in bias
-		  xEnd = xTaskGetTickCount();
-		  xDifference = xEnd - xStart;
-		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
+//		  xEnd = xTaskGetTickCount();
+//		  xDifference = xEnd - xStart;
+//		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
+
 		  //  denormalize the predicted bias
 		  float Bias = scaler_denormalize(bias,uwb_err_min, uwb_err_max);
+		  // log the predicted bias for debug
+		  nn_Bias_log = Bias;
+
 		  measuredDistance = d->distance + Bias;
+
 	  }
 
 
@@ -1186,8 +1210,8 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
 			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
 
-			  r_max_log = r_max;    //debug
-			  innovation = measuredDistance-predictedDistance;
+//			  r_max_log = r_max;    //debug
+//			  innovation = measuredDistance-predictedDistance;
 
 			  if((enable_UWB) && (measuredDistance-predictedDistance <= r_max)){
 		  	      stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
@@ -1765,17 +1789,22 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 
 //debug param
 LOG_GROUP_START(twr_ekf)
-  LOG_ADD(LOG_FLOAT,r_max,&r_max_log)
-  LOG_ADD(LOG_FLOAT,innovation_term,&innovation)
+  LOG_ADD(LOG_FLOAT,nn_Bias,&nn_Bias_log)
+  LOG_ADD(LOG_FLOAT,log_yaw,&log_feature_yaw)
+  LOG_ADD(LOG_FLOAT,log_roll,&log_feature_roll)
+  LOG_ADD(LOG_FLOAT,log_pitch,&log_feature_pitch)
+
+//  LOG_ADD(LOG_FLOAT,r_max,&r_max_log)
+//  LOG_ADD(LOG_FLOAT,innovation_term,&innovation)
   LOG_ADD(LOG_FLOAT, dx, &measuredNX)
   LOG_ADD(LOG_FLOAT, dy, &measuredNY)
   LOG_ADD(LOG_FLOAT, zrange, &logzrange)
 LOG_GROUP_STOP(twr_ekf)
 
-LOG_GROUP_START(tdoa_ekf)
-  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
-  LOG_ADD(LOG_UINT8, anchorID, &tdoaID)
-LOG_GROUP_STOP(tdoa_ekf)
+//LOG_GROUP_START(tdoa_ekf)
+//  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
+//  LOG_ADD(LOG_UINT8, anchorID, &tdoaID)
+//LOG_GROUP_STOP(tdoa_ekf)
 
 // Stock log groups
 LOG_GROUP_START(kalman)
