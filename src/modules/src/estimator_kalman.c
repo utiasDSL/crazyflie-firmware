@@ -82,10 +82,10 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = false;
-static bool NN_COM = true;
+static bool enable_UWB = true;
+static bool NN_COM = false;
 static bool OUTLIER_REJ = true;
-static bool Constant_Bias = false;
+static bool Constant_Bias = true;
 /**
  *   normalization range (put here to avoid warnings)
  */
@@ -357,6 +357,8 @@ static float log_feature_yaw;
 static float log_feature_roll;
 static float log_feature_pitch;
 static float err_check_log;
+static int Anchor_ID_log;
+static float Anchor_range_log;
 
 static float tdoaDist;
 static int tdoaID;
@@ -1156,9 +1158,9 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  float f_roll = roll;
 		  float f_pitch = pitch;
 		  // original feature
-//		  float feature[6] = {dx, dy, dz, f_yaw, f_roll, f_pitch};
+		  float feature[6] = {dx, dy, dz, f_yaw, f_roll, f_pitch};
 		  // debug feature
-		  float feature[6] ={1.3, 1.5, 0.1, 0.15, 0.03, 0.06};
+//		  float feature[6] ={1.3, 1.5, 0.1, 0.15, 0.03, 0.06};
 		  log_feature_yaw = f_yaw;
 		  log_feature_roll = f_roll;
 		  log_feature_pitch = f_pitch;
@@ -1166,21 +1168,23 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  for(int idx=0; idx<6; idx++){
 			  feature[idx] = scaler_normalize(feature[idx], uwb_feature_min[idx], uwb_feature_max[idx]);
 		  }
-		  DEBUG_PRINT("Features after normalization: %f,%f,%f,%f,%f,%f \n", (double)feature[0],(double)feature[1],(double)feature[2],(double)feature[3],(double)feature[4],(double)feature[5]);
-		  // use hand-written nn for inference
+//		  DEBUG_PRINT("Features after normalization: %f,%f,%f,%f,%f,%f \n", (double)feature[0],(double)feature[1],(double)feature[2],(double)feature[3],(double)feature[4],(double)feature[5]);
+//		   use hand-written nn for inference
 //		  xStart = xTaskGetTickCount();
 		  float bias = nn_inference(feature, 6);  // get the results in bias
-		  DEBUG_PRINT("NN_inference result: %f\n", (double)bias);
+//		  DEBUG_PRINT("NN_inference result: %f\n", (double)bias);
 //		  xEnd = xTaskGetTickCount();
 //		  xDifference = xEnd - xStart;
 //		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
 		  //  denormalize the predicted bias
 		  float Bias = scaler_denormalize(bias,uwb_err_min, uwb_err_max);
 
-		  DEBUG_PRINT("NN_inference result after denormalization: %f\n", (double)Bias);
+//		  DEBUG_PRINT("NN_inference result after denormalization: %f\n", (double)Bias);
 		  // log the predicted bias for debug
 		  nn_Bias_log = Bias;
-
+		  Anchor_ID_log = d->anchor_ID;
+//		  DEBUG_PRINT("Anchor ID: %i\n", Anchor_ID_log);
+		  Anchor_range_log = d->distance;
 		  measuredDistance = d->distance + Bias;
 	  }
 
@@ -1798,6 +1802,8 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 //  LOG_ADD(LOG_FLOAT, distance, &twrDist)
 //  LOG_ADD(LOG_UINT8, anchorID, &anchorID)
 //  LOG_ADD(LOG_FLOAT, yaw, &log_yaw)
+//Anchor_ID_log = d->anchor_ID;
+//Anchor_range_log = d->distance;
 
 //debug param
 LOG_GROUP_START(twr_ekf)
@@ -1806,6 +1812,8 @@ LOG_GROUP_START(twr_ekf)
   LOG_ADD(LOG_FLOAT,log_roll,&log_feature_roll)
   LOG_ADD(LOG_FLOAT,log_pitch,&log_feature_pitch)
   LOG_ADD(LOG_FLOAT,err_check,&err_check_log)
+  LOG_ADD(LOG_INT16,anchor_id, &Anchor_ID_log)
+  LOG_ADD(LOG_FLOAT,anchor_range, &Anchor_range_log)
 //  LOG_ADD(LOG_FLOAT,r_max,&r_max_log)
 //  LOG_ADD(LOG_FLOAT,innovation_term,&innovation)
   LOG_ADD(LOG_FLOAT, dx, &measuredNX)
