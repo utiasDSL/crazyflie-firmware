@@ -83,9 +83,9 @@
 static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
-static bool NN_COM = false;
+static bool NN_COM = true;
 static bool OUTLIER_REJ = true;
-static bool Constant_Bias = true;
+static bool Constant_Bias = false;
 /**
  *   normalization range (put here to avoid warnings)
  */

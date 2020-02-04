@@ -7,7 +7,7 @@
 
 #include "dsl_nn.h"
 
-#include "../interface/weights_old.h"
+#include "weights_NN1.h"
 #include "debug.h"
 
 #define LAYER_1_SIZE 50
