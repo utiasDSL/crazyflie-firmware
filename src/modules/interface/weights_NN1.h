@@ -3,6 +3,8 @@
  *  Created on: Jan. 28, 2020
  *      Author: wenda
  *       Email: wenda.zhao@mail.utoronto.ca
+ *
+ *       current best performance
  */
 
 #ifndef _WEIGHTS_H__
