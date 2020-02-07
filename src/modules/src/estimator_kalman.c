@@ -82,7 +82,7 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = true;
+static bool enable_UWB = false;
 static bool NN_COM = true;
 static bool OUTLIER_REJ = true;
 static bool Constant_Bias = false;
