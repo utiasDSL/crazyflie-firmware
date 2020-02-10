@@ -82,19 +82,24 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = false;
-static bool NN_COM = true;
+static bool enable_UWB = true;
+static bool NN_COM = false;
+static bool NN_tdoa_COM = false;
 static bool OUTLIER_REJ = true;
 static bool Constant_Bias = false;
 /**
  *   normalization range (put here to avoid warnings)
  */
-
-static float uwb_feature_max[6] = {6.21573126, 6.8558558, 1.96787431, 3.6977465, 0.56576387, 0.58581404};
-static float uwb_feature_min[6] = {-6.47791386, -6.28997147, -3.37768704, -3.4279357, -0.50756258, -0.51739977};
-static float uwb_err_max =  0.19264864;
-static float uwb_err_min = -0.69999307;
-
+// -------------------- The normalization ranges for TWR --------------------------------- //
+//static float uwb_feature_max[6] = {6.21573126, 6.8558558, 1.96787431, 3.6977465, 0.56576387, 0.58581404};
+//static float uwb_feature_min[6] = {-6.47791386, -6.28997147, -3.37768704, -3.4279357, -0.50756258, -0.51739977};
+//static float uwb_err_max =  0.19264864;
+//static float uwb_err_min = -0.69999307;
+// -------------------- The normalization ranges for TDoA --------------------------------- //
+static float uwb_feature_max[9] = {6.21086508, 6.18992005, 2.37577438, 6.21086508, 6.18992005, 2.37577438, 1.59163775, 0.73787737, 0.76607429 };
+static float uwb_feature_min[9] = {-6.7235915, -5.57063856, -3.37862096, -6.72375934, -5.57063856, -3.38030913,-1.57508455, -0.65031555, -0.51501978 };
+static float uwb_err_max =  0.69997349;
+static float uwb_err_min = -0.69990715;
 /**
  * Primary Kalman filter functions
  *
@@ -174,7 +179,7 @@ static inline bool stateEstimatorHasPosVelYawMeasurement(posvelyawMeasurement_t 
 static xQueueHandle tdoaDataQueue;
 #define UWB_QUEUE_LENGTH (10)
 
-static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *uwb);
+static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *uwb, float dt);
 
 static inline bool stateEstimatorHasTDOAPacket(tdoaMeasurement_t *uwb) {
   return (pdTRUE == xQueueReceive(tdoaDataQueue, uwb, 0));
@@ -357,6 +362,9 @@ static float log_feature_yaw;
 static float log_feature_roll;
 static float log_feature_pitch;
 static float err_check_log;
+static float check_log;
+static float check_abs_log;
+
 static int Anchor_ID_log;
 static float Anchor_range_log;
 
@@ -364,7 +372,8 @@ static float tdoaDist;
 static int tdoaID;
 static float logzrange = 0.0f;
 
-
+static int  count_useful = 0;
+static int  count_outlier =0;
 /**
  * Supporting and utility functions
  */
@@ -604,7 +613,7 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
   tdoaMeasurement_t tdoa;
   while (stateEstimatorHasTDOAPacket(&tdoa))
   {
-    stateEstimatorUpdateWithTDOA(&tdoa);
+    stateEstimatorUpdateWithTDOA(&tdoa, dt_uwb);
     doneUpdate = true;
   }
 
@@ -1241,7 +1250,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 }
 
 //TDoA
-static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
+static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 {
   if (tdoaCount >= 100)
   {
@@ -1250,8 +1259,6 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
      * dR = dT + d1 - d0
      */
 	float measurement=0.0f;
-
-    measurement = tdoa->distanceDiff;
     // predict based on current state
     float x = S[STATE_X];
     float y = S[STATE_Y];
@@ -1272,6 +1279,44 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
     float d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
 
     float predicted = d1 - d0;
+
+    if(NN_tdoa_COM){
+		  float f_yaw = yaw;
+		  float f_roll = roll;
+		  float f_pitch = pitch;
+		  // original feature
+		  float feature[9] = {dx1, dy1, dz1, dx0, dy0, dz0, f_yaw, f_roll, f_pitch};
+		  // debug feature
+//		  float feature[6] ={1.3, 1.5, 0.1, 0.15, 0.03, 0.06};
+		  log_feature_yaw = f_yaw;
+		  log_feature_roll = f_roll;
+		  log_feature_pitch = f_pitch;
+		  // normalize the feature elements
+		  for(int idx=0; idx<9; idx++){
+			  feature[idx] = scaler_normalize(feature[idx], uwb_feature_min[idx], uwb_feature_max[idx]);
+		  }
+//		  DEBUG_PRINT("Features after normalization: %f,%f,%f,%f,%f,%f \n", (double)feature[0],(double)feature[1],(double)feature[2],(double)feature[3],(double)feature[4],(double)feature[5]);
+//		   use hand-written nn for inference
+//		  xStart = xTaskGetTickCount();
+		  float bias = nn_inference(feature, 9);  // get the results in bias
+//		  DEBUG_PRINT("NN_inference result: %f\n", (double)bias);
+//		  xEnd = xTaskGetTickCount();
+//		  xDifference = xEnd - xStart;
+//		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
+		  //  denormalize the predicted bias
+		  float Bias = scaler_denormalize(bias,uwb_err_min, uwb_err_max);
+
+//		  DEBUG_PRINT("NN_inference result after denormalization: %f\n", (double)Bias);
+		  // log the predicted bias for debug
+		  nn_Bias_log = Bias;
+		  // TDoA measurement after DNN bias compensation
+		  measurement = tdoa->distanceDiff + Bias;
+
+    }else{
+    	  // without DNN bias compensation
+          measurement = tdoa->distanceDiff;
+    }
+
     float error = measurement - predicted;
 
     float h[STATE_DIM] = {0};
@@ -1296,14 +1341,39 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 
       bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
       tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
+      check_log = (float)sampleIsGood;
+      check_abs_log = (float)fabs(error);
+//      	  if (sampleIsGood) {   // measurements are good
+      		  if (OUTLIER_REJ){
+      			  float vx = S[STATE_PX];
+      			  float vy = S[STATE_PY];
+      			  float vz = S[STATE_PZ];
+      			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
+      			  float T_max = 100.0;
+      			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
+      			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
+      			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
+      			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
+      			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
 
-      if (sampleIsGood) {   // measurements are good
-    	  if(enable_UWB){   // only log the TDoA data, but not using uwb data for EKF
-    		  stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
-    	  }
-        tdoaID = tdoa->anchor_id;
-        tdoaDist = tdoa->distanceDiff;
-      }
+      			  float err_abs = (float)fabs(error);
+      			  float r_max_2 = (float)2.0 * r_max;
+
+      			  if((enable_UWB) && ( err_abs <= r_max_2)){
+      				  	  stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+      				  	    count_useful +=1;
+//      				  	  DEBUG_PRINT( "count useful data %i \n ",  count);
+			  	     	 }else{
+			  	     		count_outlier +=1;
+//			  	     		DEBUG_PRINT( "Outlier!!!!!!!!! \n" );
+			  	     	 }
+      		  	  }
+      		  else{
+		  		  	  if(enable_UWB){    stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
+		  	  	  }
+    	  tdoaID = tdoa->anchor_id;
+    	  tdoaDist = tdoa->distanceDiff;
+//      	  }
     }
   }
   tdoaCount++;
@@ -1808,17 +1878,22 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 //debug param
 LOG_GROUP_START(twr_ekf)
   LOG_ADD(LOG_FLOAT,nn_Bias,&nn_Bias_log)
-  LOG_ADD(LOG_FLOAT,log_yaw,&log_feature_yaw)
-  LOG_ADD(LOG_FLOAT,log_roll,&log_feature_roll)
-  LOG_ADD(LOG_FLOAT,log_pitch,&log_feature_pitch)
-  LOG_ADD(LOG_FLOAT,err_check,&err_check_log)
-  LOG_ADD(LOG_INT16,anchor_id, &Anchor_ID_log)
-  LOG_ADD(LOG_FLOAT,anchor_range, &Anchor_range_log)
+//  LOG_ADD(LOG_FLOAT,log_yaw,&log_feature_yaw)
+//  LOG_ADD(LOG_FLOAT,log_roll,&log_feature_roll)
+//  LOG_ADD(LOG_FLOAT,log_pitch,&log_feature_pitch)
+//  LOG_ADD(LOG_FLOAT,err_check,&err_check_log)
+
+  LOG_ADD(LOG_FLOAT, check,     &check_log)
+  LOG_ADD(LOG_FLOAT, check_abs, &check_abs_log)
+  LOG_ADD(LOG_UINT8, counter_useful,&count_useful)
+  LOG_ADD(LOG_UINT8, counter_outlier,&count_outlier)
+//  LOG_ADD(LOG_INT16,anchor_id, &Anchor_ID_log)
+//  LOG_ADD(LOG_FLOAT,anchor_range, &Anchor_range_log)
 //  LOG_ADD(LOG_FLOAT,r_max,&r_max_log)
 //  LOG_ADD(LOG_FLOAT,innovation_term,&innovation)
-  LOG_ADD(LOG_FLOAT, dx, &measuredNX)
-  LOG_ADD(LOG_FLOAT, dy, &measuredNY)
-  LOG_ADD(LOG_FLOAT, zrange, &logzrange)
+//  LOG_ADD(LOG_FLOAT, dx, &measuredNX)
+//  LOG_ADD(LOG_FLOAT, dy, &measuredNY)
+//  LOG_ADD(LOG_FLOAT, zrange, &logzrange)
 LOG_GROUP_STOP(twr_ekf)
 
 //LOG_GROUP_START(tdoa_ekf)

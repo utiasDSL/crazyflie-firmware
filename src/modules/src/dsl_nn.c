@@ -7,7 +7,8 @@
 
 #include "dsl_nn.h"
 
-#include "weights_NN1.h"
+// #include "weights_NN1.h"     // The weights for UWB TWR
+#include "weights_tdoa.h"
 #include "debug.h"
 
 #define LAYER_1_SIZE 50
