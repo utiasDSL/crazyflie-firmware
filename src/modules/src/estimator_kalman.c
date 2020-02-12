@@ -82,7 +82,7 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = true;
+static bool enable_UWB = false;
 static bool NN_COM = false;
 static bool NN_tdoa_COM = false;
 static bool OUTLIER_REJ = true;
@@ -372,8 +372,8 @@ static float tdoaDist;
 static int tdoaID;
 static float logzrange = 0.0f;
 
-static int  count_useful = 0;
-static int  count_outlier =0;
+static float  count_useful = 0.0f;
+static float  count_outlier =0.0f;
 /**
  * Supporting and utility functions
  */
@@ -1349,7 +1349,8 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
       			  float vy = S[STATE_PY];
       			  float vz = S[STATE_PZ];
       			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
-      			  float T_max = 100.0;
+//      			  float T_max = 200.0;     // have good results
+      			  float T_max = 200.0;
       			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
       			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
       			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
@@ -1361,11 +1362,9 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 
       			  if((enable_UWB) && ( err_abs <= r_max_2)){
       				  	  stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
-      				  	    count_useful +=1;
-//      				  	  DEBUG_PRINT( "count useful data %i \n ",  count);
+      				  	    count_useful += (float)1.0;
 			  	     	 }else{
-			  	     		count_outlier +=1;
-//			  	     		DEBUG_PRINT( "Outlier!!!!!!!!! \n" );
+			  	     		count_outlier += (float)1.0;
 			  	     	 }
       		  	  }
       		  else{
@@ -1885,8 +1884,8 @@ LOG_GROUP_START(twr_ekf)
 
   LOG_ADD(LOG_FLOAT, check,     &check_log)
   LOG_ADD(LOG_FLOAT, check_abs, &check_abs_log)
-  LOG_ADD(LOG_UINT8, counter_useful,&count_useful)
-  LOG_ADD(LOG_UINT8, counter_outlier,&count_outlier)
+  LOG_ADD(LOG_FLOAT, counter_useful,&count_useful)
+  LOG_ADD(LOG_FLOAT, counter_outlier,&count_outlier)
 //  LOG_ADD(LOG_INT16,anchor_id, &Anchor_ID_log)
 //  LOG_ADD(LOG_FLOAT,anchor_range, &Anchor_range_log)
 //  LOG_ADD(LOG_FLOAT,r_max,&r_max_log)
