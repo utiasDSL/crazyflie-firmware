@@ -82,11 +82,12 @@
 // This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = true;
-static bool enable_UWB = false;
+static bool enable_UWB = true;
 static bool NN_COM = false;
-static bool NN_tdoa_COM = false;
+static bool NN_tdoa_COM = true;
 static bool OUTLIER_REJ = true;
 static bool Constant_Bias = false;
+static bool OUTLIER_REJ_Prob = true;
 /**
  *   normalization range (put here to avoid warnings)
  */
@@ -1280,7 +1281,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 
     float predicted = d1 - d0;
 
-    if(NN_tdoa_COM){
+    if(NN_tdoa_COM && (z <=1.5f)){
 		  float f_yaw = yaw;
 		  float f_roll = roll;
 		  float f_pitch = pitch;
@@ -1340,17 +1341,18 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
       };
 
       bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
-      tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
+      tdoa->stdDev = (0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
       check_log = (float)sampleIsGood;
       check_abs_log = (float)fabs(error);
 //      	  if (sampleIsGood) {   // measurements are good
-      		  if (OUTLIER_REJ){
+      		  if (OUTLIER_REJ)
+      		  {
       			  float vx = S[STATE_PX];
       			  float vy = S[STATE_PY];
       			  float vz = S[STATE_PZ];
       			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
 //      			  float T_max = 200.0;     // have good results
-      			  float T_max = 200.0;
+      			  float T_max = 410.0;
       			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
       			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
       			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
@@ -1360,15 +1362,32 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
       			  float err_abs = (float)fabs(error);
       			  float r_max_2 = (float)2.0 * r_max;
 
-      			  if((enable_UWB) && ( err_abs <= r_max_2)){
-      				  	  stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
-      				  	    count_useful += (float)1.0;
-			  	     	 }else{
-			  	     		count_outlier += (float)1.0;
-			  	     	 }
-      		  	  }
+      			  if((enable_UWB) && ( err_abs <= r_max_2))
+      			  {
+
+      				  if(OUTLIER_REJ_Prob && (z <=1.5f))
+      				  {
+      					  if( err_abs < (float)fabs(100.0f*tdoa->stdDev) )
+      					  {
+
+      						stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+      	 				  	    count_useful += 1.0f;
+      				      }else{
+     						  // reject by outlier_prob
+      				    		count_outlier +=1.0f;
+      				           }
+     	              }else{
+      						 // after larger than 1.5 m, do not use outlier_prob
+      			    	    stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+     	                   }
+      			  }
+      				  else{
+      						// reject by model-based outlier
+      						count_outlier +=1.0f;
+      				      }
+      		  }
       		  else{
-		  		  	  if(enable_UWB){    stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
+		  		  	  if(enable_UWB){ stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
 		  	  	  }
     	  tdoaID = tdoa->anchor_id;
     	  tdoaDist = tdoa->distanceDiff;
