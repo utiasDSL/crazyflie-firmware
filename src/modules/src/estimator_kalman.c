@@ -1281,7 +1281,8 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 
     float predicted = d1 - d0;
 
-    if(NN_tdoa_COM && (z <=1.5f)){
+//    if(NN_tdoa_COM && (z <=1.5f)){
+     if(NN_tdoa_COM){
 		  float f_yaw = yaw;
 		  float f_roll = roll;
 		  float f_pitch = pitch;
@@ -1341,7 +1342,12 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
       };
 
       bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
-      tdoa->stdDev = (0.85f/1.0f)*(estimatedPosition.z) + 1.0f;   //   variance?
+      if(z<=1.5f){
+    	  tdoa->stdDev = (0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
+      }
+      else{
+    	  tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
+      }//   variance?
       check_log = (float)sampleIsGood;
       check_abs_log = (float)fabs(error);
 //      	  if (sampleIsGood) {   // measurements are good
@@ -1352,7 +1358,10 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
       			  float vz = S[STATE_PZ];
       			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
 //      			  float T_max = 200.0;     // have good results
-      			  float T_max = 410.0;
+      			  float T_max;
+      			  if(z <=1.5f){T_max = 400.0;}
+      			  else{ T_max = 200.0;}
+
       			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
       			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
       			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
