@@ -4,7 +4,7 @@
  *      Author: wenda
  *       Email: wenda.zhao@mail.utoronto.ca
  *
- *       current best performance
+ *       not as good as NN3
  */
 
 #ifndef _WEIGHTS_H__
