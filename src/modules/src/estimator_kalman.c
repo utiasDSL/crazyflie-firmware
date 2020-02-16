@@ -1161,7 +1161,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  measuredDistance = d->distance;
 	  }
       // About the time: 1 tick is 1 ms
-	  if (NN_COM && (z>1.3f)){  // nn bias compensation
+	  if (NN_COM && (z>1.0f)){  // nn bias compensation
 //		  float f_yaw = wrap_angle(yaw);
 //		  float f_roll = wrap_angle(roll);
 //		  float f_pitch = wrap_angle(pitch);
