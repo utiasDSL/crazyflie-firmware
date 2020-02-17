@@ -83,11 +83,11 @@
 static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
-static bool NN_COM = true;
-static bool NN_tdoa_COM = false;
-static bool OUTLIER_REJ = true;
-static bool Constant_Bias = false;
-static bool OUTLIER_REJ_Prob = false;
+static bool NN_COM = true;               // TWR DNN bias compensation
+static bool NN_tdoa_COM = false;          // TDoA DNN bias compensation
+static bool OUTLIER_REJ = true;          // model-based outlier rejection (TWR + TDoA)
+static bool Constant_Bias = false;         // for better TWR baseline
+static bool OUTLIER_REJ_Prob = false;     // Probablistic model of outlier rejection (TDoA)
 /**
  *   normalization range (put here to avoid warnings)
  */
@@ -1152,7 +1152,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 	  float dy = S[STATE_Y] - d->y;
 	  float dz = S[STATE_Z] - d->z;
 	  float measuredDistance = 0.0f;
-	  float con_bias[1][8]={{-0.298, -0.232, -0.196, -0.109, -0.184, -0.216, -0.169, -0.288}};
+	  float con_bias[1][8]={{-0.258, -0.232, -0.146, -0.109, -0.184, -0.216, -0.169, -0.288}};
 	  if(Constant_Bias){
 		  int Anchor_ID = d->anchor_ID;
 		  measuredDistance = d->distance + con_bias[0][Anchor_ID];
@@ -1161,7 +1161,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  measuredDistance = d->distance;
 	  }
       // About the time: 1 tick is 1 ms
-	  if (NN_COM && (z>1.0f)){  // nn bias compensation
+	  if (NN_COM && (z>0.5f)){  // nn bias compensation
 //		  float f_yaw = wrap_angle(yaw);
 //		  float f_roll = wrap_angle(roll);
 //		  float f_pitch = wrap_angle(pitch);
