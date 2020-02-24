@@ -83,11 +83,11 @@
 static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
-static bool NN_COM = true;               // TWR DNN bias compensation
-static bool NN_tdoa_COM = false;          // TDoA DNN bias compensation
+static bool NN_COM = false;               // TWR DNN bias compensation
+static bool NN_tdoa_COM = true;          // TDoA DNN bias compensation
 static bool OUTLIER_REJ = true;          // model-based outlier rejection (TWR + TDoA)
 static bool Constant_Bias = false;         // for better TWR baseline
-static bool OUTLIER_REJ_Prob = false;     // Probablistic model of outlier rejection (TDoA)
+static bool OUTLIER_REJ_Prob = true;     // Probablistic model of outlier rejection (TDoA)
 /**
  *   normalization range (put here to avoid warnings)
  */
@@ -1303,8 +1303,8 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 
     float predicted = d1 - d0;
 
-//    if(NN_tdoa_COM && (z <=1.5f)){
-     if(NN_tdoa_COM){
+    if(NN_tdoa_COM && (z <=1.5f)){
+//     if(NN_tdoa_COM){
 		  float f_yaw = yaw;
 		  float f_roll = roll;
 		  float f_pitch = pitch;
@@ -1382,7 +1382,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 //      			  float T_max = 200.0;     // have good results
       			  float T_max;
       			  if(z <=1.5f){T_max = 400.0;}
-      			  else{ T_max = 225.0;}
+      			  else{ T_max = 250.0;}
 
       			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
       			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
