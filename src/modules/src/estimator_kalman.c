@@ -1382,7 +1382,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 //      			  float T_max = 200.0;     // have good results
       			  float T_max;
       			  if(z <=1.5f){T_max = 400.0;}
-      			  else{ T_max = 250.0;}
+      			  else{ T_max = 225.0;}
 
       			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
       			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
