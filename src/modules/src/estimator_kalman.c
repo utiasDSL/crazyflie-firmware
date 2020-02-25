@@ -1301,7 +1301,6 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
   //dx_g = R[0][0] * S[STATE_PX] + R[0][1] * S[STATE_PY] + R[0][2] * S[STATE_PZ];
   //dy_g = R[1][0] * S[STATE_PX] + R[1][1] * S[STATE_PY] + R[1][2] * S[STATE_PZ];
 
-
   dx_g = S[STATE_PX];
   dy_g = S[STATE_PY];
   // Saturate elevation in prediction and correction to avoid singularities
