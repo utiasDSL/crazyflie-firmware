@@ -1303,8 +1303,8 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 
     float predicted = d1 - d0;
 
-    if(NN_tdoa_COM && (z <=1.5f)){
-//     if(NN_tdoa_COM){
+//    if(NN_tdoa_COM && (z <=1.5f)){
+     if(NN_tdoa_COM){
 		  float f_yaw = yaw;
 		  float f_roll = roll;
 		  float f_pitch = pitch;
@@ -1369,7 +1369,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
       }
       else{
     	  tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
-      }//   variance?
+      }//   variance
       check_log = (float)sampleIsGood;
       check_abs_log = (float)fabs(error);
 //      	  if (sampleIsGood) {   // measurements are good
@@ -1398,9 +1398,29 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 
       				  if(OUTLIER_REJ_Prob && (z <=1.5f))
       				  {
-      					  if( err_abs < (float)fabs(100.0f*tdoa->stdDev) )
-      					  {
+      					  //*********************Statistical Validation Test************************//
+      					  // ************************* 2020. Feb. 25 ****************************** //
+      					  float HTd_val[STATE_DIM * 1];
+      					  arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
 
+      					  float PHTd_val[STATE_DIM * 1];
+      					  arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
+
+      					  configASSERT(H.numRows == 1);
+      					  configASSERT(H.numCols == STATE_DIM);
+      					  // ====== INNOVATION COVARIANCE ======
+      					  mat_trans(&H, &HTm_val);
+      					  mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
+      					  float R_val = tdoa->stdDev*tdoa->stdDev;
+      					  float HPHR_val = R_val; // HPH' + R
+      					  for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
+      					    HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
+      					  }
+      					  configASSERT(!isnan(HPHR_val));
+      					  //************* Statistical Validation Test (Chi-squared test)***********//
+      					  float err_sqr = err_abs * err_abs;
+      					  if(err_sqr/HPHR_val < (float) 100.0){       // chi-squared test (need to tune)
+//      					  if( err_abs < (float)fabs(100.0f*tdoa->stdDev) ){  // 3 sigma test
       						stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
       	 				  	    count_useful += 1.0f;
       				      }else{
