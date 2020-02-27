@@ -84,7 +84,7 @@ static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
 static bool NN_COM = false;               // TWR DNN bias compensation
-static bool NN_tdoa_COM = true;          // TDoA DNN bias compensation
+static bool NN_tdoa_COM = false;          // TDoA DNN bias compensation
 static bool OUTLIER_REJ = true;          // model-based outlier rejection (TWR + TDoA)
 static bool Constant_Bias = false;         // for better TWR baseline
 static bool OUTLIER_REJ_Prob = true;     // Probablistic model of outlier rejection (TDoA)
@@ -1346,106 +1346,74 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
     float h[STATE_DIM] = {0};
     arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 
-    if ((d0 != 0.0f) && (d1 != 0.0f)) {
-      h[STATE_X] = (dx1 / d1 - dx0 / d0);
-      h[STATE_Y] = (dy1 / d1 - dy0 / d0);
-      h[STATE_Z] = (dz1 / d1 - dz0 / d0);
+    if ((d0 != 0.0f) && (d1 != 0.0f))
+    {   //measurements are not zeros
+    		h[STATE_X] = (dx1 / d1 - dx0 / d0);
+    		h[STATE_Y] = (dy1 / d1 - dy0 / d0);
+    		h[STATE_Z] = (dz1 / d1 - dz0 / d0);
 
-      vector_t jacobian = {
-        .x = h[STATE_X],
-        .y = h[STATE_Y],
-        .z = h[STATE_Z],
-      };
+    		vector_t jacobian = {
+    				.x = h[STATE_X],
+					.y = h[STATE_Y],
+					.z = h[STATE_Z],
+    		};
 
-      point_t estimatedPosition = {
-        .x = S[STATE_X],
-        .y = S[STATE_Y],
-        .z = S[STATE_Z],
-      };
+    		point_t estimatedPosition = {
+    				.x = S[STATE_X],
+					.y = S[STATE_Y],
+					.z = S[STATE_Z],
+    		};
 
-      bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
-      if(z<=1.5f){
-    	  tdoa->stdDev = (0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
-      }
-      else{
-    	  tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
-      }//   variance
-      check_log = (float)sampleIsGood;
-      check_abs_log = (float)fabs(error);
-//      	  if (sampleIsGood) {   // measurements are good
-      		  if (OUTLIER_REJ)
-      		  {
-      			  float vx = S[STATE_PX];
-      			  float vy = S[STATE_PY];
-      			  float vz = S[STATE_PZ];
-      			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
-//      			  float T_max = 200.0;     // have good results
-      			  float T_max;
-      			  if(z <=1.5f){T_max = 400.0;}
-      			  else{ T_max = 225.0;}
+    		bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
+    		if(z<=1.5f){
+    			tdoa->stdDev = (0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
+    		}
+    		else{
+    			tdoa->stdDev = (-0.85f/1.0f)*(estimatedPosition.z) + 1.0f;
+    		}//   variance
+    		check_log = (float)sampleIsGood;
+    		check_abs_log = (float)fabs(error);
 
-      			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
-      			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
-      			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
-      			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
-      			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
+    		// *********************** Statistical Validation Test *************************** //
+    		if(OUTLIER_REJ_Prob)
+    		{
+    			float HTd_val[STATE_DIM * 1];
+    			arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
 
-      			  float err_abs = (float)fabs(error);
-      			  float r_max_2 = (float)2.0 * r_max;
+    			float PHTd_val[STATE_DIM * 1];
+    			arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
 
-      			  if((enable_UWB) && ( err_abs <= r_max_2))
-      			  {
+    			configASSERT(H.numRows == 1);
+    			configASSERT(H.numCols == STATE_DIM);
+    			// ====== INNOVATION COVARIANCE ======
+    			mat_trans(&H, &HTm_val);
+    			mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
+    			float R_val = tdoa->stdDev*tdoa->stdDev;
+    			float HPHR_val = R_val; // HPH' + R
+    			for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
+    				HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
+    			}
+    			configASSERT(!isnan(HPHR_val));
+    			//************* Statistical Validation Test (Chi-squared test)***********//
+    			float err_abs = (float)fabs(error);
+    			float err_sqr = err_abs * err_abs;
+    			float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
+    			// ****************** Chi-squared test *********************//
+    			if(d_m <  1.8f){       // threshold need to be tuned
+    				stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+    				count_useful += 1.0f;
+    			}else{
+    				// reject by chi-squared test
+    				count_outlier +=1.0f;
+    			}
 
-      				  if(OUTLIER_REJ_Prob && (z <=1.5f))
-      				  {
-      					  //*********************Statistical Validation Test************************//
-      					  // ************************* 2020. Feb. 25 ****************************** //
-      					  float HTd_val[STATE_DIM * 1];
-      					  arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
+    		} // Chi-squared ends
 
-      					  float PHTd_val[STATE_DIM * 1];
-      					  arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
-
-      					  configASSERT(H.numRows == 1);
-      					  configASSERT(H.numCols == STATE_DIM);
-      					  // ====== INNOVATION COVARIANCE ======
-      					  mat_trans(&H, &HTm_val);
-      					  mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
-      					  float R_val = tdoa->stdDev*tdoa->stdDev;
-      					  float HPHR_val = R_val; // HPH' + R
-      					  for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
-      					    HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
-      					  }
-      					  configASSERT(!isnan(HPHR_val));
-      					  //************* Statistical Validation Test (Chi-squared test)***********//
-      					  float err_sqr = err_abs * err_abs;
-      					  if(err_sqr/HPHR_val < (float) 100.0){       // chi-squared test (need to tune)
-//      					  if( err_abs < (float)fabs(100.0f*tdoa->stdDev) ){  // 3 sigma test
-      						stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
-      	 				  	    count_useful += 1.0f;
-      				      }else{
-     						  // reject by outlier_prob
-      				    		count_outlier +=1.0f;
-      				           }
-     	              }else{
-      						 // after larger than 1.5 m, do not use outlier_prob
-      			    	    stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
-     	                   }
-      			  }
-      				  else{
-      						// reject by model-based outlier
-      						count_outlier +=1.0f;
-      				      }
-      		  }
-      		  else{
-		  		  	  if(enable_UWB){ stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
-		  	  	  }
-    	  tdoaID = tdoa->anchor_id;
-    	  tdoaDist = tdoa->distanceDiff;
-//      	  }
-    }
-  }
-  tdoaCount++;
+	  tdoaID = tdoa->anchor_id;
+	  tdoaDist = tdoa->distanceDiff;
+    } //measurements are not zeros ends
+  }   //tdoaCount >= 100 ends
+tdoaCount++;
 }
 
 // TODO remove the temporary test variables (used for logging)
