@@ -84,9 +84,15 @@ static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
 static bool NN_COM = false;                 // TWR DNN bias compensation
-static bool NN_tdoa_COM = true;           // TDoA DNN bias compensation
-static bool Constant_Bias = false;         // for better TWR baseline
-static bool OUTLIER_REJ_Prob = true;       // Probablistic model of outlier rejection (TDoA)
+static bool NN_tdoa_COM = false;            // TDoA DNN bias compensation
+static bool Constant_Bias = true;           // for better TWR baseline
+
+static bool OUTLIER_REJ = true;             // Model-based outlier rejection
+static bool OUTLIER_REJ_Prob = true;        // Probablistic model of outlier rejection
+// labels
+static bool Model_based_label = true;
+static bool Chi_squared_label = true;
+
 /**
  *   normalization range (put here to avoid warnings)
  */
@@ -262,7 +268,7 @@ static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
 #define MAX_VELOCITY (10) //meters per second
 
 // Initial variances, uncertain of position, but know we're stationary and roughly flat
-static const float stdDevInitialPosition_xy = 100;
+static const float stdDevInitialPosition_xy = 1;
 static const float stdDevInitialPosition_z = 1;
 static const float stdDevInitialVelocity = 0.01;
 static const float stdDevInitialAttitude_rollpitch = 0.01;
@@ -374,6 +380,14 @@ static float logzrange = 0.0f;
 
 static float  count_useful = 0.0f;
 static float  count_outlier =0.0f;
+
+// parameters for logging the outliers
+static float Model_based_outlier;
+static int   Model_based_outlier_id;
+static float Chi_squared_outlier;
+static int   Chi_squared_outlier_id;
+
+
 /**
  * Supporting and utility functions
  */
@@ -1161,6 +1175,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 	  }
       // About the time: 1 tick is 1 ms
 	  if (NN_COM && (z>0.5f)){  // nn bias compensation
+//	  if(NN_COM){
 //		  float f_yaw = wrap_angle(yaw);
 //		  float f_roll = wrap_angle(roll);
 //		  float f_pitch = wrap_angle(pitch);
@@ -1222,6 +1237,31 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  // Extra logging variables
 		  twrDist = d->distance;
 		  anchorID = d->anchor_ID;
+
+		  if (OUTLIER_REJ){
+		  	   float vx = S[STATE_PX];
+		  	   float vy = S[STATE_PY];
+		  	   float vz = S[STATE_PZ];
+		  	   float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
+		  	   float T_max = 40.0;
+		  	   float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
+		  	   float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
+		  	   float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
+		  	   float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
+		  	   float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
+//		  	   float err_abs = (float)fabs(measuredDistance-predictedDistance);
+
+		  	   if(measuredDistance-predictedDistance <= r_max){
+		  		    // pass the model-based outlier rejection
+		  			Model_based_label = true;
+		  		}else{
+		  			// detected by model-based outlier rejection
+		  			Model_based_label = false;
+		  			Model_based_outlier = d->distance;
+		  			Model_based_outlier_id = d->anchor_ID;
+		  		}
+		  }
+
   		// *********************** Statistical Validation Test *************************** //
 		  if(OUTLIER_REJ_Prob)
 		  {
@@ -1248,15 +1288,24 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 			  float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
 			  // ****************** Chi-squared test *********************//
 			  if(d_m < 1.5f){       // threshold after tuning
-				  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+				  Chi_squared_label = true;
 				  count_useful += 1.0f;
 			  }else{
 				  // reject by chi-squared test
+				  Chi_squared_label = false;
+				  Chi_squared_outlier = d->distance;
+				  Chi_squared_outlier_id = d->anchor_ID;
 				  count_outlier +=1.0f;
 			  }
 		  } // Chi-squared ends
-		  else{
-			  if(enable_UWB){stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);}
+
+
+		  if(enable_UWB){
+//			  if(Model_based_label && Chi_squared_label){      // if both outlier rejections are passed
+			  if(Chi_squared_label){       // only use chi-squared test
+//			  if(Model_based_label){       // only use model-based approach
+				  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+			  }
 		  }
 	  }
 }
@@ -1912,10 +1961,10 @@ LOG_GROUP_START(twr_ekf)
 //  LOG_ADD(LOG_FLOAT,log_pitch,&log_feature_pitch)
 //  LOG_ADD(LOG_FLOAT,err_check,&err_check_log)
 
-  LOG_ADD(LOG_FLOAT, check,     &check_log)
-  LOG_ADD(LOG_FLOAT, check_abs, &check_abs_log)
-  LOG_ADD(LOG_FLOAT, counter_useful,&count_useful)
-  LOG_ADD(LOG_FLOAT, counter_outlier,&count_outlier)
+//  LOG_ADD(LOG_FLOAT, check,     &check_log)
+//  LOG_ADD(LOG_FLOAT, check_abs, &check_abs_log)
+//  LOG_ADD(LOG_FLOAT, counter_useful,&count_useful)
+//  LOG_ADD(LOG_FLOAT, counter_outlier,&count_outlier)
 //  LOG_ADD(LOG_INT16,anchor_id, &Anchor_ID_log)
 //  LOG_ADD(LOG_FLOAT,anchor_range, &Anchor_range_log)
 //  LOG_ADD(LOG_FLOAT,r_max,&r_max_log)
@@ -1924,6 +1973,15 @@ LOG_GROUP_START(twr_ekf)
 //  LOG_ADD(LOG_FLOAT, dy, &measuredNY)
 //  LOG_ADD(LOG_FLOAT, zrange, &logzrange)
 LOG_GROUP_STOP(twr_ekf)
+
+LOG_GROUP_START(outlier)
+  LOG_ADD(LOG_FLOAT, model_based,    &Model_based_outlier)
+  LOG_ADD(LOG_INT16, model_based_id, &Model_based_outlier_id)
+  LOG_ADD(LOG_FLOAT, chi,            &Chi_squared_outlier)
+  LOG_ADD(LOG_INT16, chi_id,         &Chi_squared_outlier_id)
+
+LOG_GROUP_STOP(outlier)
+
 
 //LOG_GROUP_START(tdoa_ekf)
 //  LOG_ADD(LOG_FLOAT, distance, &tdoaDist)
@@ -1947,12 +2005,12 @@ LOG_GROUP_START(kalman)
   LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
   LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
   LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
-  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
-  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
-  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
-  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
-  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
-  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
+//  LOG_ADD(LOG_FLOAT, varPX, &P[STATE_PX][STATE_PX])
+//  LOG_ADD(LOG_FLOAT, varPY, &P[STATE_PY][STATE_PY])
+//  LOG_ADD(LOG_FLOAT, varPZ, &P[STATE_PZ][STATE_PZ])
+//  LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
+//  LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
+//  LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
 
   //LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
   LOG_ADD(LOG_FLOAT, q0, &q[0])
