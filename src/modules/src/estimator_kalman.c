@@ -84,7 +84,7 @@ static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
 static bool NN_COM = false;                 // TWR DNN bias compensation
-static bool NN_tdoa_COM = false;           // TDoA DNN bias compensation
+static bool NN_tdoa_COM = true;           // TDoA DNN bias compensation
 static bool Constant_Bias = false;         // for better TWR baseline
 static bool OUTLIER_REJ_Prob = true;       // Probablistic model of outlier rejection (TDoA)
 /**
