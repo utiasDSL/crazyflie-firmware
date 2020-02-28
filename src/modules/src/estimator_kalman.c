@@ -83,11 +83,10 @@
 static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
-static bool NN_COM = false;               // TWR DNN bias compensation
-static bool NN_tdoa_COM = false;          // TDoA DNN bias compensation
-static bool OUTLIER_REJ = true;          // model-based outlier rejection (TWR + TDoA)
+static bool NN_COM = false;                 // TWR DNN bias compensation
+static bool NN_tdoa_COM = false;           // TDoA DNN bias compensation
 static bool Constant_Bias = false;         // for better TWR baseline
-static bool OUTLIER_REJ_Prob = true;     // Probablistic model of outlier rejection (TDoA)
+static bool OUTLIER_REJ_Prob = true;       // Probablistic model of outlier rejection (TDoA)
 /**
  *   normalization range (put here to avoid warnings)
  */
@@ -362,7 +361,7 @@ static float nn_Bias_log;
 static float log_feature_yaw;
 static float log_feature_roll;
 static float log_feature_pitch;
-static float err_check_log;
+//static float err_check_log;
 static float check_log;
 static float check_abs_log;
 
@@ -1223,51 +1222,41 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  // Extra logging variables
 		  twrDist = d->distance;
 		  anchorID = d->anchor_ID;
-		  if (OUTLIER_REJ){
-			  float vx = S[STATE_PX];
-			  float vy = S[STATE_PY];
-			  float vz = S[STATE_PZ];
-			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
-			  float T_max = 40.0;
-			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
-			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
-			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
-			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
-			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
+  		// *********************** Statistical Validation Test *************************** //
+		  if(OUTLIER_REJ_Prob)
+		  {
+			  float HTd_val[STATE_DIM * 1];
+			  arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
+
+			  float PHTd_val[STATE_DIM * 1];
+			  arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
+
+			  configASSERT(H.numRows == 1);
+			  configASSERT(H.numCols == STATE_DIM);
+			  // ====== INNOVATION COVARIANCE ======
+			  mat_trans(&H, &HTm_val);
+			  mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
+			  float R_val = d->stdDev * d->stdDev;
+			  float HPHR_val = R_val; // HPH' + R
+			  for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
+				  HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
+			  }
+			  configASSERT(!isnan(HPHR_val));
+			  //************* Statistical Validation Test (Chi-squared test)***********//
 			  float err_abs = (float)fabs(measuredDistance-predictedDistance);
-//			  r_max_log = r_max;    //debug
-//			  innovation = measuredDistance-predictedDistance;
-			  if(measuredDistance-predictedDistance <= r_max){
-				  //only
-				  float err_check = arm_sqrt(powf(dx, 2) + powf(dy, 2) + powf(dz, 2)) - measuredDistance;
-				  err_check_log = err_check;
-
-			      if((enable_UWB) && (measuredDistance-predictedDistance <= r_max)){
-
-				  if(OUTLIER_REJ_Prob)
-				  {
-				     if( err_abs < (float)fabs(85.0f* d->stdDev))
-				       {
-				       	  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
-				     	    count_useful += 1.0f;
-				        }else{
-   						  // reject by outlier_prob
-				    		count_outlier +=1.0f;
-			    	           }
-        	              }else{
-	 					     // after larger than 1.5 m, do not use outlier_prob
-				    	      stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
-				      	       }
-			       }
-			  }
-			  else{
-					// reject by model-based outlier rejection
-		    		count_outlier +=1.0f;
-			  }
-		  }else{
-			  if(enable_UWB){
+			  float err_sqr = err_abs * err_abs;
+			  float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
+			  // ****************** Chi-squared test *********************//
+			  if(d_m < 1.5f){       // threshold after tuning
 				  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+				  count_useful += 1.0f;
+			  }else{
+				  // reject by chi-squared test
+				  count_outlier +=1.0f;
 			  }
+		  } // Chi-squared ends
+		  else{
+			  if(enable_UWB){stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);}
 		  }
 	  }
 }
@@ -1399,7 +1388,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
     			float err_sqr = err_abs * err_abs;
     			float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
     			// ****************** Chi-squared test *********************//
-    			if(d_m <  1.8f){       // threshold need to be tuned
+    			if(d_m <  1.8f){       // threshold after tuning
     				stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
     				count_useful += 1.0f;
     			}else{
@@ -1408,6 +1397,9 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
     			}
 
     		} // Chi-squared ends
+    		else{
+    			if(enable_UWB){stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
+    		}
 
 	  tdoaID = tdoa->anchor_id;
 	  tdoaDist = tdoa->distanceDiff;
@@ -1941,17 +1933,17 @@ LOG_GROUP_STOP(twr_ekf)
 // Stock log groups
 LOG_GROUP_START(kalman)
   LOG_ADD(LOG_UINT8, inFlight, &quadIsFlying)
-  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
-  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
-  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
-  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
-  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
-  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
-  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
-  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
-  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
+//  LOG_ADD(LOG_FLOAT, stateX, &S[STATE_X])
+//  LOG_ADD(LOG_FLOAT, stateY, &S[STATE_Y])
+//  LOG_ADD(LOG_FLOAT, stateZ, &S[STATE_Z])
+//  LOG_ADD(LOG_FLOAT, statePX, &S[STATE_PX])
+//  LOG_ADD(LOG_FLOAT, statePY, &S[STATE_PY])
+//  LOG_ADD(LOG_FLOAT, statePZ, &S[STATE_PZ])
+//  LOG_ADD(LOG_FLOAT, stateD0, &S[STATE_D0])
+//  LOG_ADD(LOG_FLOAT, stateD1, &S[STATE_D1])
+//  LOG_ADD(LOG_FLOAT, stateD2, &S[STATE_D2])
   //LOG_ADD(LOG_FLOAT, stateSkew, &stateSkew)
-  /*
+
   LOG_ADD(LOG_FLOAT, varX, &P[STATE_X][STATE_X])
   LOG_ADD(LOG_FLOAT, varY, &P[STATE_Y][STATE_Y])
   LOG_ADD(LOG_FLOAT, varZ, &P[STATE_Z][STATE_Z])
@@ -1961,7 +1953,7 @@ LOG_GROUP_START(kalman)
   LOG_ADD(LOG_FLOAT, varD0, &P[STATE_D0][STATE_D0])
   LOG_ADD(LOG_FLOAT, varD1, &P[STATE_D1][STATE_D1])
   LOG_ADD(LOG_FLOAT, varD2, &P[STATE_D2][STATE_D2])
-  */
+
   //LOG_ADD(LOG_FLOAT, varSkew, &varSkew)
   LOG_ADD(LOG_FLOAT, q0, &q[0])
   LOG_ADD(LOG_FLOAT, q1, &q[1])
