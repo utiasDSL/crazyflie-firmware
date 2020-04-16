@@ -83,10 +83,11 @@
 static bool enable_flow = false;
 static bool enable_zrange = true;
 static bool enable_UWB = true;
-static bool NN_COM = false;                 // TWR DNN bias compensation
-static bool NN_tdoa_COM = true;           // TDoA DNN bias compensation
+static bool NN_COM = false;                // TWR DNN bias compensation
+static bool NN_tdoa_COM = true;            // TDoA DNN bias compensation
 static bool Constant_Bias = false;         // for better TWR baseline
-static bool OUTLIER_REJ_Prob = true;       // Probablistic model of outlier rejection (TDoA)
+static bool OUTLIER_REJ = true;            // Model based outlier rejection
+static bool OUTLIER_REJ_Prob = true;       // Probablistic model of outlier rejection
 /**
  *   normalization range (put here to avoid warnings)
  */
@@ -1138,11 +1139,10 @@ static void stateEstimatorUpdateWithPosVelYaw(posvelyawMeasurement_t *posvelyaw,
 }
 
 //TWR
-// implement TWR-trilateration before fusing into EKF
 static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 {
 //	  int xStart, xEnd, xDifference;
-	  float z = S[STATE_Z];
+//	  float z = S[STATE_Z];
 	 // a measurement of distance to point (x, y, z)
 	  float h[STATE_DIM] = {0};
 	  arm_matrix_instance_f32 H = {1, STATE_DIM, h};
@@ -1160,7 +1160,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  measuredDistance = d->distance;
 	  }
       // About the time: 1 tick is 1 ms
-	  if (NN_COM && (z>0.5f)){  // nn bias compensation
+	  if (NN_COM){  // nn bias compensation
 //		  float f_yaw = wrap_angle(yaw);
 //		  float f_roll = wrap_angle(roll);
 //		  float f_pitch = wrap_angle(pitch);
@@ -1222,44 +1222,72 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 		  // Extra logging variables
 		  twrDist = d->distance;
 		  anchorID = d->anchor_ID;
-  		// *********************** Statistical Validation Test *************************** //
-		  if(OUTLIER_REJ_Prob)
-		  {
-			  float HTd_val[STATE_DIM * 1];
-			  arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
-
-			  float PHTd_val[STATE_DIM * 1];
-			  arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
-
-			  configASSERT(H.numRows == 1);
-			  configASSERT(H.numCols == STATE_DIM);
-			  // ====== INNOVATION COVARIANCE ======
-			  mat_trans(&H, &HTm_val);
-			  mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
-			  float R_val = d->stdDev * d->stdDev;
-			  float HPHR_val = R_val; // HPH' + R
-			  for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
-				  HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
-			  }
-			  configASSERT(!isnan(HPHR_val));
-			  //************* Statistical Validation Test (Chi-squared test)***********//
+		  // --------------------------- Model-based Outlier Rejection ---------------------------//
+		  if (OUTLIER_REJ){
+			  float vx = S[STATE_PX];
+			  float vy = S[STATE_PY];
+			  float vz = S[STATE_PZ];
+			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
+			  float T_max = 40.0;
+			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
+			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
+			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
+			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
+			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
 			  float err_abs = (float)fabs(measuredDistance-predictedDistance);
-			  float err_sqr = err_abs * err_abs;
-			  float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
-			  // ****************** Chi-squared test *********************//
-			  if(d_m < 1.5f){       // threshold after tuning
-				  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
-				  count_useful += 1.0f;
-			  }else{
-				  // reject by chi-squared test
-				  count_outlier +=1.0f;
+//			  r_max_log = r_max;    //debug
+//			  innovation = measuredDistance-predictedDistance;
+			  if(err_abs <= r_max){
+			      // ----------------- Statistical Validation Test (Chi-squared test) ----------------- //
+				  if(OUTLIER_REJ_Prob)
+				  {
+				    float HTd_val[STATE_DIM * 1];
+					arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
+     			    float PHTd_val[STATE_DIM * 1];
+					arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
+
+					configASSERT(H.numRows == 1);
+					configASSERT(H.numCols == STATE_DIM);
+					// ====== INNOVATION COVARIANCE ======
+					mat_trans(&H, &HTm_val);
+					mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
+					float R_val = d->stdDev * d->stdDev;
+					float HPHR_val = R_val; // HPH' + R
+					for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
+					  HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
+					}
+					configASSERT(!isnan(HPHR_val));
+					float err_abs = (float)fabs(measuredDistance-predictedDistance);
+					float err_sqr = err_abs * err_abs;
+					float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
+
+					// ****************** Chi-squared test *********************//
+					if(d_m < 1.5f){       // threshold after tuning
+					    stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+					    count_useful += 1.0f;
+					}else{
+					// reject by chi-squared test
+					    count_outlier +=1.0f;
+						  }
+					} // Chi-squared ends
+					else{
+					  // if not using Chi-square and err_abs <= r_max, fuse into EKF
+					  if(enable_UWB){stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);}
+					}
+					  // ----------------- Statistical Validation Test End ----------------- //
 			  }
-		  } // Chi-squared ends
-		  else{
-			  if(enable_UWB){stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);}
+			  else{
+					// if err_abs > r_max, reject by model-based outlier rejection
+		    		count_outlier +=1.0f;
+			  }
 		  }
-	  }
-}
+		  else{  // if not using outlier rejection
+			  if(enable_UWB){
+				  stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, d->stdDev);
+			  }
+		  }
+	  } //do not fuse 0 measurements end
+}  //TWR ends
 
 //TDoA
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
@@ -1292,7 +1320,6 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 
     float predicted = d1 - d0;
 
-//    if(NN_tdoa_COM && (z <=1.5f)){
      if(NN_tdoa_COM){
 		  float f_yaw = yaw;
 		  float f_roll = roll;
@@ -1363,44 +1390,71 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
     		check_log = (float)sampleIsGood;
     		check_abs_log = (float)fabs(error);
 
-    		// *********************** Statistical Validation Test *************************** //
-    		if(OUTLIER_REJ_Prob)
-    		{
-    			float HTd_val[STATE_DIM * 1];
-    			arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
+    		  if (OUTLIER_REJ)
+    		  {
+    			  float vx = S[STATE_PX];
+    			  float vy = S[STATE_PY];
+    			  float vz = S[STATE_PZ];
+    			  float Vpr = arm_sqrt(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
+    			  float T_max;
+    			  if(z <=1.5f){T_max = 400.0;}
+    			  else{ T_max = 225.0;}
 
-    			float PHTd_val[STATE_DIM * 1];
-    			arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
+    			  float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
+    			  float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
+    			  float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
+    			  float a_max = arm_sqrt(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
+    			  float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
 
-    			configASSERT(H.numRows == 1);
-    			configASSERT(H.numCols == STATE_DIM);
-    			// ====== INNOVATION COVARIANCE ======
-    			mat_trans(&H, &HTm_val);
-    			mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
-    			float R_val = tdoa->stdDev*tdoa->stdDev;
-    			float HPHR_val = R_val; // HPH' + R
-    			for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
-    				HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
-    			}
-    			configASSERT(!isnan(HPHR_val));
-    			//************* Statistical Validation Test (Chi-squared test)***********//
-    			float err_abs = (float)fabs(error);
-    			float err_sqr = err_abs * err_abs;
-    			float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
-    			// ****************** Chi-squared test *********************//
-    			if(d_m <  1.8f){       // threshold after tuning
-    				stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
-    				count_useful += 1.0f;
-    			}else{
-    				// reject by chi-squared test
-    				count_outlier +=1.0f;
-    			}
+    			  float err_abs = (float)fabs(error);
+    			  float r_max_2 = (float)2.0 * r_max;
 
-    		} // Chi-squared ends
-    		else{
-    			if(enable_UWB){stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
-    		}
+    			  if(err_abs <= r_max_2)
+    			  {
+    		         // *********************** Statistical Validation Test *************************** //
+    		    	 if(OUTLIER_REJ_Prob)
+    		    		{
+    		    			float HTd_val[STATE_DIM * 1];
+    		    			arm_matrix_instance_f32 HTm_val = {STATE_DIM, 1, HTd_val};
 
+    		    			float PHTd_val[STATE_DIM * 1];
+    		    			arm_matrix_instance_f32 PHTm_val = {STATE_DIM, 1, PHTd_val};
+
+    		    			configASSERT(H.numRows == 1);
+    		    			configASSERT(H.numCols == STATE_DIM);
+    		    			// ====== INNOVATION COVARIANCE ======
+    		    			mat_trans(&H, &HTm_val);
+    		    			mat_mult(&Pm, &HTm_val, &PHTm_val); // PH'
+    		    			float R_val = tdoa->stdDev*tdoa->stdDev;
+    		    			float HPHR_val = R_val; // HPH' + R
+    		    			for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
+    		    				HPHR_val += H.pData[i]*PHTd_val[i];   //  scaler update
+    		    			}
+    		    			configASSERT(!isnan(HPHR_val));
+    		    			//************* Statistical Validation Test (Chi-squared test)***********//
+    		    			float err_abs = (float)fabs(error);
+    		    			float err_sqr = err_abs * err_abs;
+    		    			float d_m = arm_sqrt(err_sqr/HPHR_val);     // M distance
+    		    			// ****************** Chi-squared test *********************//
+    		    			if(d_m <  1.8f){       // threshold after tuning
+    		    				stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
+    		    				count_useful += 1.0f;
+    		    			}else{
+    		    				// reject by chi-squared test
+    		    				count_outlier +=1.0f;
+    		    			}
+    		    	  } // Chi-squared ends
+    	    		  else{
+    	    			  // if do not use Chi-square and ( err_abs <= r_max_2), fuse the measurements
+    			  		  	  if(enable_UWB){ stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
+    			  	  	  }
+    			  }else{
+    				   // if  ( err_abs > r_max_2), reject by model-based rejection
+    				   count_outlier +=1.0f;}
+    		  }else{
+    			  // if not using outlier rejection
+    			  if(enable_UWB){stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);}
+    		  }
 	  tdoaID = tdoa->anchor_id;
 	  tdoaDist = tdoa->distanceDiff;
     } //measurements are not zeros ends
