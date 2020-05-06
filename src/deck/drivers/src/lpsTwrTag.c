@@ -422,7 +422,7 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
         }
       }
 
-
+      // Handle Lpp short
       if (lpsGetLppShort(&lppShortPacket)) {
         lpp_transaction = true;
         sendLppShort(dev, &lppShortPacket);
