@@ -55,6 +55,8 @@
 #include "lpsTdoa3Tag.h"
 #include "lpsTwrTag.h"
 
+#include "lpsTdoa4Tag.h"
+
 
 #define CS_PIN DECK_GPIO_IO1
 
@@ -93,6 +95,8 @@ static lpsAlgoOptions_t algoOptions = {
   .rangingMode = lpsMode_TDoA2,
 #elif LPS_TDOA3_ENABLE
   .rangingMode = lpsMode_TDoA3,
+#elif LPS_TDOA4_ENABLE                                // [Change]
+  .rangingMode = lpsMode_TDoA4,
 #elif defined(LPS_TWR_ENABLE)
   .rangingMode = lpsMode_TWR,
 #else
@@ -111,12 +115,15 @@ struct {
   [lpsMode_TWR] = {.algorithm = &uwbTwrTagAlgorithm, .name="TWR"},
   [lpsMode_TDoA2] = {.algorithm = &uwbTdoa2TagAlgorithm, .name="TDoA2"},
   [lpsMode_TDoA3] = {.algorithm = &uwbTdoa3TagAlgorithm, .name="TDoA3"},
+  [lpsMode_TDoA4] = {.algorithm = &uwbTdoa4TagAlgorithm, .name="TDoA4"},   // [Change]
 };
 
 #if LPS_TDOA_ENABLE
 static uwbAlgorithm_t *algorithm = &uwbTdoa2TagAlgorithm;
 #elif LPS_TDOA3_ENABLE
 static uwbAlgorithm_t *algorithm = &uwbTdoa3TagAlgorithm;
+#elif LPS_TDOA4_ENABLE                                                     // [Change]
+static uwbAlgorithm_t *algorithm = &uwbTdoa4TagAlgorithm;
 #else
 static uwbAlgorithm_t *algorithm = &uwbTwrTagAlgorithm;
 #endif

@@ -25,6 +25,7 @@ PLATFORM          ?= cf2
 LPS_TDMA_ENABLE   ?= 0
 LPS_TDOA_ENABLE   ?= 0
 LPS_TDOA3_ENABLE  ?= 0
+LPS_TDOA4_ENABLE  ?= 0    # [Change]
 BROADCAST_ENABLE  ?= 1
 
 
@@ -194,6 +195,9 @@ PROJ_OBJ += clockCorrectionEngine.o
 PROJ_OBJ += lpsTwrTag.o
 PROJ_OBJ += lpsTdoa2Tag.o
 PROJ_OBJ += lpsTdoa3Tag.o tdoaEngine.o tdoaStats.o tdoaStorage.o
+# [Change: binary file for tdoa4]
+PROJ_OBJ += lpsTdoa4Tag.o uwb.o lpp.o dwOps.o cfg.o
+
 PROJ_OBJ += outlierFilter.o
 PROJ_OBJ += flowdeck_v1v2.o
 PROJ_OBJ += oa.o
