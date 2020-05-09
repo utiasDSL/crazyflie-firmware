@@ -16,7 +16,7 @@
 #include "libdw1000.h"
 #include "mac.h"
 // #include "uwb.h"  // replace with locodeck.h
-#include "locodeck.h" 
+// #include "locodeck.h"  // in lpsTdoa4Tag.h
 
 // #include "cfg.h"   // unknown function
 // #include "lpp.h"  // handle lpp short packet, do not use for now
@@ -26,8 +26,9 @@
 // [change]
 #include "tdoaEngine.h"
 #include "tdoaStats.h"
-
-
+#include "estimator_kalman.h"
+//[change]
+#define TDOA4_RECEIVE_TIMEOUT 10000
 // Useful constants
 static const uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
 
@@ -584,10 +585,35 @@ static uint32_t startNextEvent(dwDevice_t *dev, uint32_t now)
 }
 
 
+// [change]
+static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
+  estimatorKalmanEnqueueTDOA(tdoaMeasurement);
+}
+
+//------------------------------------------------------------------//
 // Initialize/reset the agorithm
-static void tdoa4Init(uwbConfig_t * config, dwDevice_t *dev)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+// [change]: in CF algorithm, the init only has dwDevice, don't have config
+static void tdoa4Init(dwDevice_t *dev)
 {
-  ctx.anchorId = config->address[0];
+  //[change]
+  uint32_t now_ms = T2M(xTaskGetTickCount());
+  tdoaEngineInit(&engineState, now_ms, sendTdoaToEstimatorCallback, LOCODECK_TS_FREQ);
+
+  dwSetReceiveWaitTimeout(dev, TDOA4_RECEIVE_TIMEOUT);
+
+  dwCommitConfiguration(dev);
+
+  rangingOk = false;
+  //[end change]
+
+  // init for tdoa3 anchor 
+  // [change] config is initialized here
+  //   uwbConfig_t * config;
+  // [original code]
+  //  ctx.anchorId = config->address[0];
+  ctx.anchorId = 0;   // initialize to be 0
   ctx.seqNr = 0;
   ctx.txTime = 0;
   ctx.nextTxTick = 0;
@@ -604,6 +630,7 @@ static void tdoa4Init(uwbConfig_t * config, dwDevice_t *dev)
 
   srand(ctx.anchorId);
 }
+//------------------------------------------------------------------//
 
 // Called for each DW radio event
 static uint32_t tdoa4UwbEvent(dwDevice_t *dev, uwbEvent_t event)
@@ -628,15 +655,22 @@ static uint32_t tdoa4UwbEvent(dwDevice_t *dev, uwbEvent_t event)
   return timeout_ms;
 }
 
-// [Add]
+//-----------------Move the algorithm from lpstdoa3--------------------//
 static bool isRangingOk()
 {
   return rangingOk;
 }
-static bool getAnchorPosition()
-{
-    // update later
+static bool getAnchorPosition(const uint8_t anchorId, point_t* position) {
+  tdoaAnchorContext_t anchorCtx;
+  uint32_t now_ms = T2M(xTaskGetTickCount());
+
+  bool contextFound = tdoaStorageGetAnchorCtx(engineState.anchorInfoArray, anchorId, now_ms, &anchorCtx);
+  if (contextFound) {
+    tdoaStorageGetAnchorPosition(&anchorCtx, position);
     return true;
+  }
+
+  return false;
 }
 
 // [note]: How are these two functions called??
@@ -652,12 +686,11 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
 // [note]: The implementation of algorithm on the anchor and on CF are different
 // need to check tdoa engine on CF and uwb.c on lps-node-firmware 
 
-uwbAlgorithm_t uwbTdoa4Algorithm = {
-  .init = tdoa4Init,
+uwbAlgorithm_t uwbTdoa4TagAlgorithm = { //[change]: the name changed
+  .init = tdoa4Init,   // the config is changed in init func
   .onEvent = tdoa4UwbEvent,
-//[change]
+//[change]: The following are needed
   .isRangingOk = isRangingOk,
-//The following are needed
   .getAnchorPosition = getAnchorPosition,
   .getAnchorIdList = getAnchorIdList,
   .getActiveAnchorIdList = getActiveAnchorIdList,

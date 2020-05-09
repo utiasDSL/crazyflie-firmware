@@ -89,13 +89,15 @@ typedef struct uwbConfig_s {
 
 //[change]: move from uwb.c
 // System configuration
-static struct uwbConfig_s config = {
-  address: {0,0,0,0,0,0,0xcf,0xbc},
-};
+/*--- not used ---*/
+// static struct uwbConfig_s config = {
+//   address: {0,0,0,0,0,0,0xcf,0xbc},
+// };
 
 // [change]: move from uwb.h
-struct uwbConfig_s * uwbGetConfig()
-{
-  return &config;
-}
+/* This function is not used for now*/
+// struct uwbConfig_s * uwbGetConfig()
+// {
+//   return &config;
+// }
 #endif // __LPS_TDOA4_TAG_H__
