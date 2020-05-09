@@ -23,6 +23,8 @@
 
 #include "lpsTdoa4Tag.h"
 
+#include "log.h"
+
 // [change]
 #include "tdoaEngine.h"
 #include "tdoaStats.h"
@@ -110,6 +112,9 @@ typedef struct {
 #define LPP_TYPE (LPP_HEADER + 1)
 #define LPP_PAYLOAD (LPP_HEADER + 2)
 
+
+//[change]: log parameter
+static int log_range;    // distance is uint16_t
 
 static anchorContext_t* getContext(uint8_t anchorId) {
   uint8_t slot = ctx.anchorCtxLookup[anchorId];
@@ -406,7 +411,8 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
       if (dataFound) {
         //[note]: here is the range distance data!
         uint16_t distance = calculateDistance(anchorCtx, remoteRxSeqNr, remoteTx, remoteRx, rxTime);
-
+        //[note]: log range
+        log_range = distance;
         // TODO krri Remove outliers in distances
         if (distance > MIN_TOF) {
           anchorCtx->distance = distance;
@@ -696,11 +702,11 @@ uwbAlgorithm_t uwbTdoa4TagAlgorithm = { //[change]: the name changed
   .getActiveAnchorIdList = getActiveAnchorIdList,
 };
 
+//[note]: test for log parameter
+LOG_GROUP_START(tdoa3)
 
-
-
-
-
+LOG_ADD(LOG_INT16,Range, &log_range)
+LOG_GROUP_STOP(tdoa3)
 
 
 
