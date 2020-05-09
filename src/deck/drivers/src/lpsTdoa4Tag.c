@@ -9,67 +9,24 @@
 
 
 #include <string.h>
+#include <stdlib.h>   // [change] for rand() function 
 
 #include "FreeRTOS.h"
 #include "task.h"
 #include "libdw1000.h"
 #include "mac.h"
-#include "uwb.h"
+// #include "uwb.h"  // replace with locodeck.h
+#include "locodeck.h" 
 
-#include "cfg.h"
-#include "lpp.h"
+// #include "cfg.h"   // unknown function
+// #include "lpp.h"  // handle lpp short packet, do not use for now
 
 #include "lpsTdoa4Tag.h"
 
-#define debug(...) printf(__VA_ARGS__)
+// [change]
+#include "tdoaEngine.h"
+#include "tdoaStats.h"
 
-// Time length of the preamble
-#define PREAMBLE_LENGTH_S ( 128 * 1017.63e-9 )
-#define PREAMBLE_LENGTH (uint64_t)( PREAMBLE_LENGTH_S * 499.2e6 * 128 )
-
-// Guard length to account for clock drift and time of flight
-#define TDMA_GUARD_LENGTH_S ( 1e-6 )
-#define TDMA_GUARD_LENGTH (uint64_t)( TDMA_GUARD_LENGTH_S * 499.2e6 * 128 )
-
-#define TDMA_EXTRA_LENGTH_S ( 300e-6 )
-#define TDMA_EXTRA_LENGTH (uint64_t)( TDMA_EXTRA_LENGTH_S * 499.2e6 * 128 )
-
-#define TDMA_HIGH_RES_RAND_S ( 1e-3 )
-#define TDMA_HIGH_RES_RAND (uint64_t)( TDMA_HIGH_RES_RAND_S * 499.2e6 * 128 )
-
-#define ANCHOR_LIST_UPDATE_INTERVAL 1000;
-
-#define ANCHOR_STORAGE_COUNT 16
-#define REMOTE_TX_MAX_COUNT 8
-#if REMOTE_TX_MAX_COUNT > ANCHOR_STORAGE_COUNT
-  #error "Invalid settings"
-#endif
-
-#define ID_COUNT 256
-#define ID_WITHOUT_CONTEXT 0xff
-#define ID_INVALID 0xff
-
-#define SYSTEM_TX_FREQ 400.0
-#define ANCHOR_MAX_TX_FREQ 50.0
-// We need a lower limit of minimum tx rate. The TX timestamp in the protocol is
-// only 32 bits (equal to 67 ms) and we want to avoid double wraps of the TX counter.
-// To have some margin set the lowest tx frequency to 20 Hz (= 50 ms)
-#define ANCHOR_MIN_TX_FREQ 20.0
-
-
-#define ANTENNA_OFFSET 154.6   // In meters
-#define ANTENNA_DELAY  ((ANTENNA_OFFSET*499.2e6*128)/299792458.0) // In radio tick
-#define MIN_TOF ANTENNA_DELAY
-
-#define MAX_CLOCK_DEVIATION_SPEC 10e-6
-#define CLOCK_CORRECTION_SPEC_MIN (1.0d - MAX_CLOCK_DEVIATION_SPEC * 2)
-#define CLOCK_CORRECTION_SPEC_MAX (1.0d + MAX_CLOCK_DEVIATION_SPEC * 2)
-
-#define CLOCK_CORRECTION_ACCEPTED_NOISE 0.03e-6
-#define CLOCK_CORRECTION_FILTER 0.1d
-#define CLOCK_CORRECTION_BUCKET_MAX 4
-
-#define DISTANCE_VALIDITY_PERIOD M2T(2 * 1000);
 
 // Useful constants
 static const uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
@@ -114,6 +71,10 @@ static struct ctx_s {
   uint8_t anchorRxCount[ID_COUNT];
 } ctx;
 
+//[Change]
+static bool rangingOk;
+static tdoaEngineState_t engineState;
+
 // Packet formats
 #define PACKET_TYPE_TDOA4 0x30                      // [Change]
 
@@ -141,6 +102,7 @@ typedef struct {
   rangePacketHeader3_t header;
   uint8_t remoteAnchorData;
 } __attribute__((packed)) rangePacket3_t;
+
 
 
 #define LPP_HEADER 0
@@ -285,13 +247,13 @@ static void updateAnchorLists() {
   // Set the TX rate based on the number of transmitting anchors around us
   // Aim for 400 messages/s. Up to 8 anchors: 50 Hz / anchor
   float freq = SYSTEM_TX_FREQ / (availableCount + 1);
-  if (freq > ANCHOR_MAX_TX_FREQ) {
+  if (freq > (float) ANCHOR_MAX_TX_FREQ) {  //[change]: add (float)
     freq = ANCHOR_MAX_TX_FREQ;
   }
-  if (freq < ANCHOR_MIN_TX_FREQ) {
+  if (freq < (float) ANCHOR_MIN_TX_FREQ) { //[change]: add (float)
     freq = ANCHOR_MIN_TX_FREQ;
   }
-  ctx.averageTxDelay = 1000.0 / freq;
+  ctx.averageTxDelay = 1000.0f / freq;
 
   purgeData();
 }
@@ -415,9 +377,16 @@ static bool updateClockCorrection(anchorContext_t* anchorCtx, double clockCorrec
   return sampleIsAccepted;
 }
 
+
+//[note]: get range data from message
 static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
 {
-  const uint8_t remoteAnchorId = rxPacket->sourceAddress[0];
+  //[change] packet code is slightly different 
+  //     in CF: locoAddress_t sourceAddress =>  uint64_t sourceAddress
+  // in anchor: uint8_t sourceAddress[8]
+  // similar to destAddress
+
+  const uint8_t remoteAnchorId = rxPacket->sourceAddress;
   ctx.anchorRxCount[remoteAnchorId]++;
   anchorContext_t* anchorCtx = getContext(remoteAnchorId);
   if (anchorCtx) {
@@ -434,6 +403,7 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
       uint8_t remoteRxSeqNr = 0;
       bool dataFound = extractFromPacket(rangePacket, &remoteRx, &remoteRxSeqNr);
       if (dataFound) {
+        //[note]: here is the range distance data!
         uint16_t distance = calculateDistance(anchorCtx, remoteRxSeqNr, remoteTx, remoteRx, rxTime);
 
         // TODO krri Remove outliers in distances
@@ -444,7 +414,10 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
       }
     } else {
       anchorCtx->isDataGoodForTransmission = false;
+      
     }
+    // [change]
+    rangingOk = anchorCtx->isDataGoodForTransmission;
 
     anchorCtx->rxTimeStamp = rxTime;
     anchorCtx->seqNr = remoteTxSeqNr;
@@ -452,6 +425,7 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
   }
 }
 
+//[note]: main function after receive an uwb message
 static void handleRxPacket(dwDevice_t *dev)
 {
   static packet_t rxPacket;
@@ -469,13 +443,14 @@ static void handleRxPacket(dwDevice_t *dev)
   }
 
   switch(rxPacket.payload[0]) {
-  case PACKET_TYPE_TDOA4:
-    handleRangePacket(rxTime.low32, &rxPacket);
+  case PACKET_TYPE_TDOA4:       //[change]
+    handleRangePacket(rxTime.low32, &rxPacket);   //[note] get range
     break;
-  case SHORT_LPP:
-    if (rxPacket.destAddress[0] == ctx.anchorId) {
-      lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
-    }
+  case SHORT_LPP:  //[note] handle Lpp packets: do nothing for now 
+  /* [change]: originally need lpp.c lpp.h (will update later)*/
+    // if (rxPacket.destAddress[0] == ctx.anchorId) {
+    //   lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+    // }
     break;
   default:
     // Do nothing
@@ -534,31 +509,34 @@ static void setTxData(dwDevice_t *dev)
 
   if (firstEntry) {
     MAC80215_PACKET_INIT(txPacket, MAC802154_TYPE_DATA);
-
-    memcpy(txPacket.sourceAddress, base_address, 8);
-    txPacket.sourceAddress[0] = ctx.anchorId;
-    memcpy(txPacket.destAddress, base_address, 8);
-    txPacket.destAddress[0] = 0xff;
+    // [Need to be check !!!! ]
+    // [change]: add '&' in front of txPacket (not sure if it is correct)
+    memcpy(&txPacket.sourceAddress, base_address, 8);
+    txPacket.sourceAddress = ctx.anchorId;
+    memcpy(&txPacket.destAddress, base_address, 8);
+    txPacket.destAddress = 0xff;
 
     txPacket.payload[0] = PACKET_TYPE_TDOA4;
 
     firstEntry = false;
   }
 
-  uwbConfig_t *uwbConfig = uwbGetConfig();
+// [note]: unused variable (for now)
+//   uwbConfig_t *uwbConfig = uwbGetConfig();
 
   int rangePacketSize = populateTxData((rangePacket3_t *)txPacket.payload);
 
   // LPP anchor position is currently sent in all packets
-  if (uwbConfig->positionEnabled) {
-    txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
-    txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
+  /*[change]: do not handle lpp short package now (update later)*/
+//   if (uwbConfig->positionEnabled) {
+//     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
+//     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
 
-    struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
-    memcpy(pos->position, uwbConfig->position, 3 * sizeof(float));
+//     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
+//     memcpy(pos->position, uwbConfig->position, 3 * sizeof(float));
 
-    lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
-  }
+//     lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
+//   }
 
   dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
 }
@@ -650,10 +628,39 @@ static uint32_t tdoa4UwbEvent(dwDevice_t *dev, uwbEvent_t event)
   return timeout_ms;
 }
 
+// [Add]
+static bool isRangingOk()
+{
+  return rangingOk;
+}
+static bool getAnchorPosition()
+{
+    // update later
+    return true;
+}
+
+// [note]: How are these two functions called??
+static uint8_t getAnchorIdList(uint8_t unorderedAnchorList[], const int maxListSize) {
+  return tdoaStorageGetListOfAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize);
+}
+
+static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int maxListSize) {
+  uint32_t now_ms = T2M(xTaskGetTickCount());
+  return tdoaStorageGetListOfActiveAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize, now_ms);
+}
+
+// [note]: The implementation of algorithm on the anchor and on CF are different
+// need to check tdoa engine on CF and uwb.c on lps-node-firmware 
 
 uwbAlgorithm_t uwbTdoa4Algorithm = {
   .init = tdoa4Init,
   .onEvent = tdoa4UwbEvent,
+//[change]
+  .isRangingOk = isRangingOk,
+//The following are needed
+  .getAnchorPosition = getAnchorPosition,
+  .getAnchorIdList = getAnchorIdList,
+  .getActiveAnchorIdList = getActiveAnchorIdList,
 };
 
 

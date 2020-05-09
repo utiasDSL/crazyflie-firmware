@@ -196,7 +196,7 @@ PROJ_OBJ += lpsTwrTag.o
 PROJ_OBJ += lpsTdoa2Tag.o
 PROJ_OBJ += lpsTdoa3Tag.o tdoaEngine.o tdoaStats.o tdoaStorage.o
 # [Change: binary file for tdoa4]
-PROJ_OBJ += lpsTdoa4Tag.o uwb.o lpp.o dwOps.o cfg.o
+PROJ_OBJ += lpsTdoa4Tag.o 
 
 PROJ_OBJ += outlierFilter.o
 PROJ_OBJ += flowdeck_v1v2.o
