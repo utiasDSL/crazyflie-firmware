@@ -55,7 +55,7 @@ void tdoaStatsInit(tdoaStats_t* tdoaStats, uint32_t now_ms) {
 
   clearStats(tdoaStats);
 }
-
+// [Question]: Not sure what is the functionality
 void tdoaStatsUpdate(tdoaStats_t* tdoaStats, uint32_t now_ms) {
   if (now_ms > tdoaStats->nextStatisticsTime) {
     float interval = now_ms - tdoaStats->previousStatisticsTime;

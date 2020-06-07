@@ -25,9 +25,10 @@
 
 #include "log.h"
 
+#include "debug.h"
 // [change]
-#include "tdoaEngine.h"
-#include "tdoaStats.h"
+// #include "tdoaEngine.h"
+// #include "tdoaStats.h"
 #include "estimator_kalman.h"
 //[change]
 #define TDOA4_RECEIVE_TIMEOUT 10000
@@ -76,7 +77,7 @@ static struct ctx_s {
 
 //[Change]
 static bool rangingOk;
-static tdoaEngineState_t engineState;
+// static tdoaEngineState_t engineState;
 
 // Packet formats
 #define PACKET_TYPE_TDOA4 0x30                      // [Change]
@@ -391,7 +392,7 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
   //     in CF: locoAddress_t sourceAddress =>  uint64_t sourceAddress
   // in anchor: uint8_t sourceAddress[8]
   // similar to destAddress
-
+//   DEBUG_PRINT("get in handleRangePacket function \r\n");
   const uint8_t remoteAnchorId = rxPacket->sourceAddress;
   ctx.anchorRxCount[remoteAnchorId]++;
   anchorContext_t* anchorCtx = getContext(remoteAnchorId);
@@ -451,6 +452,7 @@ static void handleRxPacket(dwDevice_t *dev)
 
   switch(rxPacket.payload[0]) {
   case PACKET_TYPE_TDOA4:       //[change]
+    // DEBUG_PRINT("Received TDOA4 message \r\n");
     handleRangePacket(rxTime.low32, &rxPacket);   //[note] get range
     break;
   case SHORT_LPP:  //[note] handle Lpp packets: do nothing for now 
@@ -528,22 +530,22 @@ static void setTxData(dwDevice_t *dev)
     firstEntry = false;
   }
 
-// [note]: unused variable (for now)
-//   uwbConfig_t *uwbConfig = uwbGetConfig();
+  // [note]: unused variable (for now)
+  //   uwbConfig_t *uwbConfig = uwbGetConfig();
 
   int rangePacketSize = populateTxData((rangePacket3_t *)txPacket.payload);
 
   // LPP anchor position is currently sent in all packets
   /*[change]: do not handle lpp short package now (update later)*/
-//   if (uwbConfig->positionEnabled) {
-//     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
-//     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
+  //   if (uwbConfig->positionEnabled) {
+  //     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
+  //     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
 
-//     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
-//     memcpy(pos->position, uwbConfig->position, 3 * sizeof(float));
+  //     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
+  //     memcpy(pos->position, uwbConfig->position, 3 * sizeof(float));
 
-//     lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
-//   }
+  //     lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
+  //   }
 
   dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
 }
@@ -591,10 +593,10 @@ static uint32_t startNextEvent(dwDevice_t *dev, uint32_t now)
 }
 
 
-// [change]
-static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
-  estimatorKalmanEnqueueTDOA(tdoaMeasurement);
-}
+//// [change]: not used now, comment out
+// static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
+//   estimatorKalmanEnqueueTDOA(tdoaMeasurement);
+// }
 
 //------------------------------------------------------------------//
 // Initialize/reset the agorithm
@@ -603,10 +605,7 @@ static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
 // [change]: in CF algorithm, the init only has dwDevice, don't have config
 static void tdoa4Init(dwDevice_t *dev)
 {
-  //[change]
-  uint32_t now_ms = T2M(xTaskGetTickCount());
-  tdoaEngineInit(&engineState, now_ms, sendTdoaToEstimatorCallback, LOCODECK_TS_FREQ);
-
+ 
   dwSetReceiveWaitTimeout(dev, TDOA4_RECEIVE_TIMEOUT);
 
   dwCommitConfiguration(dev);
@@ -619,7 +618,7 @@ static void tdoa4Init(dwDevice_t *dev)
   //   uwbConfig_t * config;
   // [original code]
   //  ctx.anchorId = config->address[0];
-  ctx.anchorId = 0;   // initialize to be 0
+  ctx.anchorId = 1;   // initialize to be int 0
   ctx.seqNr = 0;
   ctx.txTime = 0;
   ctx.nextTxTick = 0;
@@ -643,6 +642,7 @@ static uint32_t tdoa4UwbEvent(dwDevice_t *dev, uwbEvent_t event)
 {
   switch (event) {
     case eventPacketReceived: {
+        // DEBUG_PRINT("Received message \r\n");
         handleRxPacket(dev);
       }
       break;
@@ -666,30 +666,81 @@ static bool isRangingOk()
 {
   return rangingOk;
 }
+
 static bool getAnchorPosition(const uint8_t anchorId, point_t* position) {
-  tdoaAnchorContext_t anchorCtx;
-  uint32_t now_ms = T2M(xTaskGetTickCount());
 
-  bool contextFound = tdoaStorageGetAnchorCtx(engineState.anchorInfoArray, anchorId, now_ms, &anchorCtx);
-  if (contextFound) {
-    tdoaStorageGetAnchorPosition(&anchorCtx, position);
+    // a walk around. For relative ranging ability, we don't need anchor position info.
+
     return true;
-  }
-
-  return false;
 }
 
-// [note]: How are these two functions called??
+// [Note]: How are these two functions called??
+// [Change]: Move the updateAnchorLists() function from anchor code
 static uint8_t getAnchorIdList(uint8_t unorderedAnchorList[], const int maxListSize) {
-  return tdoaStorageGetListOfAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize);
+    // get the anchor id num that I received msg from.
+    // dn not need to use the inputs: uint8_t unorderedAnchorList[], const int maxListSize
+    static uint8_t availableId[ID_COUNT];
+    static bool availableUsed[ID_COUNT];
+    memset(availableId, 0, sizeof(availableId));
+    memset(availableUsed, 0, sizeof(availableUsed));
+    int availableCount = 0;
+
+    static uint8_t ctxts[ANCHOR_STORAGE_COUNT];
+    memset(ctxts, 0, sizeof(ctxts));
+
+    // Collect all anchors we have got a message from
+    for (int i = 0; i < ID_COUNT; i++) {
+        if (ctx.anchorRxCount[i] != 0) {
+        availableId[availableCount++] = i;
+        }
+    }
+
+    return availableCount;
 }
 
+// [Change]: Move the updateAnchorLists() function from anchor code
 static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int maxListSize) {
-  uint32_t now_ms = T2M(xTaskGetTickCount());
-  return tdoaStorageGetListOfActiveAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize, now_ms);
+    // get the anchor id num that I received msg from.
+    static uint8_t availableId[ID_COUNT];
+    static bool availableUsed[ID_COUNT];
+    memset(availableId, 0, sizeof(availableId));
+    memset(availableUsed, 0, sizeof(availableUsed));
+    int availableCount = 0;
+
+    static uint8_t ctxts[ANCHOR_STORAGE_COUNT];
+    memset(ctxts, 0, sizeof(ctxts));
+
+    // Collect all anchors we have got a message from
+    for (int i = 0; i < ID_COUNT; i++) {
+        if (ctx.anchorRxCount[i] != 0) {
+        availableId[availableCount++] = i;
+        }
+    }
+    
+    uint8_t remoteTXIdIndex = 0;
+    uint8_t contextIndex = 0;
+    for (int i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
+        int start = rand() % availableCount;
+        // Scan forward until we find an anchor
+        for (int j = start; j < (start + availableCount); j++) {
+            const int index = j % availableCount;
+            if (!availableUsed[index]) {
+                const int id = availableId[index];
+                if (remoteTXIdIndex < REMOTE_TX_MAX_COUNT) {
+                    ctx.remoteTxId[remoteTXIdIndex++] = id;
+                    }
+                if (contextIndex < ANCHOR_STORAGE_COUNT) {
+                ctxts[contextIndex++] = id;
+                }
+                availableUsed[index] = true;
+                break;
+            }
+        }
+    }
+   return contextIndex;
 }
 
-// [note]: The implementation of algorithm on the anchor and on CF are different
+// [Note]: The implementation of algorithm on the anchor and on CF are different
 // need to check tdoa engine on CF and uwb.c on lps-node-firmware 
 
 uwbAlgorithm_t uwbTdoa4TagAlgorithm = { //[change]: the name changed
@@ -698,7 +749,7 @@ uwbAlgorithm_t uwbTdoa4TagAlgorithm = { //[change]: the name changed
 //[change]: The following are needed
   .isRangingOk = isRangingOk,
   .getAnchorPosition = getAnchorPosition,
-  .getAnchorIdList = getAnchorIdList,
+  .getAnchorIdList = getAnchorIdList,           // return the active id num: uint8_t
   .getActiveAnchorIdList = getActiveAnchorIdList,
 };
 

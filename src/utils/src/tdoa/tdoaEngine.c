@@ -131,6 +131,7 @@ static double calcDistanceDiff(const tdoaAnchorContext_t* otherAnchorCtx, const 
   return SPEED_OF_LIGHT * tdoa / locodeckTsFreq;
 }
 
+// find another anchor info to compute the TDoA. (change each time (randomly?))
 static bool findSuitableAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext_t* otherAnchorCtx, const tdoaAnchorContext_t* anchorCtx) {
   static uint8_t seqNr[REMOTE_ANCHOR_DATA_COUNT];
   static uint8_t id[REMOTE_ANCHOR_DATA_COUNT];
@@ -154,6 +155,8 @@ static bool findSuitableAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext
     const uint8_t candidateAnchorId = id[index];
     if (tdoaStorageGetCreateAnchorCtx(engineState->anchorInfoArray, candidateAnchorId, now_ms, otherAnchorCtx)) {
       if (seqNr[index] == tdoaStorageGetSeqNr(otherAnchorCtx) && tdoaStorageGetTimeOfFlight(anchorCtx, candidateAnchorId)) {
+        // successfully find a suitable anchor to compute tdoa measurements
+        // return true
         return true;
       }
     }
