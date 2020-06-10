@@ -75,6 +75,7 @@
 
 struct lppShortAnchorPosition_s {
   float position[3];
+  float quaternion[4];
 } __attribute__((packed));
 
 #define LPP_SHORT_REBOOT_TO_BOOTLOADER 0x00

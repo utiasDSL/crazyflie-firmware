@@ -6,8 +6,6 @@
         Email  : wenda.zhao@robotics.utias.utoronto.ca
     TDoA4 firmware code
 */
-
-
 #include <string.h>
 #include <stdlib.h>   // [change] for rand() function 
 #include "FreeRTOS.h"
@@ -18,7 +16,6 @@
 // #include "locodeck.h"  // in lpsTdoa4Tag.h
 // #include "cfg.h"   // unknown function
 // #include "lpp.h"  // handle lpp short packet, moved to lpsTdoa4Tag
-
 #include "lpsTdoa4Tag.h"
 #include "log.h"
 #include "debug.h"
@@ -536,21 +533,19 @@ static void setTxData(dwDevice_t *dev)
 
     firstEntry = false;
   }
-
   // [note]: unused variable (for now)
   //   uwbConfig_t *uwbConfig = uwbGetConfig();
-
   int rangePacketSize = populateTxData((rangePacket3_t *)txPacket.payload);
-
   // LPP anchor position is currently sent in all packets
     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
 
     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
-    // test with dummy positions
+    // test with dummy positions: it works!
     float dummy_pos[3] = {1.0, 1.1, 1.2};
+    float dummy_quater[4] = {1.01, 1.02, 1.03, 1.04};
     memcpy(pos->position, dummy_pos, 3 * sizeof(float));
-
+    memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
     lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
 
   dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
@@ -597,7 +592,6 @@ static uint32_t startNextEvent(dwDevice_t *dev, uint32_t now)
 
   return ctx.nextTxTick - now;
 }
-
 
 //// [change]: not used now, comment out
 // static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
