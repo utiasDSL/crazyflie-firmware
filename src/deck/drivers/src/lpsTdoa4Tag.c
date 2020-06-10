@@ -10,28 +10,26 @@
 
 #include <string.h>
 #include <stdlib.h>   // [change] for rand() function 
-
 #include "FreeRTOS.h"
 #include "task.h"
 #include "libdw1000.h"
 #include "mac.h"
 // #include "uwb.h"  // replace with locodeck.h
 // #include "locodeck.h"  // in lpsTdoa4Tag.h
-
 // #include "cfg.h"   // unknown function
-// #include "lpp.h"  // handle lpp short packet, do not use for now
+// #include "lpp.h"  // handle lpp short packet, moved to lpsTdoa4Tag
 
 #include "lpsTdoa4Tag.h"
-
 #include "log.h"
-
 #include "debug.h"
-// [change]
-// #include "tdoaEngine.h"
-// #include "tdoaStats.h"
 #include "estimator_kalman.h"
 //[change]
 #define TDOA4_RECEIVE_TIMEOUT 10000
+// Packet formats
+#define PACKET_TYPE_TDOA4 0x30                      // [Change]
+#define LPP_HEADER 0
+#define LPP_TYPE (LPP_HEADER + 1)
+#define LPP_PAYLOAD (LPP_HEADER + 2)
 // Useful constants
 static const uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
 
@@ -78,10 +76,6 @@ static struct ctx_s {
 //[Change]
 static bool rangingOk;
 // static tdoaEngineState_t engineState;
-
-// Packet formats
-#define PACKET_TYPE_TDOA4 0x30                      // [Change]
-
 typedef struct {
   uint8_t type;
   uint8_t seq;
@@ -107,13 +101,7 @@ typedef struct {
   uint8_t remoteAnchorData;
 } __attribute__((packed)) rangePacket3_t;
 
-
-
-#define LPP_HEADER 0
-#define LPP_TYPE (LPP_HEADER + 1)
-#define LPP_PAYLOAD (LPP_HEADER + 2)
-
-
+//----------------------------------------------------------------------------------------//
 //[change]: log parameter
 static int log_range;    // distance is uint16_t
 
@@ -383,7 +371,29 @@ static bool updateClockCorrection(anchorContext_t* anchorCtx, double clockCorrec
 
   return sampleIsAccepted;
 }
+// [New]: handle LPP short anchor position (moved from tdoa3 tag)
+// static void handleLppShortPacket(const uint8_t *data, const int length) {
+//   uint8_t type = data[0];
 
+//   if (type == LPP_SHORT_ANCHORPOS) {
+//     struct lppShortAnchorPos_s *newpos = (struct lppShortAnchorPos_s*)&data[1];
+//   }
+// }
+// // [New]: handle lpp packet (moved from tdoa3 tag)
+// static void handleLppPacket(const int dataLength, int rangePacketLength, const packet_t* rxPacket, tdoaAnchorContext_t* anchorCtx) {
+//   const int32_t payloadLength = dataLength - MAC802154_HEADER_LENGTH;
+//   const int32_t startOfLppDataInPayload = rangePacketLength;
+//   const int32_t lppDataLength = payloadLength - startOfLppDataInPayload;
+//   const int32_t lppTypeInPayload = startOfLppDataInPayload + 1;
+
+//   if (lppDataLength > 0) {
+//     const uint8_t lppPacketHeader = rxPacket->payload[startOfLppDataInPayload];
+//     if (lppPacketHeader == LPP_HEADER_SHORT_PACKET) {
+//       const int32_t lppTypeAndPayloadLength = lppDataLength - 1;
+//       handleLppShortPacket(anchorCtx, &rxPacket->payload[lppTypeInPayload], lppTypeAndPayloadLength);
+//     }
+//   }
+// }
 
 //[note]: get range data from message
 static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
@@ -392,7 +402,6 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
   //     in CF: locoAddress_t sourceAddress =>  uint64_t sourceAddress
   // in anchor: uint8_t sourceAddress[8]
   // similar to destAddress
-//   DEBUG_PRINT("get in handleRangePacket function \r\n");
   const uint8_t remoteAnchorId = rxPacket->sourceAddress;
   ctx.anchorRxCount[remoteAnchorId]++;
   anchorContext_t* anchorCtx = getContext(remoteAnchorId);
@@ -422,11 +431,9 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
       }
     } else {
       anchorCtx->isDataGoodForTransmission = false;
-      
     }
     // [change]
     rangingOk = anchorCtx->isDataGoodForTransmission;
-
     anchorCtx->rxTimeStamp = rxTime;
     anchorCtx->seqNr = remoteTxSeqNr;
     anchorCtx->txTimeStamp = remoteTx;
@@ -457,9 +464,9 @@ static void handleRxPacket(dwDevice_t *dev)
     break;
   case SHORT_LPP:  //[note] handle Lpp packets: do nothing for now 
   /* [change]: originally need lpp.c lpp.h (will update later)*/
-    // if (rxPacket.destAddress[0] == ctx.anchorId) {
+    if (rxPacket.destAddress == ctx.anchorId) {
     //   lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
-    // }
+    }
     break;
   default:
     // Do nothing
@@ -509,7 +516,7 @@ static int populateTxData(rangePacket3_t *rangePacket)
   return (uint8_t*)anchorDataPtr - (uint8_t*)rangePacket;
 }
 
-// Set TX data in the radio TX buffer
+// Set TX data in the radio TX buffer for sendind: sourceAddress, destAddress, LPP.position
 static void setTxData(dwDevice_t *dev)
 {
   static packet_t txPacket;
@@ -536,16 +543,15 @@ static void setTxData(dwDevice_t *dev)
   int rangePacketSize = populateTxData((rangePacket3_t *)txPacket.payload);
 
   // LPP anchor position is currently sent in all packets
-  /*[change]: do not handle lpp short package now (update later)*/
-  //   if (uwbConfig->positionEnabled) {
-  //     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
-  //     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
+    txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
+    txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
 
-  //     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
-  //     memcpy(pos->position, uwbConfig->position, 3 * sizeof(float));
+    struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
+    // test with dummy positions
+    float dummy_pos[3] = {1.0, 1.1, 1.2};
+    memcpy(pos->position, dummy_pos, 3 * sizeof(float));
 
-  //     lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
-  //   }
+    lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
 
   dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
 }

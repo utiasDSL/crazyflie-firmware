@@ -57,6 +57,19 @@
 #include <stdint.h>
 #include "stabilizer_types.h"
 
+// // moved from uwb.h code in anchor firmware
+// // config the ID drone and position from EKF, then send it through uwb
+// typedef struct DroneUwbConfig_s {
+//   uint8_t ID;
+//   float position[3];
+
+//   bool smartPower;
+//   bool forceTxPower;
+//   uint32_t txPower;
+
+// } DroneUwbConfig_t;
+// --------------------------------------------------------------- //
+
 void estimatorKalmanInit(void);
 bool estimatorKalmanTest(void);
 void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, const uint32_t tick);

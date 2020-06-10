@@ -142,6 +142,7 @@ static int updateRemoteData(tdoaAnchorContext_t* anchorCtx, const void* payload)
   return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
 }
 
+// ----------------------------------------access the position in the packet------------------------------------------------ //
 static void handleLppShortPacket(tdoaAnchorContext_t* anchorCtx, const uint8_t *data, const int length) {
   uint8_t type = data[0];
 
@@ -165,7 +166,7 @@ static void handleLppPacket(const int dataLength, int rangePacketLength, const p
     }
   }
 }
-
+// ---------------------------------------- ----------------------------- ------------------------------------------------ //
 static void rxcallback(dwDevice_t *dev) {
   tdoaStats_t* stats = &engineState.stats;
   stats->packetsReceived++;

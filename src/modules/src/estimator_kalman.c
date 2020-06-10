@@ -96,11 +96,18 @@ static float uwb_feature_max[6] = {6.21573126, 6.8558558, 1.96787431, 3.6977465,
 static float uwb_feature_min[6] = {-6.47791386, -6.28997147, -3.37768704, -3.4279357, -0.50756258, -0.51739977};
 static float uwb_err_max =  0.19264864;
 static float uwb_err_min = -0.69999307;
-// -------------------- The normalization ranges for TDoA --------------------------------- //
+// -------------------- The normalization ranges for TDoA ------------------------------- //
 static float uwb_feature_max_tdoa[9] = {6.21086508, 6.18992005, 2.37577438, 6.21086508, 6.18992005, 2.37577438, 1.59163775, 0.73787737, 0.76607429 };
 static float uwb_feature_min_tdoa[9] = {-6.7235915, -5.57063856, -3.37862096, -6.72375934, -5.57063856, -3.38030913,-1.57508455, -0.65031555, -0.51501978 };
 static float uwb_err_max_tdoa =  0.69997349;
 static float uwb_err_min_tdoa = -0.69990715;
+//---------------------------------------------------------------------------------------  //
+
+// drone UWB config
+// static struct DroneUwbConfig_s DroneConfig;
+
+
+
 /**
  * Primary Kalman filter functions
  *
