@@ -110,6 +110,8 @@ static bool isValidTimeStamp(const int64_t anchorRxTime) {
 static int updateRemoteData(tdoaAnchorContext_t* anchorCtx, const void* payload) {
   const rangePacket3_t* packet = (rangePacket3_t*)payload;
   const void* anchorDataPtr = &packet->remoteAnchorData;
+  // [Question] i is not used in the loop
+  // [Answer] after each loop --> anchorDataPtr += sizeof(remoteAnchorDataFull_t), the address move backwards
   for (uint8_t i = 0; i < packet->header.remoteCount; i++) {
     remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
 

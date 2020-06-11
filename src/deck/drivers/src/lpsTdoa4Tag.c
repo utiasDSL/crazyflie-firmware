@@ -98,6 +98,22 @@ typedef struct {
   uint8_t remoteAnchorData;
 } __attribute__((packed)) rangePacket3_t;
 
+// lppShortAnchorPos_s is defined in locodeck.h, here we define a new msg for TDoA4 
+// [New] lpp packet (transmission data): limitation is 11 float num
+struct lppShortAnchorPosition_s {
+  float position[3];
+  float quaternion[4];
+  float imu[6];
+} __attribute__((packed));
+// [New] Define a struct containing the info of remote "anchor" --> agent
+// global variable
+static struct remoteAgentInfo_s{
+    int remoteAgentID;           // source Agent 
+    int destAgentID;             // destination Agent
+    bool hasDistance;
+    struct lppShortAnchorPosition_s Pose;
+    double ranging;
+}remoteAgentInfo;                //[re-design]
 //----------------------------------------------------------------------------------------//
 //[change]: log parameter
 static int log_range;    // distance is uint16_t
@@ -312,16 +328,18 @@ static uint16_t calculateDistance(anchorContext_t* anchorCtx, int remoteRxSeqNr,
 
 static bool extractFromPacket(const rangePacket3_t* rangePacket, uint32_t* remoteRx, uint8_t* remoteRxSeqNr) {
   const void* anchorDataPtr = &rangePacket->remoteAnchorData;
+  // loop over all the remote agents' info
   for (uint8_t i = 0; i < rangePacket->header.remoteCount; i++) {
     remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
-
+    // if the radio packet is sending to this agent --> to twr
     const uint8_t id = anchorData->id;
     if (id == ctx.anchorId) {
       *remoteRxSeqNr = anchorData->seq & 0x7f;
       *remoteRx = anchorData->rxTimeStamp;
       return true;
     }
-
+    // else --> move the pointer away from the distance msg
+    // currently the other agents distance msg is not used 
     bool hasDistance = ((anchorData->seq & 0x80) != 0);
     if (hasDistance) {
       anchorDataPtr += sizeof(remoteAnchorDataFull_t);
@@ -329,7 +347,6 @@ static bool extractFromPacket(const rangePacket3_t* rangePacket, uint32_t* remot
       anchorDataPtr += sizeof(remoteAnchorDataShort_t);
     }
   }
-
   return false;
 }
 
@@ -368,32 +385,83 @@ static bool updateClockCorrection(anchorContext_t* anchorCtx, double clockCorrec
 
   return sampleIsAccepted;
 }
-// [New]: handle LPP short anchor position (moved from tdoa3 tag)
-// static void handleLppShortPacket(const uint8_t *data, const int length) {
-//   uint8_t type = data[0];
 
-//   if (type == LPP_SHORT_ANCHORPOS) {
-//     struct lppShortAnchorPos_s *newpos = (struct lppShortAnchorPos_s*)&data[1];
-//   }
-// }
-// // [New]: handle lpp packet (moved from tdoa3 tag)
-// static void handleLppPacket(const int dataLength, int rangePacketLength, const packet_t* rxPacket, tdoaAnchorContext_t* anchorCtx) {
-//   const int32_t payloadLength = dataLength - MAC802154_HEADER_LENGTH;
-//   const int32_t startOfLppDataInPayload = rangePacketLength;
-//   const int32_t lppDataLength = payloadLength - startOfLppDataInPayload;
-//   const int32_t lppTypeInPayload = startOfLppDataInPayload + 1;
 
-//   if (lppDataLength > 0) {
-//     const uint8_t lppPacketHeader = rxPacket->payload[startOfLppDataInPayload];
-//     if (lppPacketHeader == LPP_HEADER_SHORT_PACKET) {
-//       const int32_t lppTypeAndPayloadLength = lppDataLength - 1;
-//       handleLppShortPacket(anchorCtx, &rxPacket->payload[lppTypeInPayload], lppTypeAndPayloadLength);
-//     }
-//   }
-// }
+//[New]: get the LPP transmitted data
+static void handleLppShortPacket(const uint8_t *data, const int length) {
+  uint8_t type = data[0];
+  if (type == LPP_SHORT_ANCHORPOS) {
+    struct lppShortAnchorPosition_s *pose = (struct lppShortAnchorPosition_s*)&data[1];
+    // printf("Position data is: (%f,%f,%f) \r\n", pos->x, pos->y, pos->z);
+    // save and use the remote angent data
+    remoteAgentInfo.Pose.position[0] = pose->position[0];
+    remoteAgentInfo.Pose.position[1] = pose->position[1];
+    remoteAgentInfo.Pose.position[2] = pose->position[2];
+    remoteAgentInfo.Pose.quaternion[0] = pose->quaternion[0];
+    remoteAgentInfo.Pose.quaternion[1] = pose->quaternion[1];
+    remoteAgentInfo.Pose.quaternion[2] = pose->quaternion[2];
+    remoteAgentInfo.Pose.quaternion[3] = pose->quaternion[3];
+    }
+}
+// [New]
+static void handleLppPacket(const int dataLength, int rangePacketLength, const packet_t* rxPacket) {
+    const int32_t payloadLength = dataLength - MAC802154_HEADER_LENGTH;
+    const int32_t startOfLppDataInPayload = rangePacketLength;
+    const int32_t lppDataLength = payloadLength - startOfLppDataInPayload;
+    const int32_t lppTypeInPayload = startOfLppDataInPayload + 1;
+    //   printf("payloadLentgh is %d\r\n",(int)payloadLength);
+    //   printf("startOfLppDataInPayload is %d\r\n",(int)startOfLppDataInPayload);
+    if (lppDataLength > 0) {
+        const uint8_t lppPacketHeader = rxPacket->payload[startOfLppDataInPayload];
+        if (lppPacketHeader == LPP_HEADER_SHORT_PACKET) {
+            const int32_t lppTypeAndPayloadLength = lppDataLength - 1;
+            handleLppShortPacket(&rxPacket->payload[lppTypeInPayload], lppTypeAndPayloadLength);
+      }
+    }
+}
+
+// [New]: Update the remote agent info, also get the rangeDataLength --> for LPP packet
+static int updateRemoteAgentData(const void* payload){
+    const rangePacket3_t* packet = (rangePacket3_t*)payload;
+    const void* anchorDataPtr = &packet->remoteAnchorData;
+    for(uint8_t i = 0; i<packet->header.remoteCount; i++){
+        remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
+        /* comment out unused value*/
+        // uint8_t remoteId = anchorData->id;
+        // int64_t remoteRxTime = anchorData->rxTimeStamp;
+        // uint8_t remoteSeqNr = anchorData->seq & 0x7f;
+
+        /* ----------------- store the remote agent info ----------------- */
+        // if (isValidTimeStamp(remoteRxTime)) {
+        //    tdoaStorageSetRemoteRxTime(anchorCtx, remoteId, remoteRxTime, remoteSeqNr);
+        // }
+        /* ----------------- --------------------------- ----------------- */
+        bool hasDistance = ((anchorData->seq & 0x80) != 0);
+        if (hasDistance) {
+        /* comment out unused value*/
+        // int64_t tof = anchorData->distance;
+
+        /* ----------------- store the remote agent info ----------------- */
+        // if (isValidTimeStamp(tof)) {
+        //     tdoaStorageSetTimeOfFlight(anchorCtx, remoteId, tof);
+
+        //     uint8_t anchorId = tdoaStorageGetId(anchorCtx);
+        //     tdoaStats_t* stats = &engineState.stats;
+        //     if (anchorId == stats->anchorId && remoteId == stats->remoteAnchorId) {
+        //     stats->tof = (uint16_t)tof;
+        //     }
+        // }
+        /* ----------------- --------------------------- ----------------- */
+        anchorDataPtr += sizeof(remoteAnchorDataFull_t);
+        } else {
+        anchorDataPtr += sizeof(remoteAnchorDataShort_t);
+        }
+    }
+  return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
+}
 
 //[note]: get range data from message
-static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
+static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, const int dataLength)
 {
   //[change] packet code is slightly different 
   //     in CF: locoAddress_t sourceAddress =>  uint64_t sourceAddress
@@ -418,12 +486,12 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
       if (dataFound) {
         //[note]: here is the range distance data!
         uint16_t distance = calculateDistance(anchorCtx, remoteRxSeqNr, remoteTx, remoteRx, rxTime);
-        //[note]: log range
-        log_range = distance;
         // TODO krri Remove outliers in distances
         if (distance > MIN_TOF) {
           anchorCtx->distance = distance;
           anchorCtx->distanceUpdateTime = xTaskGetTickCount();
+        //[note]: log range
+        log_range = anchorCtx->distance;
         }
       }
     } else {
@@ -434,6 +502,9 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket)
     anchorCtx->rxTimeStamp = rxTime;
     anchorCtx->seqNr = remoteTxSeqNr;
     anchorCtx->txTimeStamp = remoteTx;
+    // [New] get transmitted info. Position + quaternion
+    int rangeDataLength = updateRemoteAgentData(rangePacket); 
+    handleLppPacket(dataLength, rangeDataLength, rxPacket);
   }
 }
 
@@ -457,12 +528,13 @@ static void handleRxPacket(dwDevice_t *dev)
   switch(rxPacket.payload[0]) {
   case PACKET_TYPE_TDOA4:       //[change]
     // DEBUG_PRINT("Received TDOA4 message \r\n");
-    handleRangePacket(rxTime.low32, &rxPacket);   //[note] get range
+    handleRangePacket(rxTime.low32, &rxPacket, dataLength);   //[note] get range
     break;
   case SHORT_LPP:  //[note] handle Lpp packets: do nothing for now 
   /* [change]: originally need lpp.c lpp.h (will update later)*/
     if (rxPacket.destAddress == ctx.anchorId) {
-    //   lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+      // Can be used to command to switch an agent to anchor or tag   
+      // lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
     }
     break;
   default:
@@ -542,10 +614,12 @@ static void setTxData(dwDevice_t *dev)
 
     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
     // test with dummy positions: it works!
-    float dummy_pos[3] = {1.0, 1.1, 1.2};
-    float dummy_quater[4] = {1.01, 1.02, 1.03, 1.04};
+    float dummy_pos[3] = {2.0, 2.1, 2.2};
+    float dummy_quater[4] = {2.01, 2.02, 2.03, 2.04};
+    float dummy_imu[6] = {2.11, 2.22, 2.33, 2.44, 2.55, 2.66};
     memcpy(pos->position, dummy_pos, 3 * sizeof(float));
     memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
+    memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
     lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
 
   dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
@@ -618,7 +692,7 @@ static void tdoa4Init(dwDevice_t *dev)
   //   uwbConfig_t * config;
   // [original code]
   //  ctx.anchorId = config->address[0];
-  ctx.anchorId = 1;   // initialize to be int 0
+  ctx.anchorId = 2;   // initialize to be int 0
   ctx.seqNr = 0;
   ctx.txTime = 0;
   ctx.nextTxTick = 0;
