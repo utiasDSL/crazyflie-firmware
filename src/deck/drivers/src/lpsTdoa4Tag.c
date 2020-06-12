@@ -29,7 +29,8 @@
 #define LPP_PAYLOAD (LPP_HEADER + 2)
 // Useful constants
 static const uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
-
+// [New]: Gloabl variable for the mode of the Agent. The default is TDoA4 
+static int MODE = 4;
 // Anchor context
 typedef struct {
   uint8_t id;
@@ -48,7 +49,6 @@ typedef struct {
 // This context struct contains all the required global values of the algorithm
 static struct ctx_s {
   int anchorId;
-
   // Information about latest transmitted packet
   uint8_t seqNr;
   uint32_t txTime; // In UWB clock ticks
@@ -118,6 +118,10 @@ static struct remoteAgentInfo_s{
 //[change]: log parameter
 static int log_range;    // distance is uint16_t
 
+/*--------------------------------------------------------------------*/
+int switchAgentMode(){
+    return MODE;
+}
 static anchorContext_t* getContext(uint8_t anchorId) {
   uint8_t slot = ctx.anchorCtxLookup[anchorId];
 
@@ -329,25 +333,25 @@ static uint16_t calculateDistance(anchorContext_t* anchorCtx, int remoteRxSeqNr,
 static bool extractFromPacket(const rangePacket3_t* rangePacket, uint32_t* remoteRx, uint8_t* remoteRxSeqNr) {
   const void* anchorDataPtr = &rangePacket->remoteAnchorData;
   // loop over all the remote agents' info
-  for (uint8_t i = 0; i < rangePacket->header.remoteCount; i++) {
-    remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
-    // if the radio packet is sending to this agent --> to twr
-    const uint8_t id = anchorData->id;
-    if (id == ctx.anchorId) {
-      *remoteRxSeqNr = anchorData->seq & 0x7f;
-      *remoteRx = anchorData->rxTimeStamp;
-      return true;
+    for (uint8_t i = 0; i < rangePacket->header.remoteCount; i++) {
+        remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
+        // if the radio packet is sending to this agent --> to twr
+        const uint8_t id = anchorData->id;
+        if (id == ctx.anchorId) {
+        *remoteRxSeqNr = anchorData->seq & 0x7f;
+        *remoteRx = anchorData->rxTimeStamp;
+        return true;
+        }
+        // else --> move the pointer away from the distance msg
+        // currently the other agents distance msg is not used 
+        bool hasDistance = ((anchorData->seq & 0x80) != 0);
+        if (hasDistance) {
+        anchorDataPtr += sizeof(remoteAnchorDataFull_t);
+        } else {
+        anchorDataPtr += sizeof(remoteAnchorDataShort_t);
+        }
     }
-    // else --> move the pointer away from the distance msg
-    // currently the other agents distance msg is not used 
-    bool hasDistance = ((anchorData->seq & 0x80) != 0);
-    if (hasDistance) {
-      anchorDataPtr += sizeof(remoteAnchorDataFull_t);
-    } else {
-      anchorDataPtr += sizeof(remoteAnchorDataShort_t);
-    }
-  }
-  return false;
+    return false;
 }
 
 static void fillClockCorrectionBucket(anchorContext_t* anchorCtx) {
@@ -424,6 +428,7 @@ static void handleLppPacket(const int dataLength, int rangePacketLength, const p
 static int updateRemoteAgentData(const void* payload){
     const rangePacket3_t* packet = (rangePacket3_t*)payload;
     const void* anchorDataPtr = &packet->remoteAnchorData;
+    // loop over all remote agent packe info, should save the remote agent data
     for(uint8_t i = 0; i<packet->header.remoteCount; i++){
         remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
         /* comment out unused value*/
@@ -457,7 +462,7 @@ static int updateRemoteAgentData(const void* payload){
         anchorDataPtr += sizeof(remoteAnchorDataShort_t);
         }
     }
-  return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
+    return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
 }
 
 //[note]: get range data from message
@@ -508,6 +513,54 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
   }
 }
 
+//[New]: moved from lpp.c from anchor code
+void lppHandleShortPacket(uint8_t *data, size_t length)
+{
+    if (length < 1) return;
+    int type  = data[0];
+    //   debug("Handling LPP short packet of type %02x, length %d\r\n", type, length);
+    //   debug("Raw data: ");
+    //   for (int i=0; i<length; i++) {
+    //     debug("%02x ", data[i]);
+    //   }
+    //   debug("\r\n");
+  switch(type) {
+    case LPP_SHORT_ANCHOR_POSITION:
+    {
+      // not used now. do nothing
+      break;
+    }
+    case LPP_SHORT_REBOOT:
+    { // not used now. do nothing
+      break;
+    }
+    case LPP_SHORT_MODE:
+    { // used to switch Agent mode
+      struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
+
+      // Set new mode
+      if (modeInfo->mode == LPP_SHORT_MODE_TWR) {
+        MODE = lpsMode_TWR;
+      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA2) {
+        MODE = lpsMode_TDoA2;
+      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA3) {
+        MODE = lpsMode_TDoA3;
+      }else if (modeInfo->mode == LPP_SHORT_MODE_TDOA4) {
+        MODE = lpsMode_TDoA4;
+      }
+      break;
+    }
+    case LPP_SHORT_UWB:
+    { // not used for now. Do nothing
+      break;
+    }
+    case LPP_SHORT_UWB_MODE:
+    { // not used for now. Do nothing
+      break;
+    }
+  }
+}
+
 //[note]: main function after receive an uwb message
 static void handleRxPacket(dwDevice_t *dev)
 {
@@ -530,11 +583,9 @@ static void handleRxPacket(dwDevice_t *dev)
     // DEBUG_PRINT("Received TDOA4 message \r\n");
     handleRangePacket(rxTime.low32, &rxPacket, dataLength);   //[note] get range
     break;
-  case SHORT_LPP:  //[note] handle Lpp packets: do nothing for now 
-  /* [change]: originally need lpp.c lpp.h (will update later)*/
-    if (rxPacket.destAddress == ctx.anchorId) {
-      // Can be used to command to switch an agent to anchor or tag   
-      // lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+  case SHORT_LPP:  //[New]: use SHORT_LPP to change mode
+    if (rxPacket.destAddress == ctx.anchorId) {  // the lpp is sent to this Agent 
+      lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
     }
     break;
   default:
@@ -594,21 +645,17 @@ static void setTxData(dwDevice_t *dev)
 
   if (firstEntry) {
     MAC80215_PACKET_INIT(txPacket, MAC802154_TYPE_DATA);
-    // [Need to be check !!!! ]
-    // [change]: add '&' in front of txPacket (not sure if it is correct)
+    // [change]: add '&' in front of txPacket 
     memcpy(&txPacket.sourceAddress, base_address, 8);
     txPacket.sourceAddress = ctx.anchorId;
     memcpy(&txPacket.destAddress, base_address, 8);
     txPacket.destAddress = 0xff;
-
     txPacket.payload[0] = PACKET_TYPE_TDOA4;
 
     firstEntry = false;
   }
-  // [note]: unused variable (for now)
-  //   uwbConfig_t *uwbConfig = uwbGetConfig();
-  int rangePacketSize = populateTxData((rangePacket3_t *)txPacket.payload);
-  // LPP anchor position is currently sent in all packets
+    int rangePacketSize = populateTxData((rangePacket3_t *)txPacket.payload);
+    // LPP anchor position is currently sent in all packets
     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
 
@@ -685,13 +732,7 @@ static void tdoa4Init(dwDevice_t *dev)
   dwCommitConfiguration(dev);
 
   rangingOk = false;
-  //[end change]
-
-  // init for tdoa3 anchor 
-  // [change] config is initialized here
-  //   uwbConfig_t * config;
-  // [original code]
-  //  ctx.anchorId = config->address[0];
+  // manually set the Agent ID
   ctx.anchorId = 2;   // initialize to be int 0
   ctx.seqNr = 0;
   ctx.txTime = 0;
@@ -716,7 +757,6 @@ static uint32_t tdoa4UwbEvent(dwDevice_t *dev, uwbEvent_t event)
 {
   switch (event) {
     case eventPacketReceived: {
-        // DEBUG_PRINT("Received message \r\n");
         handleRxPacket(dev);
       }
       break;

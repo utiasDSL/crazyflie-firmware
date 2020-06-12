@@ -54,7 +54,7 @@
 #include "lpsTdoa2Tag.h"
 #include "lpsTdoa3Tag.h"
 #include "lpsTwrTag.h"
-
+//[Add]
 #include "lpsTdoa4Tag.h"
 
 
@@ -209,6 +209,26 @@ static void uwbTask(void* parameters)
     // Change and init algorithm uppon request
     // The first time this loop enters, currentRangingMode is set to auto which forces
     // the initialization of the set algorithm
+
+    // [Change]: Switch Agent UWB mode
+    switch (switchAgentMode())       // defined in lpsTdoa3Tag.h, returns which mode to switch 
+    {
+        case lpsMode_TWR:
+            algoOptions.rangingMode = lpsMode_TWR; // switch to TDoA3 algorithm
+            break;
+        case lpsMode_TDoA2:
+            algoOptions.rangingMode = lpsMode_TDoA2; // switch to TDoA3 algorithm
+            break;
+        case lpsMode_TDoA3:
+            algoOptions.rangingMode = lpsMode_TDoA3; // switch to TDoA3 algorithm
+            break;
+        case lpsMode_TDoA4:
+            algoOptions.rangingMode = lpsMode_TDoA4; // switch to TDoA4 algorithm
+            break;
+        default:
+            break;
+    }
+        
     xSemaphoreTake(algoSemaphore, portMAX_DELAY);
     if (algoOptions.rangingMode == lpsMode_auto) { // Auto switch
       if (algoOptions.rangingModeDetected == false) {
@@ -247,7 +267,7 @@ static void uwbTask(void* parameters)
         }
       }
     } else if (algoOptions.currentRangingMode != algoOptions.rangingMode) {  // Set modes
-      // Reset auto mode
+      // Reset auto mode 
       algoOptions.rangingModeDetected = false;
       algoOptions.autoStarted = false;
 
@@ -418,9 +438,9 @@ static void dwm1000Init(DeckInfo *info)
   // Initialize the driver
   dwInit(dwm, &dwOps);       // Init libdw
 
-  int result = dwConfigure(dwm);
+ int result = dwConfigure(dwm);
   if (result != 0) {
-    isInit = false;
+    isInit = false; 
     DEBUG_PRINT("Failed to configure DW1000!\r\n");
     return;
   }

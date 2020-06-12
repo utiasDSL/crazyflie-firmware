@@ -83,6 +83,7 @@ struct lppShortReboot_s {
 #define LPP_SHORT_MODE_TWR 0x01
 #define LPP_SHORT_MODE_TDOA2 0x02
 #define LPP_SHORT_MODE_TDOA3 0x03
+#define LPP_SHORT_MODE_TDOA4 0x04
 
 struct lppShortMode_s {
   uint8_t mode;
@@ -122,17 +123,23 @@ typedef struct uwbConfig_s {
   bool longPreamble;
 } uwbConfig_t;
 
-//[change]: move from uwb.c
-// System configuration
-/*--- not used ---*/
-// static struct uwbConfig_s config = {
-//   address: {0,0,0,0,0,0,0xcf,0xbc},
-// };
+// used for short lpp packet
+typedef enum {
+  cfgAddress = 0,
+  cfgMode,
+  cfgAnchorlist,
+  cfgAnchorPos,
+  cfgSmartPower,
+  cfgForceTxPower,
+  cfgTxPower,
+  cfgLowBitrate,
+  cfgLongPreamble,
+} ConfigField;
 
-// [change]: move from uwb.h
-/* This function is not used for now*/
-// struct uwbConfig_s * uwbGetConfig()
-// {
-//   return &config;
-// }
+
+// [Add] Switch agent mode
+int switchAgentMode();
+// [Add] function to handle short lpp packet
+void lppHandleShortPacket(uint8_t *data, size_t length);
+
 #endif // __LPS_TDOA4_TAG_H__
