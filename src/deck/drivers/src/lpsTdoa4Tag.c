@@ -578,20 +578,21 @@ static void handleRxPacket(dwDevice_t *dev)
     return;
   }
 
-  switch(rxPacket.payload[0]) {
-  case PACKET_TYPE_TDOA4:       //[change]
-    // DEBUG_PRINT("Received TDOA4 message \r\n");
-    handleRangePacket(rxTime.low32, &rxPacket, dataLength);   //[note] get range
-    break;
-  case SHORT_LPP:  //[New]: use SHORT_LPP to change mode
-    if (rxPacket.destAddress == ctx.anchorId) {  // the lpp is sent to this Agent 
-      lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+    switch(rxPacket.payload[0]) {
+    case PACKET_TYPE_TDOA4:       //[change]
+        handleRangePacket(rxTime.low32, &rxPacket, dataLength);   //[note] get range
+        break;
+    case SHORT_LPP:  //[New]: use SHORT_LPP to change mode
+        // [Note] Need the (int) in front of rxPacket.destAddress
+        if ((int)rxPacket.destAddress == ctx.anchorId) {  // the lpp is sent to this Agent. 
+        // DEBUG_PRINT("Receive Short LPP !!!!!!!!!!!!!!!!\n");
+        lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+        }
+        break;
+    default:
+        // Do nothing
+        break;
     }
-    break;
-  default:
-    // Do nothing
-    break;
-  }
 }
 
 static void setupRx(dwDevice_t *dev)
@@ -661,9 +662,9 @@ static void setTxData(dwDevice_t *dev)
 
     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
     // test with dummy positions: it works!
-    float dummy_pos[3] = {2.0, 2.1, 2.2};
-    float dummy_quater[4] = {2.01, 2.02, 2.03, 2.04};
-    float dummy_imu[6] = {2.11, 2.22, 2.33, 2.44, 2.55, 2.66};
+    float dummy_pos[3] = {0.0, 0.1, 0.2};
+    float dummy_quater[4] = {0.01, 0.02, 0.03, 0.04};
+    float dummy_imu[6] = {0.11, 0.22, 0.33, 0.44, 0.55, 0.66};
     memcpy(pos->position, dummy_pos, 3 * sizeof(float));
     memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
     memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
@@ -733,7 +734,7 @@ static void tdoa4Init(dwDevice_t *dev)
 
   rangingOk = false;
   // manually set the Agent ID
-  ctx.anchorId = 2;   // initialize to be int 0
+  ctx.anchorId = 0;   // initialize to be int 0
   ctx.seqNr = 0;
   ctx.txTime = 0;
   ctx.nextTxTick = 0;

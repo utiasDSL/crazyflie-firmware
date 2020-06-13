@@ -199,6 +199,10 @@ static void rxcallback(dwDevice_t *dev) {
 
     rangingOk = true;
   }
+  //[New]: handle SHORT_LPP packet to switch mode
+//   else if(packet->header.type == SHORT_LPP){
+
+//   }
 }
 
 static void setRadioInReceiveMode(dwDevice_t *dev) {
