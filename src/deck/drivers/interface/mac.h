@@ -31,6 +31,7 @@ typedef struct packet_s {
     uint8_t payload[128];
 } __attribute__((packed)) packet_t;
 
+
 #define MAC80215_PACKET_INIT(packet, TYPE) packet.fcf_s.type = (TYPE); \
   packet.fcf_s.security = 0; \
   packet.fcf_s.framePending = 0; \
@@ -47,5 +48,6 @@ typedef struct packet_s {
 #define MAC802154_TYPE_CMD 3
 
 #define MAC802154_HEADER_LENGTH 21
-
+// [NEW]
+extern int MODE;  //
 #endif

@@ -60,7 +60,8 @@ The implementation must handle
 #include "cfassert.h"
 #include "log.h"
 #include "param.h"
-
+// [New]
+#include "lpsTdoa4Tag.h"
 // Positions for sent LPP packets
 #define LPS_TDOA3_TYPE 0
 #define LPS_TDOA3_SEND_LPP_PAYLOAD 1
@@ -68,7 +69,9 @@ The implementation must handle
 #define PACKET_TYPE_TDOA3 0x30
 
 #define TDOA3_RECEIVE_TIMEOUT 10000
-
+//[New] Default agent ID. Set in Init
+static int agentID = 0;                
+// int MODE = 3;
 typedef struct {
   uint8_t type;
   uint8_t seq;
@@ -169,6 +172,55 @@ static void handleLppPacket(const int dataLength, int rangePacketLength, const p
   }
 }
 // ---------------------------------------- ----------------------------- ------------------------------------------------ //
+//[New]: moved from lpp.c from anchor code
+static void lppHandleShortPacket(uint8_t *data, size_t length)
+{
+    if (length < 1) return;
+    int type  = data[0];
+
+  switch(type) {
+    case LPP_SHORT_ANCHOR_POSITION:
+    {
+      // not used now. do nothing
+      break;
+    }
+    case LPP_SHORT_REBOOT:
+    { // not used now. do nothing
+      break;
+    }
+    case LPP_SHORT_MODE:
+    { // used to switch Agent mode
+      struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
+    //   DEBUG_PRINT("Switch mode!!!!! \n");
+    //   // Set new mode
+    //   DEBUG_PRINT("MODE is %d\n",(int)modeInfo->mode);
+    //   DEBUG_PRINT("TDoA3 is %d\n",(int)LPP_SHORT_MODE_TDOA3);
+      if (modeInfo->mode == LPP_SHORT_MODE_TWR) {
+        MODE = lpsMode_TWR;
+      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA2) {
+        MODE = lpsMode_TDoA2;
+      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA3) {
+        // DEBUG_PRINT("Set mode to be tdoa3!!!!! \n");
+        MODE = lpsMode_TDoA3;
+      }else if (modeInfo->mode == LPP_SHORT_MODE_TDOA4) {
+        MODE = lpsMode_TDoA4;
+      }
+      break;
+    }
+    case LPP_SHORT_UWB:
+    { // not used for now. Do nothing
+      break;
+    }
+    case LPP_SHORT_UWB_MODE:
+    { // not used for now. Do nothing
+      break;
+    }
+  }
+}
+// int switchAgentMode(){
+//     return MODE;
+// }
+// ---------------------------------------- ----------------------------- ------------------------------------------------ //
 static void rxcallback(dwDevice_t *dev) {
   tdoaStats_t* stats = &engineState.stats;
   stats->packetsReceived++;
@@ -184,6 +236,7 @@ static void rxcallback(dwDevice_t *dev) {
   const int64_t rxAn_by_T_in_cl_T = arrival.full;
 
   const rangePacket3_t* packet = (rangePacket3_t*)rxPacket.payload;
+//   DEBUG_PRINT("Receive the radio packet !!!!!!!!!!!!\n");
   if (packet->header.type == PACKET_TYPE_TDOA3) {
     const int64_t txAn_in_cl_An = packet->header.txTimeStamp;;
     const uint8_t seqNr = packet->header.seq;
@@ -198,11 +251,14 @@ static void rxcallback(dwDevice_t *dev) {
     handleLppPacket(dataLength, rangeDataLength, &rxPacket, &anchorCtx);
 
     rangingOk = true;
+  }  //[New]: handle SHORT_LPP packet to switch mode
+  else if(packet->header.type == SHORT_LPP){
+        if ((int)rxPacket.destAddress == 0) {  // the lpp is sent to this Agent. [Debug] find a better way
+        // DEBUG_PRINT("Receive the correct Short LPP packet !!!!!!!!!!!!\n");
+        lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+        }
   }
-  //[New]: handle SHORT_LPP packet to switch mode
-//   else if(packet->header.type == SHORT_LPP){
 
-//   }
 }
 
 static void setRadioInReceiveMode(dwDevice_t *dev) {
@@ -308,6 +364,7 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 static void Initialize(dwDevice_t *dev) {
   uint32_t now_ms = T2M(xTaskGetTickCount());
+  agentID = 0;   // Agent ID
   tdoaEngineInit(&engineState, now_ms, sendTdoaToEstimatorCallback, LOCODECK_TS_FREQ);
 
   #ifdef LPS_2D_POSITION_HEIGHT

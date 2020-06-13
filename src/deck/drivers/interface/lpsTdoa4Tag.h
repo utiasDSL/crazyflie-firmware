@@ -140,6 +140,6 @@ typedef enum {
 // [Add] Switch agent mode
 int switchAgentMode();
 // [Add] function to handle short lpp packet
-void lppHandleShortPacket(uint8_t *data, size_t length);
+// void lppHandleShortPacket(uint8_t *data, size_t length);
 
 #endif // __LPS_TDOA4_TAG_H__

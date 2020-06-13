@@ -30,7 +30,7 @@
 // Useful constants
 static const uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
 // [New]: Gloabl variable for the mode of the Agent. The default is TDoA4 
-static int MODE = 4;
+int MODE = 4;
 // Anchor context
 typedef struct {
   uint8_t id;
@@ -514,7 +514,7 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
 }
 
 //[New]: moved from lpp.c from anchor code
-void lppHandleShortPacket(uint8_t *data, size_t length)
+static void lppHandleShortPacket(uint8_t *data, size_t length)
 {
     if (length < 1) return;
     int type  = data[0];
@@ -532,7 +532,7 @@ void lppHandleShortPacket(uint8_t *data, size_t length)
     case LPP_SHORT_MODE:
     { // used to switch Agent mode
       struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
-      DEBUG_PRINT("Switch mode!!!!! \n");
+    //   DEBUG_PRINT("Switch mode!!!!! \n");
     //   // Set new mode
     //   DEBUG_PRINT("MODE is %d\n",(int)modeInfo->mode);
     //   DEBUG_PRINT("TDoA3 is %d\n",(int)LPP_SHORT_MODE_TDOA3);
