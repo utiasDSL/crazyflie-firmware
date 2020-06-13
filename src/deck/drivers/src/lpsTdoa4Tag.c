@@ -518,12 +518,7 @@ void lppHandleShortPacket(uint8_t *data, size_t length)
 {
     if (length < 1) return;
     int type  = data[0];
-    //   debug("Handling LPP short packet of type %02x, length %d\r\n", type, length);
-    //   debug("Raw data: ");
-    //   for (int i=0; i<length; i++) {
-    //     debug("%02x ", data[i]);
-    //   }
-    //   debug("\r\n");
+
   switch(type) {
     case LPP_SHORT_ANCHOR_POSITION:
     {
@@ -537,13 +532,16 @@ void lppHandleShortPacket(uint8_t *data, size_t length)
     case LPP_SHORT_MODE:
     { // used to switch Agent mode
       struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
-
-      // Set new mode
+      DEBUG_PRINT("Switch mode!!!!! \n");
+    //   // Set new mode
+    //   DEBUG_PRINT("MODE is %d\n",(int)modeInfo->mode);
+    //   DEBUG_PRINT("TDoA3 is %d\n",(int)LPP_SHORT_MODE_TDOA3);
       if (modeInfo->mode == LPP_SHORT_MODE_TWR) {
         MODE = lpsMode_TWR;
       } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA2) {
         MODE = lpsMode_TDoA2;
       } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA3) {
+        // DEBUG_PRINT("Set mode to be tdoa3!!!!! \n");
         MODE = lpsMode_TDoA3;
       }else if (modeInfo->mode == LPP_SHORT_MODE_TDOA4) {
         MODE = lpsMode_TDoA4;
@@ -577,15 +575,18 @@ static void handleRxPacket(dwDevice_t *dev)
   if (dataLength == 0) {
     return;
   }
-
+    // DEBUG_PRINT("Receive radio packet \n");
     switch(rxPacket.payload[0]) {
     case PACKET_TYPE_TDOA4:       //[change]
         handleRangePacket(rxTime.low32, &rxPacket, dataLength);   //[note] get range
         break;
     case SHORT_LPP:  //[New]: use SHORT_LPP to change mode
         // [Note] Need the (int) in front of rxPacket.destAddress
+        // DEBUG_PRINT("Receive Short LPP\n");
+        // DEBUG_PRINT("rxPacket.destAddress is %d \n",(int)rxPacket.destAddress);
+        // DEBUG_PRINT("ctx.anchorId is %d \n",(int)ctx.anchorId);
         if ((int)rxPacket.destAddress == ctx.anchorId) {  // the lpp is sent to this Agent. 
-        // DEBUG_PRINT("Receive Short LPP !!!!!!!!!!!!!!!!\n");
+        // DEBUG_PRINT("Receive the correct Short LPP packet !!!!!!!!!!!!\n");
         lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
         }
         break;

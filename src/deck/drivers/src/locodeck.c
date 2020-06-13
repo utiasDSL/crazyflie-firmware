@@ -220,6 +220,7 @@ static void uwbTask(void* parameters)
             algoOptions.rangingMode = lpsMode_TDoA2; // switch to TDoA3 algorithm
             break;
         case lpsMode_TDoA3:
+            // DEBUG_PRINT("Switch mode to tdoa3!!!!! \n");
             algoOptions.rangingMode = lpsMode_TDoA3; // switch to TDoA3 algorithm
             break;
         case lpsMode_TDoA4:
