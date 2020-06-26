@@ -75,8 +75,11 @@ static void enqueueTDOA(const tdoaAnchorContext_t* anchorACtx, const tdoaAnchorC
     .distanceDiff = distanceDiff
   };
 
+  //[Note]: send the anchor positions to EKF as well
   if (tdoaStorageGetAnchorPosition(anchorACtx, &tdoa.anchorPosition[0]) && tdoaStorageGetAnchorPosition(anchorBCtx, &tdoa.anchorPosition[1])) {
       stats->packetsToEstimator++;
+      // [Note]: Send the TDoA meas. to onboard EKF
+      // It is initialized in tdoaEngineInit.
       engineState->sendTdoaToEstimator(&tdoa);
 
       uint8_t idA = tdoaStorageGetId(anchorACtx);
@@ -180,6 +183,7 @@ void tdoaEngineProcessPacket(tdoaEngineState_t* engineState, tdoaAnchorContext_t
     engineState->stats.timeIsGood++;
 
     tdoaAnchorContext_t otherAnchorCtx;
+    // find another anchor info to compute the TDoA. (change each time (randomly?))
     if (findSuitableAnchor(engineState, &otherAnchorCtx, anchorCtx)) {
       engineState->stats.suitableDataFound++;
       double tdoaDistDiff = calcDistanceDiff(&otherAnchorCtx, anchorCtx, txAn_in_cl_An, rxAn_by_T_in_cl_T, engineState->locodeckTsFreq);

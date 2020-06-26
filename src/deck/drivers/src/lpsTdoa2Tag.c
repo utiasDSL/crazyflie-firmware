@@ -207,8 +207,8 @@ static bool calcDistanceDiff(float* tdoaDistDiff, const uint8_t previousAnchor, 
   const int64_t rxAr_by_An_in_cl_An = packet->timestamps[previousAnchor];
   const int64_t tof_Ar_to_An_in_cl_An = packet->distances[previousAnchor];
   const double clockCorrection = history[anchor].clockCorrection_T_To_A;
-
-  const bool isAnchorDistanceOk = isValidTimeStamp(tof_Ar_to_An_in_cl_An);
+  // if there is not tof between anchors, return false.
+  const bool isAnchorDistanceOk = isValidTimeStamp(tof_Ar_to_An_in_cl_An);  
   const bool isRxTimeInTagOk = isValidTimeStamp(rxAr_by_An_in_cl_An);
   const bool isClockCorrectionOk = (clockCorrection != 0.0);
 

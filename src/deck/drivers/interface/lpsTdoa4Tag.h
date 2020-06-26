@@ -39,8 +39,8 @@
 #define ID_COUNT 256
 #define ID_WITHOUT_CONTEXT 0xff
 #define ID_INVALID 0xff
-
-#define SYSTEM_TX_FREQ 400.0
+// [Note]: can be reduce for inter-range. May be handled automatically
+#define SYSTEM_TX_FREQ 400.0  
 #define ANCHOR_MAX_TX_FREQ 50.0
 // We need a lower limit of minimum tx rate. The TX timestamp in the protocol is
 // only 32 bits (equal to 67 ms) and we want to avoid double wraps of the TX counter.
@@ -139,7 +139,6 @@ typedef enum {
 
 // [Add] Switch agent mode
 int switchAgentMode();
-// [Add] function to handle short lpp packet
-// void lppHandleShortPacket(uint8_t *data, size_t length);
-
+// testing for switch mode time
+// extern int xStart_s;  
 #endif // __LPS_TDOA4_TAG_H__

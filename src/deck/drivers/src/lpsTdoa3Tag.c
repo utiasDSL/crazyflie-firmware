@@ -73,28 +73,28 @@ The implementation must handle
 static int agentID = 0;                
 // int MODE = 3;
 typedef struct {
-  uint8_t type;
-  uint8_t seq;
-  uint32_t txTimeStamp;
-  uint8_t remoteCount;
+    uint8_t type;
+    uint8_t seq;
+    uint32_t txTimeStamp;
+    uint8_t remoteCount;
 } __attribute__((packed)) rangePacketHeader3_t;
 
 typedef struct {
-  uint8_t id;
-  uint8_t seq;
-  uint32_t rxTimeStamp;
-  uint16_t distance;
+    uint8_t id;
+    uint8_t seq;
+    uint32_t rxTimeStamp;
+    uint16_t distance;
 } __attribute__((packed)) remoteAnchorDataFull_t;
 
 typedef struct {
-  uint8_t id;
-  uint8_t seq;
-  uint32_t rxTimeStamp;
+    uint8_t id;
+    uint8_t seq;
+    uint32_t rxTimeStamp;
 } __attribute__((packed)) remoteAnchorDataShort_t;
 
 typedef struct {
-  rangePacketHeader3_t header;
-  uint8_t remoteAnchorData;
+    rangePacketHeader3_t header;
+    uint8_t remoteAnchorData;
 } __attribute__((packed)) rangePacket3_t;
 
 
@@ -107,69 +107,69 @@ static tdoaEngineState_t engineState;
 
 
 static bool isValidTimeStamp(const int64_t anchorRxTime) {
-  return anchorRxTime != 0;
+    return anchorRxTime != 0;
 }
 
 static int updateRemoteData(tdoaAnchorContext_t* anchorCtx, const void* payload) {
-  const rangePacket3_t* packet = (rangePacket3_t*)payload;
-  const void* anchorDataPtr = &packet->remoteAnchorData;
-  // [Question] i is not used in the loop
-  // [Answer] after each loop --> anchorDataPtr += sizeof(remoteAnchorDataFull_t), the address move backwards
-  for (uint8_t i = 0; i < packet->header.remoteCount; i++) {
-    remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
+    const rangePacket3_t* packet = (rangePacket3_t*)payload;
+    const void* anchorDataPtr = &packet->remoteAnchorData;
+    // [Question] i is not used in the loop
+    // [Answer] after each loop --> anchorDataPtr += sizeof(remoteAnchorDataFull_t), the address move backwards
+    for (uint8_t i = 0; i < packet->header.remoteCount; i++) {
+        remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
 
-    uint8_t remoteId = anchorData->id;
-    int64_t remoteRxTime = anchorData->rxTimeStamp;
-    uint8_t remoteSeqNr = anchorData->seq & 0x7f;
+        uint8_t remoteId = anchorData->id;
+        int64_t remoteRxTime = anchorData->rxTimeStamp;
+        uint8_t remoteSeqNr = anchorData->seq & 0x7f;
 
-    if (isValidTimeStamp(remoteRxTime)) {
-      tdoaStorageSetRemoteRxTime(anchorCtx, remoteId, remoteRxTime, remoteSeqNr);
-    }
-
-    bool hasDistance = ((anchorData->seq & 0x80) != 0);
-    if (hasDistance) {
-      int64_t tof = anchorData->distance;
-      if (isValidTimeStamp(tof)) {
-        tdoaStorageSetTimeOfFlight(anchorCtx, remoteId, tof);
-
-        uint8_t anchorId = tdoaStorageGetId(anchorCtx);
-        tdoaStats_t* stats = &engineState.stats;
-        if (anchorId == stats->anchorId && remoteId == stats->remoteAnchorId) {
-          stats->tof = (uint16_t)tof;
+        if (isValidTimeStamp(remoteRxTime)) {
+            tdoaStorageSetRemoteRxTime(anchorCtx, remoteId, remoteRxTime, remoteSeqNr);
         }
-      }
-      anchorDataPtr += sizeof(remoteAnchorDataFull_t);
-    } else {
-      anchorDataPtr += sizeof(remoteAnchorDataShort_t);
-    }
-  }
 
-  return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
+        bool hasDistance = ((anchorData->seq & 0x80) != 0);
+        if (hasDistance) {
+            int64_t tof = anchorData->distance;
+            if (isValidTimeStamp(tof)) {
+                tdoaStorageSetTimeOfFlight(anchorCtx, remoteId, tof);
+
+                uint8_t anchorId = tdoaStorageGetId(anchorCtx);
+                tdoaStats_t* stats = &engineState.stats;
+                if (anchorId == stats->anchorId && remoteId == stats->remoteAnchorId) {
+                    stats->tof = (uint16_t)tof;
+                }
+            }
+            anchorDataPtr += sizeof(remoteAnchorDataFull_t);
+        } 
+        else{
+            anchorDataPtr += sizeof(remoteAnchorDataShort_t);
+        }
+    }
+
+    return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
 }
 
 // ----------------------------------------access the position in the packet------------------------------------------------ //
 static void handleLppShortPacket(tdoaAnchorContext_t* anchorCtx, const uint8_t *data, const int length) {
-  uint8_t type = data[0];
-
-  if (type == LPP_SHORT_ANCHORPOS) {
-    struct lppShortAnchorPos_s *newpos = (struct lppShortAnchorPos_s*)&data[1];
-    tdoaStorageSetAnchorPosition(anchorCtx, newpos->x, newpos->y, newpos->z);
-  }
+    uint8_t type = data[0];
+    if (type == LPP_SHORT_ANCHORPOS) {
+        struct lppShortAnchorPos_s *newpos = (struct lppShortAnchorPos_s*)&data[1];
+        tdoaStorageSetAnchorPosition(anchorCtx, newpos->x, newpos->y, newpos->z);
+    }
 }
 
 static void handleLppPacket(const int dataLength, int rangePacketLength, const packet_t* rxPacket, tdoaAnchorContext_t* anchorCtx) {
-  const int32_t payloadLength = dataLength - MAC802154_HEADER_LENGTH;
-  const int32_t startOfLppDataInPayload = rangePacketLength;
-  const int32_t lppDataLength = payloadLength - startOfLppDataInPayload;
-  const int32_t lppTypeInPayload = startOfLppDataInPayload + 1;
+    const int32_t payloadLength = dataLength - MAC802154_HEADER_LENGTH;
+    const int32_t startOfLppDataInPayload = rangePacketLength;
+    const int32_t lppDataLength = payloadLength - startOfLppDataInPayload;
+    const int32_t lppTypeInPayload = startOfLppDataInPayload + 1;
 
-  if (lppDataLength > 0) {
-    const uint8_t lppPacketHeader = rxPacket->payload[startOfLppDataInPayload];
-    if (lppPacketHeader == LPP_HEADER_SHORT_PACKET) {
-      const int32_t lppTypeAndPayloadLength = lppDataLength - 1;
-      handleLppShortPacket(anchorCtx, &rxPacket->payload[lppTypeInPayload], lppTypeAndPayloadLength);
+    if (lppDataLength > 0) {
+        const uint8_t lppPacketHeader = rxPacket->payload[startOfLppDataInPayload];
+        if (lppPacketHeader == LPP_HEADER_SHORT_PACKET) {
+            const int32_t lppTypeAndPayloadLength = lppDataLength - 1;
+            handleLppShortPacket(anchorCtx, &rxPacket->payload[lppTypeInPayload], lppTypeAndPayloadLength);
+        }
     }
-  }
 }
 // ---------------------------------------- ----------------------------- ------------------------------------------------ //
 //[New]: moved from lpp.c from anchor code
@@ -178,222 +178,229 @@ static void lppHandleShortPacket(uint8_t *data, size_t length)
     if (length < 1) return;
     int type  = data[0];
 
-  switch(type) {
-    case LPP_SHORT_ANCHOR_POSITION:
-    {
-      // not used now. do nothing
-      break;
+    switch(type) {
+        case LPP_SHORT_ANCHOR_POSITION:
+        {
+            // not used now. do nothing
+            break;
+        }
+        case LPP_SHORT_REBOOT:
+        { // not used now. do nothing
+            break;
+        }
+        case LPP_SHORT_MODE:
+        { // used to switch Agent mode
+            struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
+            //   DEBUG_PRINT("Switch mode!!!!! \n");
+            //   // Set new mode
+            //   DEBUG_PRINT("MODE is %d\n",(int)modeInfo->mode);
+            //   DEBUG_PRINT("TDoA3 is %d\n",(int)LPP_SHORT_MODE_TDOA3);
+                if (modeInfo->mode == LPP_SHORT_MODE_TWR) {
+                    MODE = lpsMode_TWR;
+                } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA2) {
+                    MODE = lpsMode_TDoA2;
+                } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA3) {
+                    // DEBUG_PRINT("Set mode to be tdoa3!!!!! \n");
+                    MODE = lpsMode_TDoA3;
+                }else if (modeInfo->mode == LPP_SHORT_MODE_TDOA4) {
+                    MODE = lpsMode_TDoA4;
+                }
+                break;
+        }
+        case LPP_SHORT_UWB:
+        { // not used for now. Do nothing
+            break;
+        }
+        case LPP_SHORT_UWB_MODE:
+        { // not used for now. Do nothing
+            break;
+        }
     }
-    case LPP_SHORT_REBOOT:
-    { // not used now. do nothing
-      break;
-    }
-    case LPP_SHORT_MODE:
-    { // used to switch Agent mode
-      struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
-    //   DEBUG_PRINT("Switch mode!!!!! \n");
-    //   // Set new mode
-    //   DEBUG_PRINT("MODE is %d\n",(int)modeInfo->mode);
-    //   DEBUG_PRINT("TDoA3 is %d\n",(int)LPP_SHORT_MODE_TDOA3);
-      if (modeInfo->mode == LPP_SHORT_MODE_TWR) {
-        MODE = lpsMode_TWR;
-      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA2) {
-        MODE = lpsMode_TDoA2;
-      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA3) {
-        // DEBUG_PRINT("Set mode to be tdoa3!!!!! \n");
-        MODE = lpsMode_TDoA3;
-      }else if (modeInfo->mode == LPP_SHORT_MODE_TDOA4) {
-        MODE = lpsMode_TDoA4;
-      }
-      break;
-    }
-    case LPP_SHORT_UWB:
-    { // not used for now. Do nothing
-      break;
-    }
-    case LPP_SHORT_UWB_MODE:
-    { // not used for now. Do nothing
-      break;
-    }
-  }
 }
 // int switchAgentMode(){
 //     return MODE;
 // }
 // ---------------------------------------- ----------------------------- ------------------------------------------------ //
 static void rxcallback(dwDevice_t *dev) {
-  tdoaStats_t* stats = &engineState.stats;
-  stats->packetsReceived++;
+    tdoaStats_t* stats = &engineState.stats;
+    stats->packetsReceived++;
 
-  int dataLength = dwGetDataLength(dev);
-  packet_t rxPacket;
+    int dataLength = dwGetDataLength(dev);
+    packet_t rxPacket;
 
-  dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
-  const uint8_t anchorId = rxPacket.sourceAddress & 0xff;
+    dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
+    const uint8_t anchorId = rxPacket.sourceAddress & 0xff;
 
-  dwTime_t arrival = {.full = 0};
-  dwGetReceiveTimestamp(dev, &arrival);
-  const int64_t rxAn_by_T_in_cl_T = arrival.full;
+    dwTime_t arrival = {.full = 0};
+    dwGetReceiveTimestamp(dev, &arrival);
+    const int64_t rxAn_by_T_in_cl_T = arrival.full;
 
-  const rangePacket3_t* packet = (rangePacket3_t*)rxPacket.payload;
-//   DEBUG_PRINT("Receive the radio packet !!!!!!!!!!!!\n");
-  if (packet->header.type == PACKET_TYPE_TDOA3) {
-    const int64_t txAn_in_cl_An = packet->header.txTimeStamp;;
-    const uint8_t seqNr = packet->header.seq;
+    const rangePacket3_t* packet = (rangePacket3_t*)rxPacket.payload;
+    //   DEBUG_PRINT("Receive the radio packet !!!!!!!!!!!!\n");
+    if (packet->header.type == PACKET_TYPE_TDOA3) {
+        const int64_t txAn_in_cl_An = packet->header.txTimeStamp;;
+        const uint8_t seqNr = packet->header.seq;
 
-    tdoaAnchorContext_t anchorCtx;
-    uint32_t now_ms = T2M(xTaskGetTickCount());
+        tdoaAnchorContext_t anchorCtx;
+        uint32_t now_ms = T2M(xTaskGetTickCount());
 
-    tdoaEngineGetAnchorCtxForPacketProcessing(&engineState, anchorId, now_ms, &anchorCtx);
-    int rangeDataLength = updateRemoteData(&anchorCtx, packet);
-    tdoaEngineProcessPacket(&engineState, &anchorCtx, txAn_in_cl_An, rxAn_by_T_in_cl_T);
-    tdoaStorageSetRxTxData(&anchorCtx, rxAn_by_T_in_cl_T, txAn_in_cl_An, seqNr);
-    handleLppPacket(dataLength, rangeDataLength, &rxPacket, &anchorCtx);
+        tdoaEngineGetAnchorCtxForPacketProcessing(&engineState, anchorId, now_ms, &anchorCtx);
+        int rangeDataLength = updateRemoteData(&anchorCtx, packet);
+        // compute tdoa measurements
+        tdoaEngineProcessPacket(&engineState, &anchorCtx, txAn_in_cl_An, rxAn_by_T_in_cl_T);
+        tdoaStorageSetRxTxData(&anchorCtx, rxAn_by_T_in_cl_T, txAn_in_cl_An, seqNr);
+        handleLppPacket(dataLength, rangeDataLength, &rxPacket, &anchorCtx);
 
-    rangingOk = true;
-  }  //[New]: handle SHORT_LPP packet to switch mode
-  else if(packet->header.type == SHORT_LPP){
+        rangingOk = true;
+    }  //[New]: handle SHORT_LPP packet to switch mode
+    else if(packet->header.type == SHORT_LPP){
         if ((int)rxPacket.destAddress == 0) {  // the lpp is sent to this Agent. [Debug] find a better way
-        // DEBUG_PRINT("Receive the correct Short LPP packet !!!!!!!!!!!!\n");
-        lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+            // DEBUG_PRINT("Receive the correct Short LPP packet !!!!!!!!!!!!\n");
+            lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
         }
-  }
+    }
 
 }
 
 static void setRadioInReceiveMode(dwDevice_t *dev) {
-  dwNewReceive(dev);
-  dwSetDefaults(dev);
-  dwStartReceive(dev);
+    dwNewReceive(dev);
+    dwSetDefaults(dev);
+    dwStartReceive(dev);
 }
 
 static void sendLppShort(dwDevice_t *dev, lpsLppShortPacket_t *packet)
 {
-  static packet_t txPacket;
-  dwIdle(dev);
+    static packet_t txPacket;
+    dwIdle(dev);
 
-  MAC80215_PACKET_INIT(txPacket, MAC802154_TYPE_DATA);
+    MAC80215_PACKET_INIT(txPacket, MAC802154_TYPE_DATA);
 
-  txPacket.payload[LPS_TDOA3_TYPE] = LPP_HEADER_SHORT_PACKET;
-  memcpy(&txPacket.payload[LPS_TDOA3_SEND_LPP_PAYLOAD], packet->data, packet->length);
+    txPacket.payload[LPS_TDOA3_TYPE] = LPP_HEADER_SHORT_PACKET;
+    memcpy(&txPacket.payload[LPS_TDOA3_SEND_LPP_PAYLOAD], packet->data, packet->length);
 
-  txPacket.pan = 0xbccf;
-  txPacket.sourceAddress = 0xbccf000000000000 | 0xff;
-  txPacket.destAddress = 0xbccf000000000000 | packet->dest;
+    txPacket.pan = 0xbccf;
+    txPacket.sourceAddress = 0xbccf000000000000 | 0xff;
+    txPacket.destAddress = 0xbccf000000000000 | packet->dest;
 
-  dwNewTransmit(dev);
-  dwSetDefaults(dev);
-  dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH+1+packet->length);
+    dwNewTransmit(dev);
+    dwSetDefaults(dev);
+    dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH+1+packet->length);
 
-  dwStartTransmit(dev);
+    dwStartTransmit(dev);
 }
 
 static bool sendLpp(dwDevice_t *dev) {
-  bool lppPacketToSend = lpsGetLppShort(&lppPacket);
-  if (lppPacketToSend) {
-    sendLppShort(dev, &lppPacket);
-    return true;
-  }
+    bool lppPacketToSend = lpsGetLppShort(&lppPacket);
+    if (lppPacketToSend) {
+        sendLppShort(dev, &lppPacket);
+        return true;
+    }
 
-  return false;
+    return false;
 }
 
 static uint32_t onEvent(dwDevice_t *dev, uwbEvent_t event) {
-  switch(event) {
-    case eventPacketReceived:
-      rxcallback(dev);
-      break;
-    case eventTimeout:
-      break;
-    case eventReceiveTimeout:
-      break;
-    case eventPacketSent:
-      // Service packet sent, the radio is back to receive automatically
-      break;
-    default:
-      ASSERT_FAILED();
-  }
+    switch(event) {
+        case eventPacketReceived:
+            rxcallback(dev);
+            break;
+        case eventTimeout:
+            break;
+        case eventReceiveTimeout:
+            break;
+        case eventPacketSent:
+            // Service packet sent, the radio is back to receive automatically
+            break;
+        default:
+        ASSERT_FAILED();
+    }
 
-  if(!sendLpp(dev)) {
-    setRadioInReceiveMode(dev);
-  }
+    if(!sendLpp(dev)) {
+        setRadioInReceiveMode(dev);
+    }
 
-  uint32_t now_ms = T2M(xTaskGetTickCount());
-  tdoaStatsUpdate(&engineState.stats, now_ms);
+    uint32_t now_ms = T2M(xTaskGetTickCount());
+    tdoaStatsUpdate(&engineState.stats, now_ms);
 
-  return MAX_TIMEOUT;
+    return MAX_TIMEOUT;
 }
 
 static void sendTdoaToEstimatorCallback(tdoaMeasurement_t* tdoaMeasurement) {
-  estimatorKalmanEnqueueTDOA(tdoaMeasurement);
+    estimatorKalmanEnqueueTDOA(tdoaMeasurement);
 
-  #ifdef LPS_2D_POSITION_HEIGHT
-  // If LPS_2D_POSITION_HEIGHT is defined we assume that we are doing 2D positioning.
-  // LPS_2D_POSITION_HEIGHT contains the height (Z) that the tag will be located at
-  heightMeasurement_t heightData;
-  heightData.timestamp = xTaskGetTickCount();
-  heightData.height = LPS_2D_POSITION_HEIGHT;
-  heightData.stdDev = 0.0001;
-  estimatorKalmanEnqueueAsoluteHeight(&heightData);
-  #endif
+    #ifdef LPS_2D_POSITION_HEIGHT
+    // If LPS_2D_POSITION_HEIGHT is defined we assume that we are doing 2D positioning.
+    // LPS_2D_POSITION_HEIGHT contains the height (Z) that the tag will be located at
+    heightMeasurement_t heightData;
+    heightData.timestamp = xTaskGetTickCount();
+    heightData.height = LPS_2D_POSITION_HEIGHT;
+    heightData.stdDev = 0.0001;
+    estimatorKalmanEnqueueAsoluteHeight(&heightData);
+    #endif
 }
 
 static bool getAnchorPosition(const uint8_t anchorId, point_t* position) {
-  tdoaAnchorContext_t anchorCtx;
-  uint32_t now_ms = T2M(xTaskGetTickCount());
+    tdoaAnchorContext_t anchorCtx;
+    uint32_t now_ms = T2M(xTaskGetTickCount());
 
-  bool contextFound = tdoaStorageGetAnchorCtx(engineState.anchorInfoArray, anchorId, now_ms, &anchorCtx);
-  if (contextFound) {
-    tdoaStorageGetAnchorPosition(&anchorCtx, position);
-    return true;
-  }
+    bool contextFound = tdoaStorageGetAnchorCtx(engineState.anchorInfoArray, anchorId, now_ms, &anchorCtx);
+    if (contextFound) {
+        tdoaStorageGetAnchorPosition(&anchorCtx, position);
+        return true;
+    }
 
-  return false;
+    return false;
 }
 
 static uint8_t getAnchorIdList(uint8_t unorderedAnchorList[], const int maxListSize) {
-  return tdoaStorageGetListOfAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize);
+    return tdoaStorageGetListOfAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize);
 }
 
 static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int maxListSize) {
-  uint32_t now_ms = T2M(xTaskGetTickCount());
-  return tdoaStorageGetListOfActiveAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize, now_ms);
+    uint32_t now_ms = T2M(xTaskGetTickCount());
+    return tdoaStorageGetListOfActiveAnchorIds(engineState.anchorInfoArray, unorderedAnchorList, maxListSize, now_ms);
 }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 static void Initialize(dwDevice_t *dev) {
-  uint32_t now_ms = T2M(xTaskGetTickCount());
-  agentID = 0;   // Agent ID
-  tdoaEngineInit(&engineState, now_ms, sendTdoaToEstimatorCallback, LOCODECK_TS_FREQ);
+    uint32_t now_ms = T2M(xTaskGetTickCount());
+    agentID = 0;   // Agent ID
+    tdoaEngineInit(&engineState, now_ms, sendTdoaToEstimatorCallback, LOCODECK_TS_FREQ);
 
-  #ifdef LPS_2D_POSITION_HEIGHT
-  DEBUG_PRINT("2D positioning enabled at %f m height\n", LPS_2D_POSITION_HEIGHT);
-  #endif
+    #ifdef LPS_2D_POSITION_HEIGHT
+    DEBUG_PRINT("2D positioning enabled at %f m height\n", LPS_2D_POSITION_HEIGHT);
+    #endif
 
-  dwSetReceiveWaitTimeout(dev, TDOA3_RECEIVE_TIMEOUT);
+    dwSetReceiveWaitTimeout(dev, TDOA3_RECEIVE_TIMEOUT);
 
-  dwCommitConfiguration(dev);
-
-  rangingOk = false;
+    dwCommitConfiguration(dev);
+    //------ testing switch time ------//
+        // int xEnd=0; int xDifference=0;
+        // xEnd = T2M(xTaskGetTickCount());
+        // xDifference = xEnd - xStart_s;  //xStart_s is in lpsTdoa4Tag.c
+        // //   DEBUG_PRINT( "xStart: %i \n", xStart_s);
+        // DEBUG_PRINT( "Switch mode: %i \n", xDifference);
+    //------ ----------------- ------// 
+    rangingOk = false;
 }
 #pragma GCC diagnostic pop
 
 static bool isRangingOk()
 {
-  return rangingOk;
+    return rangingOk;
 }
 
 uwbAlgorithm_t uwbTdoa3TagAlgorithm = {
-  .init = Initialize,
-  .onEvent = onEvent,
-  .isRangingOk = isRangingOk,
-  .getAnchorPosition = getAnchorPosition,
-  .getAnchorIdList = getAnchorIdList,
-  .getActiveAnchorIdList = getActiveAnchorIdList,
+    .init = Initialize,
+    .onEvent = onEvent,
+    .isRangingOk = isRangingOk,
+    .getAnchorPosition = getAnchorPosition,
+    .getAnchorIdList = getAnchorIdList,
+    .getActiveAnchorIdList = getActiveAnchorIdList,
 };
 
-
+// [Note]: for debugging to see the tdoa packet rate
 LOG_GROUP_START(tdoa3)
 LOG_ADD(LOG_UINT16, stRx, &engineState.stats.packetsReceivedRate)
 LOG_ADD(LOG_UINT16, stEst, &engineState.stats.packetsToEstimatorRate)

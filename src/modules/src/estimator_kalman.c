@@ -106,8 +106,6 @@ static float uwb_err_min_tdoa = -0.69990715;
 // drone UWB config
 // static struct DroneUwbConfig_s DroneConfig;
 
-
-
 /**
  * Primary Kalman filter functions
  *

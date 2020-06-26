@@ -48,6 +48,7 @@ void tdoaStorageInitialize(tdoaAnchorInfo_t anchorStorage[]) {
   memset(anchorStorage, 0, sizeof(tdoaAnchorInfo_t) * ANCHOR_STORAGE_COUNT);
 }
 
+//[Note]: organize the anchor list on the tag side
 bool tdoaStorageGetCreateAnchorCtx(tdoaAnchorInfo_t anchorStorage[], const uint8_t anchor, const uint32_t currentTime_ms, tdoaAnchorContext_t* anchorCtx) {
   anchorCtx->currentTime_ms = currentTime_ms;
   uint32_t oldestUpdateTime = currentTime_ms;

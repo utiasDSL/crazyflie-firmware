@@ -33,41 +33,41 @@ static const uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
 int MODE = 4;
 // Anchor context
 typedef struct {
-  uint8_t id;
-  bool isUsed;
-  uint8_t seqNr;
-  uint32_t rxTimeStamp;
-  uint32_t txTimeStamp;
-  uint16_t distance;
-  uint32_t distanceUpdateTime;
-  bool isDataGoodForTransmission;
+    uint8_t id;
+    bool isUsed;
+    uint8_t seqNr;
+    uint32_t rxTimeStamp;
+    uint32_t txTimeStamp;
+    uint16_t distance;
+    uint32_t distanceUpdateTime;
+    bool isDataGoodForTransmission;
 
-  double clockCorrection;
-  int clockCorrectionBucket;
+    double clockCorrection;
+    int clockCorrectionBucket;
 } anchorContext_t;
 
 // This context struct contains all the required global values of the algorithm
 static struct ctx_s {
-  int anchorId;
-  // Information about latest transmitted packet
-  uint8_t seqNr;
-  uint32_t txTime; // In UWB clock ticks
+    int anchorId;
+    // Information about latest transmitted packet
+    uint8_t seqNr;
+    uint32_t txTime; // In UWB clock ticks
 
-  // Next transmit time in system clock ticks
-  uint32_t nextTxTick;
-  int averageTxDelay; // ms
+    // Next transmit time in system clock ticks
+    uint32_t nextTxTick;
+    int averageTxDelay; // ms
 
-  // List of ids to transmit in remote data section
-  uint8_t remoteTxId[REMOTE_TX_MAX_COUNT];
-  uint8_t remoteTxIdCount;
+    // List of ids to transmit in remote data section
+    uint8_t remoteTxId[REMOTE_TX_MAX_COUNT];
+    uint8_t remoteTxIdCount;
 
-  // The list of anchors to transmit and store is updated at regular intervals
-  uint32_t nextAnchorListUpdate;
+    // The list of anchors to transmit and store is updated at regular intervals
+    uint32_t nextAnchorListUpdate;
 
-  // Remote anchor data
-  uint8_t anchorCtxLookup[ID_COUNT];
-  anchorContext_t anchorCtx[ANCHOR_STORAGE_COUNT];
-  uint8_t anchorRxCount[ID_COUNT];
+    // Remote anchor data
+    uint8_t anchorCtxLookup[ID_COUNT];
+    anchorContext_t anchorCtx[ANCHOR_STORAGE_COUNT];
+    uint8_t anchorRxCount[ID_COUNT];
 } ctx;
 
 //[Change]
@@ -183,7 +183,7 @@ static void createAnchorContextsInList(const uint8_t* id, const uint8_t count) {
   }
 }
 
-static void purgeData() {
+static void purgeData() { // clear the data
   uint32_t now = xTaskGetTickCount();
   uint32_t acceptedCreationTime = now - DISTANCE_VALIDITY_PERIOD;
 
@@ -425,6 +425,7 @@ static void handleLppPacket(const int dataLength, int rangePacketLength, const p
 }
 
 // [New]: Update the remote agent info, also get the rangeDataLength --> for LPP packet
+// [Note]: store the remote agent info. for tdoa computation
 static int updateRemoteAgentData(const void* payload){
     const rangePacket3_t* packet = (rangePacket3_t*)payload;
     const void* anchorDataPtr = &packet->remoteAnchorData;
@@ -513,7 +514,7 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
   }
 }
 
-//[New]: moved from lpp.c from anchor code
+//[New]: moved from lpp.c in anchor code
 static void lppHandleShortPacket(uint8_t *data, size_t length)
 {
     if (length < 1) return;
@@ -560,8 +561,12 @@ static void lppHandleShortPacket(uint8_t *data, size_t length)
 }
 
 //[note]: main function after receive an uwb message
+// static int idx = 0;    // for testing time
+// static int xStart=0;   // xStart used in different if loop, need to be static
+// int xStart_s=0;        // testing for switching mode, used in lpsTdoa3Tag.c
 static void handleRxPacket(dwDevice_t *dev)
 {
+  //   int xEnd=0; int xDifference=0;
   static packet_t rxPacket;
   dwTime_t rxTime = { .full = 0 };
 
@@ -578,7 +583,26 @@ static void handleRxPacket(dwDevice_t *dev)
     // DEBUG_PRINT("Receive radio packet \n");
     switch(rxPacket.payload[0]) {
     case PACKET_TYPE_TDOA4:       //[change]
+        // original code
         handleRangePacket(rxTime.low32, &rxPacket, dataLength);   //[note] get range
+        // //------------------ testing time ------------------ //
+        // if(idx==0){
+        //     xStart =  T2M(xTaskGetTickCount());
+        //     idx=idx+1;
+        //     handleRangePacket(rxTime.low32, &rxPacket, dataLength);
+        // }else if(idx==50){
+        //     handleRangePacket(rxTime.low32, &rxPacket, dataLength);
+        //     xEnd = T2M(xTaskGetTickCount());
+        //     xDifference = xEnd - xStart;
+        //     // DEBUG_PRINT( "xStart: %i,xEnd: %i \n", xStart, xEnd);
+		//     DEBUG_PRINT( "50 range: %i \n", xDifference);
+        //     //reset
+        //     idx=0;
+        // }else{
+        //     handleRangePacket(rxTime.low32, &rxPacket, dataLength);
+        //     idx=idx+1;
+        // }
+        //-------------------------------------------------//
         break;
     case SHORT_LPP:  //[New]: use SHORT_LPP to change mode
         // [Note] Need the (int) in front of rxPacket.destAddress
@@ -586,8 +610,10 @@ static void handleRxPacket(dwDevice_t *dev)
         // DEBUG_PRINT("rxPacket.destAddress is %d \n",(int)rxPacket.destAddress);
         // DEBUG_PRINT("ctx.anchorId is %d \n",(int)ctx.anchorId);
         if ((int)rxPacket.destAddress == ctx.anchorId) {  // the lpp is sent to this Agent. 
-        // DEBUG_PRINT("Receive the correct Short LPP packet !!!!!!!!!!!!\n");
-        lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
+            // DEBUG_PRINT("Receive the correct Short LPP packet !!!!!!!!!!!!\n");
+            // testing switch time//
+            // xStart_s = T2M(xTaskGetTickCount());
+            lppHandleShortPacket(&rxPacket.payload[1], dataLength - MAC802154_HEADER_LENGTH - 1);
         }
         break;
     default:
@@ -757,6 +783,7 @@ static void tdoa4Init(dwDevice_t *dev)
 // Called for each DW radio event
 static uint32_t tdoa4UwbEvent(dwDevice_t *dev, uwbEvent_t event)
 {
+//   int xStart=0; int xEnd=0; int xDifference=0;
   switch (event) {
     case eventPacketReceived: {
         handleRxPacket(dev);
@@ -862,7 +889,7 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
 uwbAlgorithm_t uwbTdoa4TagAlgorithm = { //[change]: the name changed
   .init = tdoa4Init,   // the config is changed in init func
   .onEvent = tdoa4UwbEvent,
-//[change]: The following are needed
+  //[change]: The following are needed
   .isRangingOk = isRangingOk,
   .getAnchorPosition = getAnchorPosition,
   .getAnchorIdList = getAnchorIdList,           // return the active id num: uint8_t
@@ -870,10 +897,10 @@ uwbAlgorithm_t uwbTdoa4TagAlgorithm = { //[change]: the name changed
 };
 
 //[note]: test for log parameter
-LOG_GROUP_START(tdoa3)
+LOG_GROUP_START(tdoa4)
 
 LOG_ADD(LOG_INT16,Range, &log_range)
-LOG_GROUP_STOP(tdoa3)
+LOG_GROUP_STOP(tdoa4)
 
 
 
