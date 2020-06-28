@@ -23,14 +23,14 @@
 //[change]
 #define TDOA4_RECEIVE_TIMEOUT 10000
 // Packet formats
-#define PACKET_TYPE_TDOA4 0x30                      // [Change]
+#define PACKET_TYPE_TDOA4 0x60                      // [Change]
 #define LPP_HEADER 0
 #define LPP_TYPE (LPP_HEADER + 1)
 #define LPP_PAYLOAD (LPP_HEADER + 2)
 // Useful constants
 static const uint8_t base_address[] = {0,0,0,0,0,0,0xcf,0xbc};
-// [New]: Gloabl variable for the mode of the Agent. The default is TDoA4 
-int MODE = 4;
+// [New]: Gloabl variable for the mode of the Agent. The default is TDoA3
+int MODE = 3;
 // Anchor context
 typedef struct {
     uint8_t id;
@@ -100,7 +100,7 @@ typedef struct {
 
 // lppShortAnchorPos_s is defined in locodeck.h, here we define a new msg for TDoA4 
 // [New] lpp packet (transmission data): limitation is 11 float num
-struct lppShortAnchorPosition_s {
+struct lppShortAgent_s {
   float position[3];
   float quaternion[4];
   float imu[6];
@@ -111,7 +111,7 @@ static struct remoteAgentInfo_s{
     int remoteAgentID;           // source Agent 
     int destAgentID;             // destination Agent
     bool hasDistance;
-    struct lppShortAnchorPosition_s Pose;
+    struct lppShortAgent_s Pose;
     double ranging;
 }remoteAgentInfo;                //[re-design]
 //----------------------------------------------------------------------------------------//
@@ -122,6 +122,7 @@ static int log_range;    // distance is uint16_t
 int switchAgentMode(){
     return MODE;
 }
+
 static anchorContext_t* getContext(uint8_t anchorId) {
   uint8_t slot = ctx.anchorCtxLookup[anchorId];
 
@@ -365,7 +366,6 @@ static bool emptyClockCorrectionBucket(anchorContext_t* anchorCtx) {
       anchorCtx->clockCorrectionBucket--;
       return false;
     }
-
     return true;
 }
 
@@ -395,7 +395,7 @@ static bool updateClockCorrection(anchorContext_t* anchorCtx, double clockCorrec
 static void handleLppShortPacket(const uint8_t *data, const int length) {
   uint8_t type = data[0];
   if (type == LPP_SHORT_ANCHORPOS) {
-    struct lppShortAnchorPosition_s *pose = (struct lppShortAnchorPosition_s*)&data[1];
+    struct lppShortAgent_s *pose = (struct lppShortAgent_s*)&data[1];
     // printf("Position data is: (%f,%f,%f) \r\n", pos->x, pos->y, pos->z);
     // save and use the remote angent data
     remoteAgentInfo.Pose.position[0] = pose->position[0];
@@ -687,7 +687,7 @@ static void setTxData(dwDevice_t *dev)
     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
 
-    struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
+    struct lppShortAgent_s *pos = (struct lppShortAgent_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
     // test with dummy positions: it works!
     float dummy_pos[3] = {0.0, 0.1, 0.2};
     float dummy_quater[4] = {0.01, 0.02, 0.03, 0.04};
@@ -695,7 +695,7 @@ static void setTxData(dwDevice_t *dev)
     memcpy(pos->position, dummy_pos, 3 * sizeof(float));
     memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
     memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
-    lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
+    lppLength = 2 + sizeof(struct lppShortAgent_s);
 
   dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
 }
