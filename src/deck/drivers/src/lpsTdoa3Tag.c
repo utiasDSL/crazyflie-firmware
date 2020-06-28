@@ -42,6 +42,15 @@ The implementation must handle
 
 */
 
+/*
+    lpsTdoa3Tag.c
+
+    Created on : Jun, 28, 2020
+        Author : Wenda Zhao
+        Email  : wenda.zhao@robotics.utias.utoronto.ca
+    add inter-drone ranging and info. exchange feature
+*/
+
 #include <string.h>
 
 #include "FreeRTOS.h"
