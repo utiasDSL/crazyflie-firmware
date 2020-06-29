@@ -70,7 +70,7 @@ The implementation must handle
 #include "log.h"
 #include "param.h"
 // [New]
-#include "lpsTdoa4Tag.h"
+// #include "lpsTdoa4Tag.h"
 // Positions for sent LPP packets
 #define LPS_TDOA3_TYPE 0
 #define LPS_TDOA3_SEND_LPP_PAYLOAD 1
@@ -125,6 +125,34 @@ static bool rangingOk;
 static tdoaEngineState_t engineState;
 
 /* ----------------------------- Data structure used for tdoa4 feature ----------------------------- */
+// define it's own data structure for packets from agents (to avoid code confusion)
+typedef struct {
+    uint8_t type;
+    uint8_t seq;
+    uint32_t txTimeStamp;
+    uint8_t remoteCount;
+} __attribute__((packed)) rangePacketHeader4_t;
+
+typedef struct {
+    rangePacketHeader4_t header;
+    uint8_t remoteAgentData;
+} __attribute__((packed)) rangePacket4_t;
+
+typedef struct {
+    uint8_t id;
+    uint8_t seq;
+    uint32_t rxTimeStamp;
+    uint16_t distance;
+} __attribute__((packed)) remoteAgentDataFull_t;
+
+typedef struct {
+    uint8_t id;
+    uint8_t seq;
+    uint32_t rxTimeStamp;
+} __attribute__((packed)) remoteAgentDataShort_t;
+
+
+
 // Anchor context
 typedef struct {
     uint8_t id;
@@ -138,10 +166,10 @@ typedef struct {
 
     double clockCorrection;
     int clockCorrectionBucket;
-} anchorContext_t;
-// This context struct contains all the required global values of the algorithm
+} agentContext_t;
+// This context struct contains all the required global values of the inter-agent algorithm
 static struct ctx_s {
-    int anchorId;
+    int agentId;    //[change] anchorId->agentId
     // Information about latest transmitted packet
     uint8_t seqNr;
     uint32_t txTime; // In UWB clock ticks
@@ -154,13 +182,13 @@ static struct ctx_s {
     uint8_t remoteTxId[REMOTE_TX_MAX_COUNT];
     uint8_t remoteTxIdCount;
 
-    // The list of anchors to transmit and store is updated at regular intervals
-    uint32_t nextAnchorListUpdate;
+    // The list of agents to transmit and store is updated at regular intervals
+    uint32_t nextAgentListUpdate;
 
-    // Remote anchor data
-    uint8_t anchorCtxLookup[ID_COUNT];
-    anchorContext_t anchorCtx[ANCHOR_STORAGE_COUNT];
-    uint8_t anchorRxCount[ID_COUNT];
+    // Remote agent data
+    uint8_t agentCtxLookup[ID_COUNT];
+    agentContext_t agentCtx[AGENT_STORAGE_COUNT];
+    uint8_t agentRxCount[ID_COUNT];
 } ctx;
 
 // lppShortAnchorPos_s is defined in locodeck.h, here we define a new msg for TDoA4 
@@ -182,24 +210,24 @@ static struct remoteAgentInfo_s{
 /* ------------------------------------------------------------------------------------------------- */
 
 /* ----------------------------- Function used for tdoa4 feature ----------------------------- */
-static anchorContext_t* getContext(uint8_t anchorId) {
-  uint8_t slot = ctx.anchorCtxLookup[anchorId];
+static agentContext_t* getContext(uint8_t agentId) {
+  uint8_t slot = ctx.agentCtxLookup[agentId];
 
   if (slot == ID_WITHOUT_CONTEXT) {
     return 0;
   }
-  return &ctx.anchorCtx[slot];
+  return &ctx.agentCtx[slot];
 }
 
-static void clearAnchorRxCount() {
-  memset(&ctx.anchorRxCount, 0, ID_COUNT);
+static void clearAgentRxCount() {
+  memset(&ctx.agentRxCount, 0, ID_COUNT);
 }
 
-static void removeAnchorContextsNotInList(const uint8_t* id, const uint8_t count) {
-  for (int i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
-    anchorContext_t* anchorCtx = &ctx.anchorCtx[i];
-    if (anchorCtx->isUsed) {
-      const uint8_t ctxId = anchorCtx->id;
+static void removeAgentContextsNotInList(const uint8_t* id, const uint8_t count) {
+  for (int i = 0; i < AGENT_STORAGE_COUNT; i++) {
+    agentContext_t* agentCtx = &ctx.agentCtx[i];
+    if (agentCtx->isUsed) {
+      const uint8_t ctxId = agentCtx->id;
       bool found = false;
       for (int j = 0; j < count; j++) {
         if (id[j] == ctxId) {
@@ -209,35 +237,35 @@ static void removeAnchorContextsNotInList(const uint8_t* id, const uint8_t count
       }
 
       if (!found) {
-        ctx.anchorCtxLookup[ctxId] = ID_WITHOUT_CONTEXT;
-        anchorCtx->isUsed = false;
+        ctx.agentCtxLookup[ctxId] = ID_WITHOUT_CONTEXT;
+        agentCtx->isUsed = false;
       }
     }
   }
 }
 
-static void createAnchorContext(const uint8_t id) {
-  if (ctx.anchorCtxLookup[id] != ID_WITHOUT_CONTEXT) {
+static void createAgentContext(const uint8_t id) {
+  if (ctx.agentCtxLookup[id] != ID_WITHOUT_CONTEXT) {
     // Already has a context, we're done
     return;
   }
 
-  for (uint8_t i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
-    anchorContext_t* anchorCtx = &ctx.anchorCtx[i];
-    if (!anchorCtx->isUsed) {
-      ctx.anchorCtxLookup[id] = i;
+  for (uint8_t i = 0; i < AGENT_STORAGE_COUNT; i++) {
+    agentContext_t* agentCtx = &ctx.agentCtx[i];
+    if (!agentCtx->isUsed) {
+      ctx.agentCtxLookup[id] = i;
 
-      memset(anchorCtx, 0, sizeof(anchorContext_t));
-      anchorCtx->id = id;
-      anchorCtx->isUsed = true;
+      memset(agentCtx, 0, sizeof(agentContext_t));
+      agentCtx->id = id;
+      agentCtx->isUsed = true;
 
       break;
     }
   }
 }
-static void createAnchorContextsInList(const uint8_t* id, const uint8_t count) {
+static void createAgentContextsInList(const uint8_t* id, const uint8_t count) {
   for (uint8_t i = 0; i < count; i++) {
-    createAnchorContext(id[i]);
+    createAgentContext(id[i]);
   }
 }
 
@@ -245,14 +273,13 @@ static void purgeData() { // clear the data
   uint32_t now = xTaskGetTickCount();
   uint32_t acceptedCreationTime = now - DISTANCE_VALIDITY_PERIOD;
 
-  for (int i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
-    anchorContext_t* anchorCtx = &ctx.anchorCtx[i];
-    if (anchorCtx->isUsed) {
-      if (anchorCtx->distanceUpdateTime < acceptedCreationTime) {
-        anchorCtx->distance = 0;
-
-        anchorCtx->clockCorrection = 0.0;
-        anchorCtx->clockCorrectionBucket = 0;
+  for (int i = 0; i < AGENT_STORAGE_COUNT; i++) {
+    agentContext_t* agentCtx = &ctx.agentCtx[i];
+    if (agentCtx->isUsed) {
+      if (agentCtx->distanceUpdateTime < acceptedCreationTime) {
+        agentCtx->distance = 0;
+        agentCtx->clockCorrection = 0.0;
+        agentCtx->clockCorrectionBucket = 0;
       }
     }
   }
@@ -263,7 +290,7 @@ static void purgeData() { // clear the data
 // update might take some time but this should not be a problem since the TX
 // times are randomized anyway. The intention is that we could plug in clever
 // algorithms here that optimizes which anchors to use.
-static void updateAnchorLists() {
+static void updateAgentLists() {
   // Randomize which anchors to use
 
   static uint8_t availableId[ID_COUNT];
@@ -272,12 +299,12 @@ static void updateAnchorLists() {
   memset(availableUsed, 0, sizeof(availableUsed));
   int availableCount = 0;
 
-  static uint8_t ctxts[ANCHOR_STORAGE_COUNT];
+  static uint8_t ctxts[AGENT_STORAGE_COUNT];
   memset(ctxts, 0, sizeof(ctxts));
 
   // Collect all anchors we have got a message from
   for (int i = 0; i < ID_COUNT; i++) {
-    if (ctx.anchorRxCount[i] != 0) {
+    if (ctx.agentRxCount[i] != 0) {
       availableId[availableCount++] = i;
     }
   }
@@ -286,7 +313,7 @@ static void updateAnchorLists() {
   // randomized subsets for storage and TX ids
   uint8_t remoteTXIdIndex = 0;
   uint8_t contextIndex = 0;
-  for (int i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
+  for (int i = 0; i < AGENT_STORAGE_COUNT; i++) {
     int start = rand() % availableCount;
     // Scan forward until we find an anchor
     for (int j = start; j < (start + availableCount); j++) {
@@ -297,31 +324,31 @@ static void updateAnchorLists() {
         if (remoteTXIdIndex < REMOTE_TX_MAX_COUNT) {
           ctx.remoteTxId[remoteTXIdIndex++] = id;
         }
-        if (contextIndex < ANCHOR_STORAGE_COUNT) {
+        if (contextIndex < AGENT_STORAGE_COUNT) {
           ctxts[contextIndex++] = id;
         }
-
         availableUsed[index] = true;
         break;
       }
     }
   }
 
-  removeAnchorContextsNotInList(ctxts, contextIndex);
-  createAnchorContextsInList(ctxts, contextIndex);
+  removeAgentContextsNotInList(ctxts, contextIndex);
+  createAgentContextsInList(ctxts, contextIndex);
 
   ctx.remoteTxIdCount = remoteTXIdIndex;
 
-  clearAnchorRxCount();
-
-  // Set the TX rate based on the number of transmitting anchors around us
-  // Aim for 400 messages/s. Up to 8 anchors: 50 Hz / anchor
+  clearAgentRxCount();
+  
+  // [Note]: organize the msg freq between agents
+  // Set the TX rate based on the number of transmitting agents around us
+  // Aim for 400 messages/s. Up to 8 agents: 50 Hz / anchor
   float freq = SYSTEM_TX_FREQ / (availableCount + 1);
-  if (freq > (float) ANCHOR_MAX_TX_FREQ) {  //[change]: add (float)
-    freq = ANCHOR_MAX_TX_FREQ;
+  if (freq > (float) AGENT_MAX_TX_FREQ) {  //[change]: add (float)
+    freq = AGENT_MAX_TX_FREQ;
   }
-  if (freq < (float) ANCHOR_MIN_TX_FREQ) { //[change]: add (float)
-    freq = ANCHOR_MIN_TX_FREQ;
+  if (freq < (float) AGENT_MIN_TX_FREQ) { //[change]: add (float)
+    freq = AGENT_MIN_TX_FREQ;
   }
   ctx.averageTxDelay = 1000.0f / freq;
 
@@ -345,26 +372,19 @@ static dwTime_t findTransmitTimeAsSoonAsPossible(dwDevice_t *dev)
   // And some extra
   transmitTime.full += TDMA_EXTRA_LENGTH;
 
-  // TODO krri Adding randomization on this level adds a long delay, is it worth it?
-  // The randomization on OS level is quantized to 1 ms (tick time of the system)
-  // Add a high res random to smooth it out
-  // uint32_t r = rand();
-  // uint32_t delay = r % TDMA_HIGH_RES_RAND;
-  // transmitTime.full += delay;
-
   // DW1000 can only schedule time with 9 LSB at 0, adjust for it
   adjustTxRxTime(&transmitTime);
 
   return transmitTime;
 }
 
-static double calculateClockCorrection(anchorContext_t* anchorCtx, int remoteTxSeqNr, uint32_t remoteTx, uint32_t rx)
+static double calculateClockCorrection(agentContext_t* agentCtx, int remoteTxSeqNr, uint32_t remoteTx, uint32_t rx)
 {
   double result = 0.0d;
 
   // Assigning to uint32_t truncates the diffs and takes care of wrapping clocks
-  uint32_t tickCountRemote = remoteTx - anchorCtx->txTimeStamp;
-  uint32_t tickCountLocal = rx - anchorCtx->rxTimeStamp;
+  uint32_t tickCountRemote = remoteTx - agentCtx->txTimeStamp;
+  uint32_t tickCountLocal = rx - agentCtx->rxTimeStamp;
 
   if (tickCountRemote != 0) {
     result = (double)tickCountLocal / (double)tickCountRemote;
@@ -373,12 +393,12 @@ static double calculateClockCorrection(anchorContext_t* anchorCtx, int remoteTxS
   return result;
 }
 
-static uint16_t calculateDistance(anchorContext_t* anchorCtx, int remoteRxSeqNr, uint32_t remoteTx, uint32_t remoteRx, uint32_t rx)
+static uint16_t calculateDistance(agentContext_t* agentCtx, int remoteRxSeqNr, uint32_t remoteTx, uint32_t remoteRx, uint32_t rx)
 {
   // Check that the remote received seq nr is our latest tx seq nr
-  if (remoteRxSeqNr == ctx.seqNr && anchorCtx->clockCorrection > 0.0d) {
+  if (remoteRxSeqNr == ctx.seqNr && agentCtx->clockCorrection > 0.0d) {
     uint32_t localTime = rx - ctx.txTime;
-    uint32_t remoteTime = (uint32_t)((double)(remoteTx - remoteRx) * anchorCtx->clockCorrection);
+    uint32_t remoteTime = (uint32_t)((double)(remoteTx - remoteRx) * agentCtx->clockCorrection);
     uint32_t distance = (localTime - remoteTime) / 2;
 
     return distance & 0xfffful;
@@ -386,58 +406,59 @@ static uint16_t calculateDistance(anchorContext_t* anchorCtx, int remoteRxSeqNr,
     return 0;
   }
 }
-static bool extractFromPacket(const rangePacket3_t* rangePacket, uint32_t* remoteRx, uint8_t* remoteRxSeqNr) {
-  const void* anchorDataPtr = &rangePacket->remoteAnchorData;
+// [change] use the data structure defined for packets from agents
+static bool extractFromPacket(const rangePacket4_t* rangePacket, uint32_t* remoteRx, uint8_t* remoteRxSeqNr) {
+  const void* agentDataPtr = &rangePacket->remoteAgentData;
   // loop over all the remote agents' info
     for (uint8_t i = 0; i < rangePacket->header.remoteCount; i++) {
-        remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
+        remoteAgentDataFull_t* agentData = (remoteAgentDataFull_t*)agentDataPtr;
         // if the radio packet is sending to this agent --> to twr
-        const uint8_t id = anchorData->id;
-        if (id == ctx.anchorId) {
-        *remoteRxSeqNr = anchorData->seq & 0x7f;
-        *remoteRx = anchorData->rxTimeStamp;
+        const uint8_t id = agentData->id;
+        if (id == ctx.agentId) {
+        *remoteRxSeqNr = agentData->seq & 0x7f;
+        *remoteRx = agentData->rxTimeStamp;
         return true;
         }
         // else --> move the pointer away from the distance msg
         // currently the other agents distance msg is not used 
-        bool hasDistance = ((anchorData->seq & 0x80) != 0);
+        bool hasDistance = ((agentData->seq & 0x80) != 0);
         if (hasDistance) {
-        anchorDataPtr += sizeof(remoteAnchorDataFull_t);
+        agentDataPtr += sizeof(remoteAgentDataFull_t);
         } else {
-        anchorDataPtr += sizeof(remoteAnchorDataShort_t);
+        agentDataPtr += sizeof(remoteAgentDataShort_t);
         }
     }
     return false;
 }
 
-static void fillClockCorrectionBucket(anchorContext_t* anchorCtx) {
-    if (anchorCtx->clockCorrectionBucket < CLOCK_CORRECTION_BUCKET_MAX) {
-      anchorCtx->clockCorrectionBucket++;
+static void fillClockCorrectionBucket(agentContext_t* agentCtx) {
+    if (agentCtx->clockCorrectionBucket < CLOCK_CORRECTION_BUCKET_MAX) {
+      agentCtx->clockCorrectionBucket++;
     }
 }
 
-static bool emptyClockCorrectionBucket(anchorContext_t* anchorCtx) {
-    if (anchorCtx->clockCorrectionBucket > 0) {
-      anchorCtx->clockCorrectionBucket--;
+static bool emptyClockCorrectionBucket(agentContext_t* agentCtx) {
+    if (agentCtx->clockCorrectionBucket > 0) {
+      agentCtx->clockCorrectionBucket--;
       return false;
     }
     return true;
 }
 
-static bool updateClockCorrection(anchorContext_t* anchorCtx, double clockCorrection) {
-  const double diff = clockCorrection - anchorCtx->clockCorrection;
+static bool updateClockCorrection(agentContext_t* agentCtx, double clockCorrection) {
+  const double diff = clockCorrection - agentCtx->clockCorrection;
   bool sampleIsAccepted = false;
 
   if (-CLOCK_CORRECTION_ACCEPTED_NOISE < diff && diff < CLOCK_CORRECTION_ACCEPTED_NOISE) {
     // LP filter
-    anchorCtx->clockCorrection = anchorCtx->clockCorrection * (1.0d - CLOCK_CORRECTION_FILTER) + clockCorrection * CLOCK_CORRECTION_FILTER;
+    agentCtx->clockCorrection = agentCtx->clockCorrection * (1.0d - CLOCK_CORRECTION_FILTER) + clockCorrection * CLOCK_CORRECTION_FILTER;
 
-    fillClockCorrectionBucket(anchorCtx);
+    fillClockCorrectionBucket(agentCtx);
     sampleIsAccepted = true;
   } else {
-    if (emptyClockCorrectionBucket(anchorCtx)) {
+    if (emptyClockCorrectionBucket(agentCtx)) {
       if (CLOCK_CORRECTION_SPEC_MIN < clockCorrection && clockCorrection < CLOCK_CORRECTION_SPEC_MAX) {
-        anchorCtx->clockCorrection = clockCorrection;
+        agentCtx->clockCorrection = clockCorrection;
       }
     }
   }
@@ -448,7 +469,7 @@ static bool updateClockCorrection(anchorContext_t* anchorCtx, double clockCorrec
 //[New]: get the LPP transmitted data --- tdoa4
 static void handleLppShortPacket_tdoa4(const uint8_t *data, const int length) {
   uint8_t type = data[0];
-  if (type == LPP_SHORT_ANCHORPOS) {
+  if (type == LPP_SHORT_AGENT_INFO) {
     struct lppShortAgent_s *pose = (struct lppShortAgent_s*)&data[1];
     // printf("Position data is: (%f,%f,%f) \r\n", pos->x, pos->y, pos->z);
     // save and use the remote angent data
@@ -473,6 +494,7 @@ static void handleLppPacket_tdoa4(const int dataLength, int rangePacketLength, c
         const uint8_t lppPacketHeader = rxPacket->payload[startOfLppDataInPayload];
         if (lppPacketHeader == LPP_HEADER_SHORT_PACKET) {
             const int32_t lppTypeAndPayloadLength = lppDataLength - 1;
+            // extract the remote agent info for usage
             handleLppShortPacket_tdoa4(&rxPacket->payload[lppTypeInPayload], lppTypeAndPayloadLength);
       }
     }
@@ -481,11 +503,11 @@ static void handleLppPacket_tdoa4(const int dataLength, int rangePacketLength, c
 // [New]: Update the remote agent info, also get the rangeDataLength --> for LPP packet
 // [Note]: store the remote agent info. for tdoa (among agents) computation
 static int updateRemoteAgentData(const void* payload){
-    const rangePacket3_t* packet = (rangePacket3_t*)payload;
-    const void* anchorDataPtr = &packet->remoteAnchorData;
+    const rangePacket4_t* packet = (rangePacket4_t*)payload;
+    const void* agentDataPtr = &packet->remoteAgentData;
     // loop over all remote agent packe info, should save the remote agent data
     for(uint8_t i = 0; i<packet->header.remoteCount; i++){
-        remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
+        remoteAgentDataFull_t* agentData = (remoteAgentDataFull_t*)agentDataPtr;
         /* comment out unused value*/
         // uint8_t remoteId = anchorData->id;
         // int64_t remoteRxTime = anchorData->rxTimeStamp;
@@ -496,7 +518,7 @@ static int updateRemoteAgentData(const void* payload){
         //    tdoaStorageSetRemoteRxTime(anchorCtx, remoteId, remoteRxTime, remoteSeqNr);
         // }
         /* ----------------- --------------------------- ----------------- */
-        bool hasDistance = ((anchorData->seq & 0x80) != 0);
+        bool hasDistance = ((agentData->seq & 0x80) != 0);
         if (hasDistance) {
         /* comment out unused value*/
         // int64_t tof = anchorData->distance;
@@ -512,12 +534,12 @@ static int updateRemoteAgentData(const void* payload){
         //     }
         // }
         /* ----------------- --------------------------- ----------------- */
-        anchorDataPtr += sizeof(remoteAnchorDataFull_t);
+        agentDataPtr += sizeof(remoteAgentDataFull_t);
         } else {
-        anchorDataPtr += sizeof(remoteAnchorDataShort_t);
+        agentDataPtr += sizeof(remoteAgentDataShort_t);
         }
     }
-    return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
+    return (uint8_t*)agentDataPtr - (uint8_t*)packet;
 }
 
 //[note]: get range data from message
@@ -527,41 +549,41 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
   //     in CF: locoAddress_t sourceAddress =>  uint64_t sourceAddress
   // in anchor: uint8_t sourceAddress[8]
   // similar to destAddress
-  const uint8_t remoteAnchorId = rxPacket->sourceAddress;
-  ctx.anchorRxCount[remoteAnchorId]++;
-  anchorContext_t* anchorCtx = getContext(remoteAnchorId);
-  if (anchorCtx) {
-    const rangePacket3_t* rangePacket = (rangePacket3_t *)rxPacket->payload;
+  const uint8_t remoteAgentId = rxPacket->sourceAddress;
+  ctx.agentRxCount[remoteAgentId]++;
+  agentContext_t* agentCtx = getContext(remoteAgentId);
+  if (agentCtx) {
+    const rangePacket4_t* rangePacket = (rangePacket4_t *)rxPacket->payload;
 
     uint32_t remoteTx = rangePacket->header.txTimeStamp;
     uint8_t remoteTxSeqNr = rangePacket->header.seq;
 
-    double clockCorrection = calculateClockCorrection(anchorCtx, remoteTxSeqNr, remoteTx, rxTime);
-    if (updateClockCorrection(anchorCtx, clockCorrection)) {
-      anchorCtx->isDataGoodForTransmission = true;
+    double clockCorrection = calculateClockCorrection(agentCtx, remoteTxSeqNr, remoteTx, rxTime);
+    if (updateClockCorrection(agentCtx, clockCorrection)) {
+      agentCtx->isDataGoodForTransmission = true;
 
       uint32_t remoteRx = 0;
       uint8_t remoteRxSeqNr = 0;
       bool dataFound = extractFromPacket(rangePacket, &remoteRx, &remoteRxSeqNr);
       if (dataFound) {
         //[note]: here is the range distance data!
-        uint16_t distance = calculateDistance(anchorCtx, remoteRxSeqNr, remoteTx, remoteRx, rxTime);
+        uint16_t distance = calculateDistance(agentCtx, remoteRxSeqNr, remoteTx, remoteRx, rxTime);
         // TODO krri Remove outliers in distances
         if (distance > MIN_TOF) {
-          anchorCtx->distance = distance;
-          anchorCtx->distanceUpdateTime = xTaskGetTickCount();
+          agentCtx->distance = distance;
+          agentCtx->distanceUpdateTime = xTaskGetTickCount();
         //[note]: log range
         // log_range = anchorCtx->distance;
         }
       }
     } else {
-      anchorCtx->isDataGoodForTransmission = false;
+      agentCtx->isDataGoodForTransmission = false;
     }
     // [change]
-    rangingOk = anchorCtx->isDataGoodForTransmission;
-    anchorCtx->rxTimeStamp = rxTime;
-    anchorCtx->seqNr = remoteTxSeqNr;
-    anchorCtx->txTimeStamp = remoteTx;
+    rangingOk = agentCtx->isDataGoodForTransmission;
+    agentCtx->rxTimeStamp = rxTime;
+    agentCtx->seqNr = remoteTxSeqNr;
+    agentCtx->txTimeStamp = remoteTx;
     // [New] get transmitted info. Position + quaternion
     int rangeDataLength = updateRemoteAgentData(rangePacket); 
     handleLppPacket_tdoa4(dataLength, rangeDataLength, rxPacket);
@@ -569,39 +591,39 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
 }
 
 // Send information 
-static int populateTxData(rangePacket3_t *rangePacket)
+static int populateTxData(rangePacket4_t *rangePacket)
 {
   // rangePacket->header.type already populated
   rangePacket->header.seq = ctx.seqNr;
   rangePacket->header.txTimeStamp = ctx.txTime;
 
-  uint8_t remoteAnchorCount = 0;
-  uint8_t* anchorDataPtr = &rangePacket->remoteAnchorData;
+  uint8_t remoteAgentCount = 0;
+  uint8_t* agentDataPtr = &rangePacket->remoteAgentData;
   for (uint8_t i = 0; i < ctx.remoteTxIdCount; i++) {
-    remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*) anchorDataPtr;
+    remoteAgentDataFull_t* agentData = (remoteAgentDataFull_t*) agentDataPtr;
 
     uint8_t id = ctx.remoteTxId[i];
-    anchorContext_t* anchorCtx = getContext(id);
+    agentContext_t* agentCtx = getContext(id);
 
-    if (anchorCtx->isDataGoodForTransmission) {
-      anchorData->id = id;
-      anchorData->seq = anchorCtx->seqNr;
-      anchorData->rxTimeStamp = anchorCtx->rxTimeStamp;
+    if (agentCtx->isDataGoodForTransmission) {
+      agentData->id = id;
+      agentData->seq = agentCtx->seqNr;
+      agentData->rxTimeStamp = agentCtx->rxTimeStamp;
 
-      if (anchorCtx->distance > 0) {
-        anchorData->distance = anchorCtx->distance;
-        anchorDataPtr += sizeof(remoteAnchorDataFull_t);
-        anchorData->seq |= 0x80;
+      if (agentCtx->distance > 0) {
+        agentData->distance = agentCtx->distance;
+        agentDataPtr += sizeof(remoteAgentDataFull_t);
+        agentData->seq |= 0x80;
       } else {
-        anchorDataPtr += sizeof(remoteAnchorDataShort_t);
+        agentDataPtr += sizeof(remoteAgentDataShort_t);
       }
 
-      remoteAnchorCount++;
+      remoteAgentCount++;
     }
   }
-  rangePacket->header.remoteCount = remoteAnchorCount;
+  rangePacket->header.remoteCount = remoteAgentCount;
 
-  return (uint8_t*)anchorDataPtr - (uint8_t*)rangePacket;
+  return (uint8_t*)agentDataPtr - (uint8_t*)rangePacket;
 }
 // Set TX data in the radio TX buffer for sendind: sourceAddress, destAddress, LPP.position
 static void setTxData(dwDevice_t *dev)
@@ -614,23 +636,23 @@ static void setTxData(dwDevice_t *dev)
     MAC80215_PACKET_INIT(txPacket, MAC802154_TYPE_DATA);
     // [change]: add '&' in front of txPacket 
     memcpy(&txPacket.sourceAddress, base_address, 8);
-    txPacket.sourceAddress = ctx.anchorId;
+    txPacket.sourceAddress = ctx.agentId;
     memcpy(&txPacket.destAddress, base_address, 8);
     txPacket.destAddress = 0xff;
     txPacket.payload[0] = PACKET_TYPE_TDOA4;
 
     firstEntry = false;
   }
-    int rangePacketSize = populateTxData((rangePacket3_t *)txPacket.payload);
+    int rangePacketSize = populateTxData((rangePacket4_t *)txPacket.payload);
     // LPP anchor position is currently sent in all packets
     txPacket.payload[rangePacketSize + LPP_HEADER] = SHORT_LPP;
-    txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
+    txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_AGENT_INFO;
 
     struct lppShortAgent_s *pos = (struct lppShortAgent_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
     // test with dummy positions: it works!
-    float dummy_pos[3] = {0.15, 0.25, 0.35};
-    float dummy_quater[4] = {0.015, 0.025, 0.035, 0.045};
-    float dummy_imu[6] = {0.115, 0.225, 0.335, 0.445, 0.555, 0.665};
+    float dummy_pos[3] = {1.15, 1.25, 1.35};
+    float dummy_quater[4] = {1.015, 1.025, 1.035, 1.045};
+    float dummy_imu[6] = {1.115, 1.225, 1.335, 1.445, 1.555, 1.665};
     memcpy(pos->position, dummy_pos, 3 * sizeof(float));
     memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
     memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
@@ -876,6 +898,7 @@ static void handleRxPacket(dwDevice_t *dev)
     switch(rxPacket.payload[0]) {
         case PACKET_TYPE_TDOA3: 
             rxcallback_tdoa3(dev);     // compute tdoa3 
+            break;
         case PACKET_TYPE_TDOA4:        //[change]
             // original code
             handleRangePacket(rxTime.low32, &rxPacket, dataLength);   //[note] get range
@@ -903,7 +926,7 @@ static void handleRxPacket(dwDevice_t *dev)
             // DEBUG_PRINT("Receive Short LPP\n");
             // DEBUG_PRINT("rxPacket.destAddress is %d \n",(int)rxPacket.destAddress);
             // DEBUG_PRINT("ctx.anchorId is %d \n",(int)ctx.anchorId);
-            if ((int)rxPacket.destAddress == ctx.anchorId) {  // the lpp is sent to this Agent. 
+            if ((int)rxPacket.destAddress == ctx.agentId) {  // the lpp is sent to this Agent. 
                 // DEBUG_PRINT("Receive the correct Short LPP packet !!!!!!!!!!!!\n");
                 // testing switch time//
                 // xStart_s = T2M(xTaskGetTickCount());
@@ -956,8 +979,10 @@ static uint32_t onEvent(dwDevice_t *dev, uwbEvent_t event) {
             // rxcallback_tdoa3(dev);
             break;
         case eventTimeout:
+            setRadioInReceiveMode(dev);
             break;
         case eventReceiveTimeout:
+            setRadioInReceiveMode(dev);
             break;
         case eventPacketSent:
             // Service packet sent, the radio is back to receive automatically
@@ -973,9 +998,9 @@ static uint32_t onEvent(dwDevice_t *dev, uwbEvent_t event) {
     uint32_t now_ms = T2M(xTaskGetTickCount());
     tdoaStatsUpdate(&engineState.stats, now_ms);
     // --- tdoa4 --- //
-    if (now_ms> ctx.nextAnchorListUpdate){
-        updateAnchorLists();
-        ctx.nextAnchorListUpdate = now_ms + ANCHOR_LIST_UPDATE_INTERVAL;
+    if (now_ms> ctx.nextAgentListUpdate){     
+        updateAgentLists();  
+        ctx.nextAgentListUpdate = now_ms + AGENT_LIST_UPDATE_INTERVAL;
     }
 
     uint32_t timeout_ms = startNextEvent(dev,now_ms);
@@ -1025,7 +1050,6 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 static void Initialize(dwDevice_t *dev) {
     uint32_t now_ms = T2M(xTaskGetTickCount());
-    // agentID = 0;   // Agent ID
     tdoaEngineInit(&engineState, now_ms, sendTdoaToEstimatorCallback, LOCODECK_TS_FREQ);
 
     #ifdef LPS_2D_POSITION_HEIGHT
@@ -1045,22 +1069,22 @@ static void Initialize(dwDevice_t *dev) {
     rangingOk = false;
     // ----------------------- initialize Agent info. (tdoa4) ----------------------- // 
     // manually set the Agent ID
-    ctx.anchorId = 0;   // Agent ID
+    ctx.agentId = 1;   // Agent ID
     ctx.seqNr = 0;
     ctx.txTime = 0;
     ctx.nextTxTick = 0;
-    ctx.averageTxDelay = 1000.0 / ANCHOR_MAX_TX_FREQ;
+    ctx.averageTxDelay = 1000.0 / AGENT_MAX_TX_FREQ;
     ctx.remoteTxIdCount = 0;
-    ctx.nextAnchorListUpdate = 0;
+    ctx.nextAgentListUpdate = 0;
 
-    memset(&ctx.anchorCtxLookup, ID_WITHOUT_CONTEXT, ID_COUNT);
-    for (int i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
-        ctx.anchorCtx[i].isUsed = false;
+    memset(&ctx.agentCtxLookup, ID_WITHOUT_CONTEXT, ID_COUNT);
+    for (int i = 0; i < AGENT_STORAGE_COUNT; i++) {
+        ctx.agentCtx[i].isUsed = false;
     }
 
-    clearAnchorRxCount();
+    clearAgentRxCount();
 
-    srand(ctx.anchorId);
+    srand(ctx.agentId);
     // ------------------------------------ End ------------------------------------ //
 }
 #pragma GCC diagnostic pop
@@ -1094,9 +1118,7 @@ LOG_ADD(LOG_UINT16, stMiss, &engineState.stats.contextMissRate)
 LOG_ADD(LOG_FLOAT, cc, &engineState.stats.clockCorrection)
 LOG_ADD(LOG_UINT16, tof, &engineState.stats.tof)
 LOG_ADD(LOG_FLOAT, tdoa, &engineState.stats.tdoa)
-LOG_GROUP_STOP(tdoa3)
 
-PARAM_GROUP_START(tdoa3)
 PARAM_ADD(PARAM_UINT8, logId, &engineState.stats.newAnchorId)
 PARAM_ADD(PARAM_UINT8, logOthrId, &engineState.stats.newRemoteAnchorId)
 PARAM_GROUP_STOP(tdoa3)

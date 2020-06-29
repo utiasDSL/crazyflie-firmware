@@ -124,6 +124,7 @@ void locoDeckSetRangingState(const uint16_t newState);
 
 #define LPP_SHORT_ANCHORPOS 0x01
 
+
 struct lppShortAnchorPos_s {
   float x;
   float y;

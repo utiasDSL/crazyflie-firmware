@@ -52,10 +52,14 @@
 #include "locodeck.h"
 
 #include "lpsTdoa2Tag.h"
-#include "lpsTdoa3Tag.h"
+// The header files tdoa3 and tdoa4 have repeated definition, a way to walk around
+// #include "lpsTdoa3Tag.h"
+extern uwbAlgorithm_t uwbTdoa3TagAlgorithm;
+
 #include "lpsTwrTag.h"
 //[Add]
 #include "lpsTdoa4Tag.h"
+
 
 
 #define CS_PIN DECK_GPIO_IO1
