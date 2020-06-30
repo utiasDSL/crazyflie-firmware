@@ -651,9 +651,9 @@ static void setTxData(dwDevice_t *dev)
 
     struct lppShortAgent_s *pos = (struct lppShortAgent_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
     // test with dummy positions: it works!
-    float dummy_pos[3] = {1.15, 1.25, 1.35};
-    float dummy_quater[4] = {1.015, 1.025, 1.035, 1.045};
-    float dummy_imu[6] = {1.115, 1.225, 1.335, 1.445, 1.555, 1.665};
+    float dummy_pos[3] = {0.15, 0.25, 0.35};
+    float dummy_quater[4] = {0.015, 0.025, 0.035, 0.045};
+    float dummy_imu[6] = {0.115, 0.225, 0.335, 0.445, 0.555, 0.665};
     memcpy(pos->position, dummy_pos, 3 * sizeof(float));
     memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
     memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
@@ -1072,7 +1072,7 @@ static void Initialize(dwDevice_t *dev) {
     rangingOk = false;
     // ----------------------- initialize Agent info. (tdoa4) ----------------------- // 
     // manually set the Agent ID
-    ctx.agentId = 1;   // Agent ID
+    ctx.agentId = 0;   // Agent ID
     ctx.seqNr = 0;
     ctx.txTime = 0;
     ctx.nextTxTick = 0;
