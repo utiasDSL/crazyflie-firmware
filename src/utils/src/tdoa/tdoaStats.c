@@ -56,19 +56,31 @@ void tdoaStatsInit(tdoaStats_t* tdoaStats, uint32_t now_ms) {
   clearStats(tdoaStats);
 }
 // [Question]: Not sure what is the functionality
-// used for the GUI and debugging. 
+// [Answer]: used for the GUI and debugging. 
 void tdoaStatsUpdate(tdoaStats_t* tdoaStats, uint32_t now_ms) {
   if (now_ms > tdoaStats->nextStatisticsTime) {
     float interval = now_ms - tdoaStats->previousStatisticsTime;
     if (interval > 0.0f) {
+
+      // [Note]: the rate of receiving tdoa3 packet. (Rate of calling rxcallback_tdoa3)
       tdoaStats->packetsReceivedRate = (uint16_t)(1000.0f * tdoaStats->packetsReceived / interval);
+
+      // [Note]: the rate of sending tdoa meas. to EKF (always 0)
       tdoaStats->packetsToEstimatorRate = (uint16_t)(1000.0f * tdoaStats->packetsToEstimator / interval);
+    
+      // [Note]: The value is always 0
       tdoaStats->clockCorrectionRate = (uint16_t)(1000.0f * tdoaStats->clockCorrectionCount / interval);
 
+      // [Note]: contextHitRate is around 100
       tdoaStats->contextHitRate = (uint16_t)(1000.0f * tdoaStats->contextHitCount / interval);
+
+      // [Note]: The value is always 0
       tdoaStats->contextMissRate = (uint16_t)(1000.0f * tdoaStats->contextMissCount / interval);
 
+      // [Note]: The value is always 0
       tdoaStats->suitableDataFoundRate = (uint16_t)(1000.0f * tdoaStats->suitableDataFound / interval);
+
+      // [Note]: The value is always 0
       tdoaStats->timeIsGoodRate = (uint16_t)(1000.0f * tdoaStats->timeIsGood / interval);
     }
 

@@ -71,6 +71,7 @@ The implementation must handle
 #include "param.h"
 // [New]
 // #include "lpsTdoa4Tag.h"
+
 // Positions for sent LPP packets
 #define LPS_TDOA3_TYPE 0
 #define LPS_TDOA3_SEND_LPP_PAYLOAD 1
@@ -542,7 +543,7 @@ static int updateRemoteAgentData(const void* payload){
     return (uint8_t*)agentDataPtr - (uint8_t*)packet;
 }
 
-//[note]: get range data from message
+//[note]: get range data from message (TDoA4)
 static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, const int dataLength)
 {
   //[change] packet code is slightly different 
@@ -694,6 +695,7 @@ static void setRadioInReceiveMode(dwDevice_t *dev) {
     dwStartReceive(dev);
 }
 
+// [Note]: transmit TWR
 static uint32_t startNextEvent(dwDevice_t *dev, uint32_t now)
 {
   dwIdle(dev);
@@ -833,6 +835,7 @@ static void lppHandleShortPacket(uint8_t *data, size_t length)
 /* ----------------------------- Callback function for tdoa3 ------------------------------------ */
 static void rxcallback_tdoa3(dwDevice_t *dev) {
     tdoaStats_t* stats = &engineState.stats;
+    // [Note]: The value here is reasonable
     stats->packetsReceived++;
 
     int dataLength = dwGetDataLength(dev);
@@ -1104,6 +1107,8 @@ uwbAlgorithm_t uwbTdoa3TagAlgorithm = {
 };
 
 // [Note]: for debugging to see the tdoa packet rate
+// [Problem]: stRx and stHit have values.
+//            stEst, stTime, stFound, stCc, stMiss, cc remain to be 0.
 LOG_GROUP_START(tdoa3)
 LOG_ADD(LOG_UINT16, stRx, &engineState.stats.packetsReceivedRate)
 LOG_ADD(LOG_UINT16, stEst, &engineState.stats.packetsToEstimatorRate)

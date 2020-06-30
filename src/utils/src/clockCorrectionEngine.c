@@ -1,5 +1,8 @@
 #include "clockCorrectionEngine.h"
 
+#define DEBUG_MODULE "ClockCorrect_ENGINE"
+#include "debug.h"
+
 #define MAX_CLOCK_DEVIATION_SPEC 10e-6
 #define CLOCK_CORRECTION_SPEC_MIN (1.0 - MAX_CLOCK_DEVIATION_SPEC * 2)
 #define CLOCK_CORRECTION_SPEC_MAX (1.0 + MAX_CLOCK_DEVIATION_SPEC * 2)
@@ -84,14 +87,27 @@ double clockCorrectionEngineCalculate(const uint64_t new_t_in_cl_reference, cons
 
 /**
  Updates the clock correction only if the provided value follows certain conditions. This is used to discard wrong clock correction measurements.
- @return True if the provided clock correction sample ir reliable, false otherwise. A sample is reliable when it is in the accepted noise level (which means that we already have two or more samples that are similar) and has been LP filtered.
+ @return True if the provided clock correction sample is reliable, false otherwise. A sample is reliable when it is in the accepted noise level (which means that we already have two or more samples that are similar) and has been LP filtered.
  */
+
+
+// [Problem] Find the problem in this function
 bool clockCorrectionEngineUpdate(clockCorrectionStorage_t* storage, const double clockCorrectionCandidate) {
   bool sampleIsReliable = false;
-
+  /*--------------------------------------------------------------------------------------*/
+  // [Solution] Solution 2. (works) It seems the "initialize" is called only once.
+  // [Problem] Did not find where the clockCorrection is initialized in the original code.
+    if (storage->clockCorrection == 0){
+        DEBUG_PRINT("Solution 2 !!!!!!!!!!!!!!!!!!!");
+        storage->clockCorrection = clockCorrectionCandidate;
+    }
+  /*--------------------------------------------------------------------------------------*/
   const double currentClockCorrection = storage->clockCorrection;
   const double difference = clockCorrectionCandidate - currentClockCorrection;
 
+  // [Problem]: The currentClockCorrection is 0, leading to a large difference.(storage->clockCorrection is not initialized) 
+  //   DEBUG_PRINT("currentClockCorrection: %f \n", currentClockCorrection);
+  //   DEBUG_PRINT("difference: %f \n", difference);
 #ifdef CLOCK_CORRECTION_ENABLE_LOGGING
   logMinAcceptedNoiseLimit = scaleValueForLogging(currentClockCorrection - CLOCK_CORRECTION_ACCEPTED_NOISE);
   logMaxAcceptedNoiseLimit = scaleValueForLogging(currentClockCorrection + CLOCK_CORRECTION_ACCEPTED_NOISE);
@@ -101,10 +117,14 @@ bool clockCorrectionEngineUpdate(clockCorrectionStorage_t* storage, const double
   logClockCorrectionCandidate = scaleValueForLogging(clockCorrectionCandidate);
 #endif
 
+// [Original code] The currentClockCorrection is 0, leading to a large difference.
   if (-CLOCK_CORRECTION_ACCEPTED_NOISE < difference && difference < CLOCK_CORRECTION_ACCEPTED_NOISE) {
     // Simple low pass filter
     const double newClockCorrection = currentClockCorrection * CLOCK_CORRECTION_FILTER + clockCorrectionCandidate * (1.0 - CLOCK_CORRECTION_FILTER);
 
+// [Solution] One way to walk around. It works!!!!!! (Solution 1)
+// if(true && difference){
+//     const double newClockCorrection = clockCorrectionCandidate;
     sampleIsReliable = true;
     fillClockCorrectionBucket(storage);
     storage->clockCorrection = newClockCorrection;

@@ -67,6 +67,7 @@ static uint64_t truncateToAnchorTimeStamp(uint64_t fullTimeStamp) {
   return fullTimeStamp & TRUNCATE_TO_ANCHOR_TS_BITMAP;
 }
 
+
 static void enqueueTDOA(const tdoaAnchorContext_t* anchorACtx, const tdoaAnchorContext_t* anchorBCtx, double distanceDiff, tdoaEngineState_t* engineState) {
   tdoaStats_t* stats = &engineState->stats;
 
@@ -78,12 +79,12 @@ static void enqueueTDOA(const tdoaAnchorContext_t* anchorACtx, const tdoaAnchorC
   //[Note]: send the anchor positions to EKF as well
   if (tdoaStorageGetAnchorPosition(anchorACtx, &tdoa.anchorPosition[0]) && tdoaStorageGetAnchorPosition(anchorBCtx, &tdoa.anchorPosition[1])) {
       stats->packetsToEstimator++;
-      // [Note]: Send the TDoA meas. to onboard EKF
-      // It is initialized in tdoaEngineInit.
+      // [Note]: Send the TDoA meas. to onboard EKF. It is initialized in tdoaEngineInit.
       engineState->sendTdoaToEstimator(&tdoa);
 
       uint8_t idA = tdoaStorageGetId(anchorACtx);
       uint8_t idB = tdoaStorageGetId(anchorBCtx);
+      //[Note]: stats-> tdoa should update here
       if (idA == stats->anchorId && idB == stats->remoteAnchorId) {
         stats->tdoa = distanceDiff;
       }
@@ -93,6 +94,8 @@ static void enqueueTDOA(const tdoaAnchorContext_t* anchorACtx, const tdoaAnchorC
   }
 }
 
+//[Problem]: stats->clockCorrectionCount and stats->clockCorrection remain to be 0
+// Found the problem in clockCorrectionEngine, leading to  (sampleIsReliable -> false)
 static bool updateClockCorrection(tdoaAnchorContext_t* anchorCtx, const int64_t txAn_in_cl_An, const int64_t rxAn_by_T_in_cl_T, tdoaStats_t* stats) {
   bool sampleIsReliable = false;
 
@@ -100,7 +103,10 @@ static bool updateClockCorrection(tdoaAnchorContext_t* anchorCtx, const int64_t 
   const int64_t latest_txAn_in_cl_An = tdoaStorageGetTxTime(anchorCtx);
 
   if (latest_rxAn_by_T_in_cl_T != 0 && latest_txAn_in_cl_An != 0) {
+
     double clockCorrectionCandidate = clockCorrectionEngineCalculate(rxAn_by_T_in_cl_T, latest_rxAn_by_T_in_cl_T, txAn_in_cl_An, latest_txAn_in_cl_An, TRUNCATE_TO_ANCHOR_TS_BITMAP);
+    // DEBUG_PRINT("clock Correction Cand: %f \n", clockCorrectionCandidate); // around 1.000062
+
     sampleIsReliable = clockCorrectionEngineUpdate(tdoaStorageGetClockCorrectionStorage(anchorCtx), clockCorrectionCandidate);
 
     if (sampleIsReliable){
@@ -169,15 +175,20 @@ static bool findSuitableAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext
   return false;
 }
 
+
 void tdoaEngineGetAnchorCtxForPacketProcessing(tdoaEngineState_t* engineState, const uint8_t anchorId, const uint32_t currentTime_ms, tdoaAnchorContext_t* anchorCtx) {
   if (tdoaStorageGetCreateAnchorCtx(engineState->anchorInfoArray, anchorId, currentTime_ms, anchorCtx)) {
+      // contextHitCount has value
     engineState->stats.contextHitCount++;
   } else {
+      
     engineState->stats.contextMissCount++;
   }
 }
 
+
 void tdoaEngineProcessPacket(tdoaEngineState_t* engineState, tdoaAnchorContext_t* anchorCtx, const int64_t txAn_in_cl_An, const int64_t rxAn_by_T_in_cl_T) {
+    
   bool timeIsGood = updateClockCorrection(anchorCtx, txAn_in_cl_An, rxAn_by_T_in_cl_T, &engineState->stats);
   if (timeIsGood) {
     engineState->stats.timeIsGood++;
@@ -185,6 +196,7 @@ void tdoaEngineProcessPacket(tdoaEngineState_t* engineState, tdoaAnchorContext_t
     tdoaAnchorContext_t otherAnchorCtx;
     // find another anchor info to compute the TDoA. (change each time (randomly?))
     if (findSuitableAnchor(engineState, &otherAnchorCtx, anchorCtx)) {
+      
       engineState->stats.suitableDataFound++;
       double tdoaDistDiff = calcDistanceDiff(&otherAnchorCtx, anchorCtx, txAn_in_cl_An, rxAn_by_T_in_cl_T, engineState->locodeckTsFreq);
       enqueueTDOA(&otherAnchorCtx, anchorCtx, tdoaDistDiff, engineState);
