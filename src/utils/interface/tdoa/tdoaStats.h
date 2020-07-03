@@ -37,8 +37,8 @@ typedef struct {
   uint32_t nextStatisticsTime;
   uint32_t previousStatisticsTime;
 
-  uint8_t newAnchorId; // Used to change anchor to log, set as param
-  uint8_t newRemoteAnchorId; // Used to change remote anchor to log, set as param
+  uint8_t newAnchorId;        // Used to change anchor to log, set as param
+  uint8_t newRemoteAnchorId;  // Used to change remote anchor to log, set as param
 } tdoaStats_t;
 
 void tdoaStatsInit(tdoaStats_t* tdoaStats, uint32_t now_ms);

@@ -344,6 +344,10 @@ LOG_ADD(LOG_UINT16, stMiss, &engineState.stats.contextMissRate)
 LOG_ADD(LOG_FLOAT, cc, &engineState.stats.clockCorrection)
 LOG_ADD(LOG_UINT16, tof, &engineState.stats.tof)
 LOG_ADD(LOG_FLOAT, tdoa, &engineState.stats.tdoa)
+
+
+LOG_ADD(LOG_UINT8, logId, &engineState.stats.anchorId)
+LOG_ADD(LOG_UINT8, logRemoteId, &engineState.stats.remoteAnchorId)
 LOG_GROUP_STOP(tdoa3)
 
 PARAM_GROUP_START(tdoa3)

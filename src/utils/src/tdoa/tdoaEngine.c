@@ -52,8 +52,12 @@ The implementation must handle
 #include "tdoaStats.h"
 #include "clockCorrectionEngine.h"
 #include "physicalConstants.h"
+#include "log.h"
 
 #define MEASUREMENT_NOISE_STD 0.15f
+// log_param
+static uint8_t log_anchorId;
+static uint8_t log_remoteId;
 
 void tdoaEngineInit(tdoaEngineState_t* engineState, const uint32_t now_ms, tdoaEngineSendTdoaToEstimator sendTdoaToEstimator, const double locodeckTsFreq) {
   tdoaStorageInitialize(engineState->anchorInfoArray);
@@ -81,12 +85,24 @@ static void enqueueTDOA(const tdoaAnchorContext_t* anchorACtx, const tdoaAnchorC
 
       uint8_t idA = tdoaStorageGetId(anchorACtx);
       uint8_t idB = tdoaStorageGetId(anchorBCtx);
+      log_anchorId = idA;
+      log_remoteId = idB;
+      // the following if doesn't work properly
       if (idA == stats->anchorId && idB == stats->remoteAnchorId) {
         stats->tdoa = distanceDiff;
+        //log
+        // log_anchorId = tdoaStorageGetId(anchorACtx);
+        // log_remoteId = tdoaStorageGetId(anchorBCtx);
       }
       if (idB == stats->anchorId && idA == stats->remoteAnchorId) {
         stats->tdoa = -distanceDiff;
+        //log
+        // log_anchorId = tdoaStorageGetId(anchorBCtx);
+        // log_remoteId = tdoaStorageGetId(anchorACtx);
       }
+      //log
+      // log_anchorId = stats->anchorId;
+      // log_remoteId = stats->remoteAnchorId;
   }
 }
 
@@ -184,3 +200,8 @@ void tdoaEngineProcessPacket(tdoaEngineState_t* engineState, tdoaAnchorContext_t
     }
   }
 }
+
+LOG_GROUP_START(tdoa_engine)
+LOG_ADD(LOG_UINT8, logId, &log_anchorId)
+LOG_ADD(LOG_UINT8, logRemoteId, &log_remoteId)
+LOG_GROUP_STOP(tdoa_engine)
