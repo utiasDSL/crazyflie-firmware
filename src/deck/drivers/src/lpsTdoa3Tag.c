@@ -652,11 +652,11 @@ static void setTxData(dwDevice_t *dev)
     struct lppShortAgent_s *pos = (struct lppShortAgent_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
     // test with dummy positions: it works!
     float dummy_pos[3] = {0.15, 0.25, 0.35};
-    float dummy_quater[4] = {0.015, 0.025, 0.035, 0.045};
-    float dummy_imu[6] = {0.115, 0.225, 0.335, 0.445, 0.555, 0.665};
+    // float dummy_quater[4] = {0.015, 0.025, 0.035, 0.045};
+    // float dummy_imu[6] = {0.115, 0.225, 0.335, 0.445, 0.555, 0.665};
     memcpy(pos->position, dummy_pos, 3 * sizeof(float));
-    memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
-    memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
+    // memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
+    // memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
     lppLength = 2 + sizeof(struct lppShortAgent_s);
 
   dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
@@ -883,7 +883,8 @@ static void rxcallback_tdoa3(dwDevice_t *dev) {
 // int xStart_s=0;        // testing for switching mode, used in lpsTdoa3Tag.c
 static void handleRxPacket(dwDevice_t *dev)
 {
-    //   int xEnd=0; int xDifference=0;
+    // int xEnd=0; int xDifference=0;
+
     static packet_t rxPacket;
     dwTime_t rxTime = { .full = 0 };
 
@@ -1123,7 +1124,11 @@ LOG_ADD(LOG_UINT16, stMiss, &engineState.stats.contextMissRate)
 LOG_ADD(LOG_FLOAT, cc, &engineState.stats.clockCorrection)
 LOG_ADD(LOG_UINT16, tof, &engineState.stats.tof)
 LOG_ADD(LOG_FLOAT, tdoa, &engineState.stats.tdoa)
+LOG_ADD(LOG_UINT8, logId, &engineState.stats.newAnchorId)
+LOG_ADD(LOG_UINT8, logOthrId, &engineState.stats.newRemoteAnchorId)
+LOG_GROUP_STOP(tdoa3)
 
+PARAM_ADD_GROUP(tdoa3)
 PARAM_ADD(PARAM_UINT8, logId, &engineState.stats.newAnchorId)
 PARAM_ADD(PARAM_UINT8, logOthrId, &engineState.stats.newRemoteAnchorId)
 PARAM_GROUP_STOP(tdoa3)
