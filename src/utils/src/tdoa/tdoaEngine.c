@@ -52,8 +52,12 @@ The implementation must handle
 #include "tdoaStats.h"
 #include "clockCorrectionEngine.h"
 #include "physicalConstants.h"
-
+#include "log.h"
 #define MEASUREMENT_NOISE_STD 0.15f
+
+//log param
+static uint8_t log_anchorId;
+static uint8_t log_remoteId;
 
 void tdoaEngineInit(tdoaEngineState_t* engineState, const uint32_t now_ms, tdoaEngineSendTdoaToEstimator sendTdoaToEstimator, const double locodeckTsFreq) {
   tdoaStorageInitialize(engineState->anchorInfoArray);
@@ -84,6 +88,9 @@ static void enqueueTDOA(const tdoaAnchorContext_t* anchorACtx, const tdoaAnchorC
 
       uint8_t idA = tdoaStorageGetId(anchorACtx);
       uint8_t idB = tdoaStorageGetId(anchorBCtx);
+      log_anchorId = idA;
+      log_remoteId = idB;
+      // The if statements doesn't work properly
       //[Note]: stats-> tdoa should update here
       if (idA == stats->anchorId && idB == stats->remoteAnchorId) {
         stats->tdoa = distanceDiff;
@@ -203,3 +210,10 @@ void tdoaEngineProcessPacket(tdoaEngineState_t* engineState, tdoaAnchorContext_t
     }
   }
 }
+
+LOG_GROUP_START(tdoa_engine)
+LOG_ADD(LOG_INT8, logId, &log_anchorId)
+LOG_ADD(LOG_INT8, logRemoteId, &log_remoteId)
+LOG_GROUP_STOP(tdoa_engine)
+
+

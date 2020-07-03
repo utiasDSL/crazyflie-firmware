@@ -209,6 +209,8 @@ static struct remoteAgentInfo_s{
     double ranging;
 }remoteAgentInfo;                //[re-design]
 /* ------------------------------------------------------------------------------------------------- */
+//log parameters
+static float log_range;    // distance is uint16_t
 
 /* ----------------------------- Function used for tdoa4 feature ----------------------------- */
 static agentContext_t* getContext(uint8_t agentId) {
@@ -573,8 +575,9 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
         if (distance > MIN_TOF) {
           agentCtx->distance = distance;
           agentCtx->distanceUpdateTime = xTaskGetTickCount();
-        //[note]: log range
-        // log_range = anchorCtx->distance;
+        //[note]: log time of flight of inter-drone ranging
+          float M_PER_TICK = 0.0046917639786157855;
+          log_range = (float) distance * M_PER_TICK - (float)ANTENNA_OFFSET;
         }
       }
     } else {
@@ -1073,7 +1076,7 @@ static void Initialize(dwDevice_t *dev) {
     rangingOk = false;
     // ----------------------- initialize Agent info. (tdoa4) ----------------------- // 
     // manually set the Agent ID
-    ctx.agentId = 0;   // Agent ID
+    ctx.agentId = 1;   // Agent ID
     ctx.seqNr = 0;
     ctx.txTime = 0;
     ctx.nextTxTick = 0;
@@ -1124,11 +1127,13 @@ LOG_ADD(LOG_UINT16, stMiss, &engineState.stats.contextMissRate)
 LOG_ADD(LOG_FLOAT, cc, &engineState.stats.clockCorrection)
 LOG_ADD(LOG_UINT16, tof, &engineState.stats.tof)
 LOG_ADD(LOG_FLOAT, tdoa, &engineState.stats.tdoa)
-LOG_ADD(LOG_UINT8, logId, &engineState.stats.newAnchorId)
-LOG_ADD(LOG_UINT8, logOthrId, &engineState.stats.newRemoteAnchorId)
 LOG_GROUP_STOP(tdoa3)
 
-PARAM_ADD_GROUP(tdoa3)
+LOG_GROUP_START(tdoa4)
+LOG_ADD(LOG_FLOAT, inter_range, &log_range)
+LOG_GROUP_STOP(tdoa4)
+
+PARAM_GROUP_START(tdoa3)
 PARAM_ADD(PARAM_UINT8, logId, &engineState.stats.newAnchorId)
 PARAM_ADD(PARAM_UINT8, logOthrId, &engineState.stats.newRemoteAnchorId)
 PARAM_GROUP_STOP(tdoa3)
