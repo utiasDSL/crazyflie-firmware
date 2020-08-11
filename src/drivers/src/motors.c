@@ -46,6 +46,8 @@ static uint16_t motorsConvBitsTo16(uint16_t bits);
 static uint16_t motorsConv16ToBits(uint16_t bits);
 
 uint32_t motor_ratios[] = {0, 0, 0, 0};
+float motor_thrust_log[] = {0.0, 0.0, 0.0, 0.0};
+float motor_supply_voltage_log[] = {0.0, 0.0, 0.0, 0.0};
 
 void motorsPlayTone(uint16_t frequency, uint16_t duration_msec);
 void motorsPlayMelody(uint16_t *notes);
@@ -217,7 +219,8 @@ void motorsSetRatio(uint32_t id, uint16_t ithrust)
       percentage = percentage > 1.0f ? 1.0f : percentage;
       ratio = percentage * UINT16_MAX;
       motor_ratios[id] = ratio;
-
+      motor_thrust_log[id] = thrust;
+      motor_supply_voltage_log[id] = supply_voltage;
     }
   #endif
     if (motorMap[id]->drvType == BRUSHLESS)
@@ -307,3 +310,17 @@ LOG_ADD(LOG_UINT32, m2_pwm, &motor_ratios[1])
 LOG_ADD(LOG_UINT32, m3_pwm, &motor_ratios[2])
 LOG_ADD(LOG_UINT32, m4_pwm, &motor_ratios[3])
 LOG_GROUP_STOP(pwm)
+
+LOG_GROUP_START(thrust)
+LOG_ADD(LOG_FLOAT, m1_thrust, &motor_thrust_log[0])
+LOG_ADD(LOG_FLOAT, m2_thrust, &motor_thrust_log[1])
+LOG_ADD(LOG_FLOAT, m3_thrust, &motor_thrust_log[2])
+LOG_ADD(LOG_FLOAT, m4_thrust, &motor_thrust_log[3])
+LOG_GROUP_STOP(thrust)
+
+LOG_GROUP_START(supvolt)
+LOG_ADD(LOG_FLOAT, m1_supvolt, &motor_supply_voltage_log[0])
+LOG_ADD(LOG_FLOAT, m2_supvolt, &motor_supply_voltage_log[1])
+LOG_ADD(LOG_FLOAT, m3_supvolt, &motor_supply_voltage_log[2])
+LOG_ADD(LOG_FLOAT, m4_supvolt, &motor_supply_voltage_log[3])
+LOG_GROUP_STOP(supvolt)
