@@ -70,7 +70,7 @@ static const uint8_t typeLength[] = {
 };
 
 // Maximum log payload length (4 bytes are used for block id and timestamp)
-#define LOG_MAX_LEN 26
+#define LOG_MAX_LEN 52
 
 /* Log packet parameters storage */
 #define LOG_MAX_OPS 128
