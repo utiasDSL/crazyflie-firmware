@@ -61,12 +61,9 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
      0xbccf000000000007,
  #endif
    },
-
    .combinedAnchorPositionOk = false,
-
    // To set a static anchor position from startup, uncomment and modify the
    // following code:
-
    //DSL-08vicon
     .anchorPosition = {
             {timestamp: 1, x: -3.1705, y: -4.0053, z: 0.16087},   //0
@@ -309,13 +306,13 @@ static bool rxcallback(dwDevice_t *dev) {
 
     if (anchor < LOCODECK_NR_OF_TDOA2_ANCHORS) {
 
-#ifdef LPS_TDOA2_SYNCHRONIZATION_VARIABLE
-      // Storing timing
-      if (anchor == 0) {
-        stats.lastAnchor0Seq = packet->sequenceNrs[anchor];
-        stats.lastAnchor0RxTick = xTaskGetTickCount();
-      }
-#endif
+    #ifdef LPS_TDOA2_SYNCHRONIZATION_VARIABLE
+        // Storing timing
+        if (anchor == 0) {
+            stats.lastAnchor0Seq = packet->sequenceNrs[anchor];
+            stats.lastAnchor0RxTick = xTaskGetTickCount();
+        }
+    #endif
 
       calcClockCorrection(&history[anchor].clockCorrection_T_To_A, anchor, packet, &arrival);
       logClockCorrection[anchor] = history[anchor].clockCorrection_T_To_A;
@@ -324,7 +321,7 @@ static bool rxcallback(dwDevice_t *dev) {
         float tdoaDistDiff = 0.0;
         if (calcDistanceDiff(&tdoaDistDiff, previousAnchor, anchor, packet, &arrival)) {
           rangingOk = true;
-          enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);        // update measurements
+          enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);        // update measurements to EKF
           addToLog(anchor, previousAnchor, tdoaDistDiff, packet);   // recall the measurements in round-robbin fashion (7-0,0-1, ... ,6-7)
         }
       }

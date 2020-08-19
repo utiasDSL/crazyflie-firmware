@@ -580,8 +580,6 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
     doneUpdate = true;
   }
 
-//  major changes
-//  modify here for trilateration
   float dt_uwb = (float)(osTick-lastPrediction)/configTICK_RATE_HZ;     // re-check about this dt
   distanceMeasurement_t dist;
   while (stateEstimatorHasDistanceMeasurement(&dist)){
@@ -1171,7 +1169,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 //		  float f_pitch = wrap_angle(pitch);
 		  float f_yaw = yaw;
 		  float f_roll = roll;
-		  float f_pitch = pitch;
+		  float f_pitch = pitch;                    // Need to check if this one is correct? or -pitch
 		  // original feature
 		  float feature[6] = {dx, dy, dz, f_yaw, f_roll, f_pitch};
 		  // debug feature
@@ -1739,6 +1737,7 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
   // [Change] change the roll, pitch and yaw into a static value (so that can be used in the NN_COM)
   yaw = atan2f(2*(q[1]*q[2]+q[0]*q[3]) , q[0]*q[0] + q[1]*q[1] - q[2]*q[2] - q[3]*q[3]);
   pitch = asinf(-2*(q[1]*q[3] - q[0]*q[2]));
+  // [Note]: pitch should be pitch = - pitch
   roll = atan2f(2*(q[2]*q[3]+q[0]*q[1]) , q[0]*q[0] - q[1]*q[1] - q[2]*q[2] + q[3]*q[3]);
 
   // [CHANGE] yaw estimate
@@ -1748,7 +1747,7 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
   state->attitude = (attitude_t){
       .timestamp = tick,
       .roll = roll*RAD_TO_DEG,
-      .pitch = -pitch*RAD_TO_DEG,
+      .pitch = -pitch*RAD_TO_DEG,                       //[Question]: why pitch is negative   [Answer]: Maybe because of the IMU mounting
       .yaw = yaw*RAD_TO_DEG
   };
 
@@ -1764,7 +1763,6 @@ static void stateEstimatorExternalizeState(state_t *state, sensorData_t *sensors
       .z = q[3]
   };
 }
-
 
 void estimatorKalmanInit(void) {
   if (!isInit)
