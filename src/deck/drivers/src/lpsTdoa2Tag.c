@@ -41,7 +41,7 @@
 
 #include "physicalConstants.h"
 
-#define MEASUREMENT_NOISE_STD 0.15f
+#define MEASUREMENT_NOISE_STD 0.2f                   // tdoa measurement noise      
 #define STATS_INTERVAL 500
 #define ANCHOR_OK_TIMEOUT 1500
 
@@ -78,16 +78,16 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //         {timestamp: 1, x: 4.0379, y: 4.9047, z: 3.3585},   //6
 //         {timestamp: 1, x: -3.1476, y: 4.4244, z: 0.15857},   //7
 //    },
-   // DSL-2020-0820
+//DSL-2020-0824vicon
     .anchorPosition = {
-        {timestamp: 1, x: -1.8688, y: -2.3915, z: 0.1554},   //0
-        {timestamp: 1, x: -2.4915, y: 2.7086,  z: 2.1674},   //1
-        {timestamp: 1, x:  2.3486, y: 2.5049,  z: 0.1640},   //2
-        {timestamp: 1, x:  2.4073, y: -2.8205, z: 2.1868},   //3
-        {timestamp: 1, x: -2.1133, y: -2.8152, z: 2.0556},   //4
-        {timestamp: 1, x: 2.0688,  y: -2.4641, z: 0.16316},   //5
-        {timestamp: 1, x: 2.63397, y: 2.87717, z: 2.17757},   //6
-        {timestamp: 1, x: -2.3034, y: 2.4575,  z: 0.16865},   //7
+            {timestamp: 1, x: -3.0933, y: -4.0651, z: 0.1549},   //0
+            {timestamp: 1, x: -3.7058, y: 3.8305, z: 3.1872},   //1
+            {timestamp: 1, x:  3.0488, y: 3.6443, z: 0.1768},   //2
+            {timestamp: 1, x:  4.2329, y: -4.3812, z: 3.4116},   //3
+            {timestamp: 1, x: -3.5236, y: -4.5195, z: 3.1245},   //4
+            {timestamp: 1, x:  3.1501, y: -3.9946, z: 0.1587},   //5
+            {timestamp: 1, x:  3.9850, y:  3.9757, z: 3.3841},   //6
+            {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
    },
 };
 
@@ -533,14 +533,14 @@ LOG_ADD(LOG_FLOAT, d6-7, &logUwbTdoaDistDiff[7])
 //LOG_ADD(LOG_FLOAT, cc6, &logClockCorrection[6])
 //LOG_ADD(LOG_FLOAT, cc7, &logClockCorrection[7])
 
-LOG_ADD(LOG_UINT16, dist7-0, &logAnchorDistance[0])
-LOG_ADD(LOG_UINT16, dist0-1, &logAnchorDistance[1])
-LOG_ADD(LOG_UINT16, dist1-2, &logAnchorDistance[2])
-LOG_ADD(LOG_UINT16, dist2-3, &logAnchorDistance[3])
-LOG_ADD(LOG_UINT16, dist3-4, &logAnchorDistance[4])
-LOG_ADD(LOG_UINT16, dist4-5, &logAnchorDistance[5])
-LOG_ADD(LOG_UINT16, dist5-6, &logAnchorDistance[6])
-LOG_ADD(LOG_UINT16, dist6-7, &logAnchorDistance[7])
+// LOG_ADD(LOG_UINT16, dist7-0, &logAnchorDistance[0])
+// LOG_ADD(LOG_UINT16, dist0-1, &logAnchorDistance[1])
+// LOG_ADD(LOG_UINT16, dist1-2, &logAnchorDistance[2])
+// LOG_ADD(LOG_UINT16, dist2-3, &logAnchorDistance[3])
+// LOG_ADD(LOG_UINT16, dist3-4, &logAnchorDistance[4])
+// LOG_ADD(LOG_UINT16, dist4-5, &logAnchorDistance[5])
+// LOG_ADD(LOG_UINT16, dist5-6, &logAnchorDistance[6])
+// LOG_ADD(LOG_UINT16, dist6-7, &logAnchorDistance[7])
 
 LOG_ADD(LOG_UINT16, stRx, &stats.packetsReceivedRate)
 LOG_ADD(LOG_UINT16, stSeq, &stats.packetsSeqNrPassRate)
