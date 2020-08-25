@@ -429,213 +429,212 @@ static void decoupleState(stateIdx_t state)
 }
 #endif
 
-// --------------------------------------------------
+// ----------------------- main function --------------------------- //
 
-// main function
 void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, const uint32_t tick)
 {
-  // If the client (via a parameter update) triggers an estimator reset:
-  if (resetEstimation) { estimatorKalmanInit(); resetEstimation = false; }
+    // If the client (via a parameter update) triggers an estimator reset:
+    if (resetEstimation) { estimatorKalmanInit(); resetEstimation = false; }
 
-  // Tracks whether an update to the state has been made, and the state therefore requires finalization
-  bool doneUpdate = false;
+    // Tracks whether an update to the state has been made, and the state therefore requires finalization
+    bool doneUpdate = false;
 
-  uint32_t osTick = xTaskGetTickCount(); // would be nice if this had a precision higher than 1ms...
+    uint32_t osTick = xTaskGetTickCount(); // would be nice if this had a precision higher than 1ms...
 
-#ifdef KALMAN_DECOUPLE_XY
-  // Decouple position states
-  decoupleState(STATE_X);
-  decoupleState(STATE_PX);
-  decoupleState(STATE_Y);
-  decoupleState(STATE_PY);
-#endif
+    #ifdef KALMAN_DECOUPLE_XY
+    // Decouple position states
+    decoupleState(STATE_X);
+    decoupleState(STATE_PX);
+    decoupleState(STATE_Y);
+    decoupleState(STATE_PY);
+    #endif
 
-  // Average the last IMU measurements. We do this because the prediction loop is
-  // slower than the IMU loop, but the IMU information is required externally at
-  // a higher rate (for body rate control).
-  if (sensorsReadAcc(&sensors->acc)) {
-    accAccumulator.x += GRAVITY_MAGNITUDE*sensors->acc.x; // accelerometer is in Gs
-    accAccumulator.y += GRAVITY_MAGNITUDE*sensors->acc.y; // but the estimator requires ms^-2
-    accAccumulator.z += GRAVITY_MAGNITUDE*sensors->acc.z;
-    accAccumulatorCount++;
-  }
-
-  if (sensorsReadGyro(&sensors->gyro)) {
-    gyroAccumulator.x += sensors->gyro.x * DEG_TO_RAD; // gyro is in deg/sec
-    gyroAccumulator.y += sensors->gyro.y * DEG_TO_RAD; // but the estimator requires rad/sec
-    gyroAccumulator.z += sensors->gyro.z * DEG_TO_RAD;
-    gyroAccumulatorCount++;
-  }
-
-  if (sensorsReadMag(&sensors->mag)) {
-      // Currently the magnetometer doesn't play a part in the estimation
-  }
-
-  // Average the thrust command from the last timestep, generated externally by the controller
-  thrustAccumulator += control->thrust * CONTROL_TO_ACC; // thrust is in grams, we need ms^-2
-  thrustAccumulatorCount++;
-
-  // Run the system dynamics to predict the state forward.
-  if ((osTick-lastPrediction) >= configTICK_RATE_HZ/PREDICT_RATE // update at the PREDICT_RATE
-      && gyroAccumulatorCount > 0
-      && accAccumulatorCount > 0
-      && thrustAccumulatorCount > 0)
-  {
-    gyroAccumulator.x /= gyroAccumulatorCount;
-    gyroAccumulator.y /= gyroAccumulatorCount;
-    gyroAccumulator.z /= gyroAccumulatorCount;
-
-    accAccumulator.x /= accAccumulatorCount;
-    accAccumulator.y /= accAccumulatorCount;
-    accAccumulator.z /= accAccumulatorCount;
-
-    thrustAccumulator /= thrustAccumulatorCount;
-
-    float dt = (float)(osTick-lastPrediction)/configTICK_RATE_HZ;
-    stateEstimatorPredict(thrustAccumulator, &accAccumulator, &gyroAccumulator, dt); // prediction
-
-    if (!quadIsFlying) { // accelerometers give us information about attitude on slanted ground
-      stateEstimatorUpdateWithAccOnGround(&accAccumulator);
+    // Average the last IMU measurements. We do this because the prediction loop is
+    // slower than the IMU loop, but the IMU information is required externally at
+    // a higher rate (for body rate control).
+    if (sensorsReadAcc(&sensors->acc)) {
+        accAccumulator.x += GRAVITY_MAGNITUDE*sensors->acc.x; // accelerometer is in Gs
+        accAccumulator.y += GRAVITY_MAGNITUDE*sensors->acc.y; // but the estimator requires ms^-2
+        accAccumulator.z += GRAVITY_MAGNITUDE*sensors->acc.z;
+        accAccumulatorCount++;
     }
 
-    lastPrediction = osTick;
-
-    accAccumulator = (Axis3f){.axis={0}};
-    accAccumulatorCount = 0;
-    gyroAccumulator = (Axis3f){.axis={0}};
-    gyroAccumulatorCount = 0;
-    thrustAccumulator = 0;
-    thrustAccumulatorCount = 0;
-
-    doneUpdate = true;
-  }
-
-
-  /**
-   * Add process noise every loop, rather than every prediction
-   */
-  stateEstimatorAddProcessNoise((float)(osTick-lastPNUpdate)/configTICK_RATE_HZ);
-  lastPNUpdate = osTick;
-
-
-  /**
-   * Update the state estimate with the barometer measurements
-   */
-  // Accumulate the barometer measurements
-  if (sensorsReadBaro(&sensors->baro)) {
-#ifdef KALMAN_USE_BARO_UPDATE
-    baroAccumulator.asl += sensors->baro.asl;
-    baroAccumulatorCount++;
-  }
-
-  if ((osTick-lastBaroUpdate) >= configTICK_RATE_HZ/BARO_RATE // update at BARO_RATE
-      && baroAccumulatorCount > 0)
-  {
-    baroAccumulator.asl /= baroAccumulatorCount;
-
-    stateEstimatorUpdateWithBaro(&sensors->baro);
-
-    baroAccumulator.asl = 0;
-    baroAccumulatorCount = 0;
-    lastBaroUpdate = osTick;
-    doneUpdate = true;
-#endif
-  }
-
-  /**
-   * Sensor measurements can come in sporadically and faster than the stabilizer loop frequency,
-   * we therefore consume all measurements since the last loop, rather than accumulating
-   */
-
-  tofMeasurement_t tof;
-  while (stateEstimatorHasTOFPacket(&tof))
-  {
-    stateEstimatorUpdateWithTof(&tof);
-    doneUpdate = true;
-  }
-
-  heightMeasurement_t height;
-  while (stateEstimatorHasHeightPacket(&height))
-  {
-    stateEstimatorUpdateWithAbsoluteHeight(&height);
-    doneUpdate = true;
-  }
-
-// [Change]
-  float dt_uwb = (float)(osTick-lastPrediction)/configTICK_RATE_HZ;     
-  distanceMeasurement_t dist;
-  while (stateEstimatorHasDistanceMeasurement(&dist)){
-	stateEstimatorUpdateWithDistance(&dist,dt_uwb);
-	doneUpdate = true;
-  }
-
-  positionMeasurement_t pos;
-  while (stateEstimatorHasPositionMeasurement(&pos))
-  {
-    if (first_vicon){
-      resetEstimation = true;
-      first_vicon = false;
-
-    }else{
-    stateEstimatorUpdateWithPosition(&pos);
-    doneUpdate = true;
+    if (sensorsReadGyro(&sensors->gyro)) {
+        gyroAccumulator.x += sensors->gyro.x * DEG_TO_RAD; // gyro is in deg/sec
+        gyroAccumulator.y += sensors->gyro.y * DEG_TO_RAD; // but the estimator requires rad/sec
+        gyroAccumulator.z += sensors->gyro.z * DEG_TO_RAD;
+        gyroAccumulatorCount++;
     }
 
-  }
+    if (sensorsReadMag(&sensors->mag)) {
+        // Currently the magnetometer doesn't play a part in the estimation
+    }
 
-  posvelMeasurement_t posvel;
-  while(stateEstimatorHasPosVelMeasurement(&posvel)){
-	  stateEstimatorUpdateWithPosVel(&posvel,sensors);
-	  doneUpdate = true;
-  }
+    // Average the thrust command from the last timestep, generated externally by the controller
+    thrustAccumulator += control->thrust * CONTROL_TO_ACC; // thrust is in grams, we need ms^-2
+    thrustAccumulatorCount++;
 
-  // [CHANGE] yaw estimation
-  posvelyawMeasurement_t posvelyaw;
-  while(stateEstimatorHasPosVelYawMeasurement(&posvelyaw)){
-	  stateEstimatorUpdateWithPosVelYaw(&posvelyaw,sensors);
-	  doneUpdate = true;
-  }
+    // Run the system dynamics to predict the state forward.
+    if ((osTick-lastPrediction) >= configTICK_RATE_HZ/PREDICT_RATE // update at the PREDICT_RATE
+        && gyroAccumulatorCount > 0
+        && accAccumulatorCount > 0
+        && thrustAccumulatorCount > 0)
+    {
+        gyroAccumulator.x /= gyroAccumulatorCount;
+        gyroAccumulator.y /= gyroAccumulatorCount;
+        gyroAccumulator.z /= gyroAccumulatorCount;
 
-  tdoaMeasurement_t tdoa;
-  bool ROBUST = false;      // Flag
-  while (stateEstimatorHasTDOAPacket(&tdoa))
-  {
-    // [Change] Select EKF tdoa update method: EKF + Chi-square or robust EKF with M-estimation  
-    if (ROBUST){   
-        robustEstimatorUpdateWithTDOA(&tdoa);
+        accAccumulator.x /= accAccumulatorCount;
+        accAccumulator.y /= accAccumulatorCount;
+        accAccumulator.z /= accAccumulatorCount;
+
+        thrustAccumulator /= thrustAccumulatorCount;
+
+        float dt = (float)(osTick-lastPrediction)/configTICK_RATE_HZ;
+        stateEstimatorPredict(thrustAccumulator, &accAccumulator, &gyroAccumulator, dt); // prediction
+
+        if (!quadIsFlying) { // accelerometers give us information about attitude on slanted ground
+            stateEstimatorUpdateWithAccOnGround(&accAccumulator);
         }
-    else{
-        stateEstimatorUpdateWithTDOA(&tdoa, dt_uwb);
+
+        lastPrediction = osTick;
+
+        accAccumulator = (Axis3f){.axis={0}};
+        accAccumulatorCount = 0;
+        gyroAccumulator = (Axis3f){.axis={0}};
+        gyroAccumulatorCount = 0;
+        thrustAccumulator = 0;
+        thrustAccumulatorCount = 0;
+
+        doneUpdate = true;
     }
-    doneUpdate = true;
-  }
 
-  flowMeasurement_t flow;
-  while (stateEstimatorHasFlowPacket(&flow))
-  {
-    stateEstimatorUpdateWithFlow(&flow, sensors);
-    doneUpdate = true;
-  }
 
-  /**
-   * If an update has been made, the state is finalized:
-   * - the attitude error is moved into the body attitude quaternion,
-   * - the body attitude is converted into a rotation matrix for the next prediction, and
-   * - correctness of the covariance matrix is ensured
-   */
+    /**
+     * Add process noise every loop, rather than every prediction
+     */
+    stateEstimatorAddProcessNoise((float)(osTick-lastPNUpdate)/configTICK_RATE_HZ);
+    lastPNUpdate = osTick;
 
-  if (doneUpdate)
-  {
-    stateEstimatorFinalize(sensors, osTick);
+
+    /**
+     * Update the state estimate with the barometer measurements
+     */
+    // Accumulate the barometer measurements
+    if (sensorsReadBaro(&sensors->baro)) {
+        #ifdef KALMAN_USE_BARO_UPDATE
+            
+            baroAccumulator.asl += sensors->baro.asl;
+            baroAccumulatorCount++;
+        }
+
+        if ((osTick-lastBaroUpdate) >= configTICK_RATE_HZ/BARO_RATE // update at BARO_RATE
+            && baroAccumulatorCount > 0)
+        {
+            baroAccumulator.asl /= baroAccumulatorCount;
+
+            stateEstimatorUpdateWithBaro(&sensors->baro);
+
+            baroAccumulator.asl = 0;
+            baroAccumulatorCount = 0;
+            lastBaroUpdate = osTick;
+            doneUpdate = true;
+        #endif
+    }
+
+    /**
+     * Sensor measurements can come in sporadically and faster than the stabilizer loop frequency,
+     * we therefore consume all measurements since the last loop, rather than accumulating
+     */
+
+    tofMeasurement_t tof;
+    while (stateEstimatorHasTOFPacket(&tof))
+    {
+        stateEstimatorUpdateWithTof(&tof);
+        doneUpdate = true;
+    }
+
+    heightMeasurement_t height;
+    while (stateEstimatorHasHeightPacket(&height))
+    {
+        stateEstimatorUpdateWithAbsoluteHeight(&height);
+        doneUpdate = true;
+    }
+
+    // [Change]
+    float dt_uwb = (float)(osTick-lastPrediction)/configTICK_RATE_HZ;     
+    distanceMeasurement_t dist;
+    while (stateEstimatorHasDistanceMeasurement(&dist)){
+        stateEstimatorUpdateWithDistance(&dist,dt_uwb);
+        doneUpdate = true;
+    }
+
+    positionMeasurement_t pos;
+    while (stateEstimatorHasPositionMeasurement(&pos))
+    {
+        if (first_vicon){
+        resetEstimation = true;
+        first_vicon = false;
+
+        }else{
+        stateEstimatorUpdateWithPosition(&pos);
+        doneUpdate = true;
+        }
+
+    }
+
+    posvelMeasurement_t posvel;
+    while(stateEstimatorHasPosVelMeasurement(&posvel)){
+        stateEstimatorUpdateWithPosVel(&posvel,sensors);
+        doneUpdate = true;
+    }
+
+    // [CHANGE] yaw estimation
+    posvelyawMeasurement_t posvelyaw;
+    while(stateEstimatorHasPosVelYawMeasurement(&posvelyaw)){
+        stateEstimatorUpdateWithPosVelYaw(&posvelyaw,sensors);
+        doneUpdate = true;
+    }
+    // [CHANGE] robust ekf for uwb tdoa measurements
+    tdoaMeasurement_t tdoa;
+    bool ROBUST = false;      // Flag
+    while (stateEstimatorHasTDOAPacket(&tdoa))
+    {
+        // [Change] Select EKF tdoa update method: EKF + Chi-square or robust EKF with M-estimation  
+        if (ROBUST){   
+            robustEstimatorUpdateWithTDOA(&tdoa);
+            }
+        else{
+            stateEstimatorUpdateWithTDOA(&tdoa, dt_uwb);
+        }
+        doneUpdate = true;
+    }
+
+    flowMeasurement_t flow;
+    while (stateEstimatorHasFlowPacket(&flow))
+    {
+        stateEstimatorUpdateWithFlow(&flow, sensors);
+        doneUpdate = true;
+    }
+
+    /**
+     * If an update has been made, the state is finalized:
+     * - the attitude error is moved into the body attitude quaternion,
+     * - the body attitude is converted into a rotation matrix for the next prediction, and
+     * - correctness of the covariance matrix is ensured
+     */
+
+    if (doneUpdate)
+    {
+        stateEstimatorFinalize(sensors, osTick);
+        stateEstimatorAssertNotNaN();
+    }
+    /**
+     * Finally, the internal state is externalized.
+     * This is done every round, since the external state includes some sensor data
+     */
+    stateEstimatorExternalizeState(state, sensors, osTick);
     stateEstimatorAssertNotNaN();
-  }
-
-  /**
-   * Finally, the internal state is externalized.
-   * This is done every round, since the external state includes some sensor data
-   */
-  stateEstimatorExternalizeState(state, sensors, osTick);
-  stateEstimatorAssertNotNaN();
 }
 
 static void stateEstimatorPredict(float cmdThrust, Axis3f *acc, Axis3f *gyro, float dt)
