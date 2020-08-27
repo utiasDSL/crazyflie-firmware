@@ -57,7 +57,8 @@
 
 #include "estimator_kalman.h"
 #include "outlierFilter.h"
-
+// use printf
+#include <stdio.h>
 
 #include "stm32f4xx.h"
 
@@ -172,8 +173,13 @@ static xQueueHandle tdoaDataQueue;
 
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *uwb, float dt);
 
-// [Change] Define a new robust update EKF with tdoa measurements
+// [CHANGE] Define a new robust update EKF with tdoa measurements (with help functions)
 static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *uwb);
+static void Cholesky_Decomposition(int n, float matrix[n][n],  float lower[n][n]);
+static void GM_weight(float e, float * GM_e);
+static void matrixcopy(int ROW, int COLUMN, float destmat[ROW][COLUMN], float srcmat[ROW][COLUMN]);
+static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]);
+// --------------------------------------------------------------------- //
 
 static inline bool stateEstimatorHasTDOAPacket(tdoaMeasurement_t *uwb) {
   return (pdTRUE == xQueueReceive(tdoaDataQueue, uwb, 0));
@@ -292,7 +298,13 @@ static float log_HPHR_chi = 0.0f;
 static float log_h1 = 0.0f;
 static float log_h2 = 0.0f;
 static float log_h3 = 0.0f;
-static float log_pht[9 * 1]={0};
+static float log_xerr[9]={0};
+static float log_wy = 0.0f; 
+static float log_ey = 0.0f;
+static float log_error = 0.0f;
+static float log_error_c = 0.0f;
+static float log_qc = 0.0f;
+static float log_qiter =0.0f;
 /**
  * Quadrocopter State
  *
@@ -433,6 +445,13 @@ static void decoupleState(stateIdx_t state)
 
 void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, const uint32_t tick)
 {
+    // ------------------ debug testing ------------------------- //
+    // // --- Cholesky is correct! ---//
+    // // --- vector/matrixcopy are correct! ---//
+    // // --- GM_weight function is correct --- //
+
+    //-----------------------------------------------------------//
+
     // If the client (via a parameter update) triggers an estimator reset:
     if (resetEstimation) { estimatorKalmanInit(); resetEstimation = false; }
 
@@ -956,7 +975,6 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
   float HPHR = R; // HPH' + R
   for (int i=0; i<STATE_DIM; i++) { // Add the element of HPH' to the above
     HPHR += Hm->pData[i]*PHTd[i]; // this obviously only works if the update is scalar (as in this function)
-    log_pht[i] = PHTd[i];
   }
   configASSERT(!isnan(HPHR));
   // check the Chi-sqaure in original Update function
@@ -1016,24 +1034,24 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
 static void stateEstimatorUpdateWithAccOnGround(Axis3f *acc)
 {
   // The following code is disabled due to the function not being complete (and that we aim for zero warnings).
-#if 0
-  // This update only makes sense on the ground, when no thrust is being produced,
-  // since the accelerometers can then directly measure the direction of gravity
-  float accMag = sqrtf(acc->x*acc->x + acc->y*acc->y + acc->z*acc->z);
+    #if 0
+    // This update only makes sense on the ground, when no thrust is being produced,
+    // since the accelerometers can then directly measure the direction of gravity
+    float accMag = sqrtf(acc->x*acc->x + acc->y*acc->y + acc->z*acc->z);
 
-  // Only do the update if the quad isn't flying, and if the accelerometers
-  // are close enough to gravity that we can assume it is the only force
-  if(!quadIsFlying && fabs(1-accMag/GRAVITY_MAGNITUDE) < 0.01) {
-    float h[STATE_DIM] = {0};
-    arm_matrix_instance_f32 H = {1, STATE_DIM, h};
+    // Only do the update if the quad isn't flying, and if the accelerometers
+    // are close enough to gravity that we can assume it is the only force
+    if(!quadIsFlying && fabs(1-accMag/GRAVITY_MAGNITUDE) < 0.01) {
+        float h[STATE_DIM] = {0};
+        arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 
-    float gravityInBodyX = GRAVITY_MAGNITUDE * R[2][0];
-    float gravityInBodyY = GRAVITY_MAGNITUDE * R[2][1];
-    float gravityInBodyZ = GRAVITY_MAGNITUDE * R[2][2];
+        float gravityInBodyX = GRAVITY_MAGNITUDE * R[2][0];
+        float gravityInBodyY = GRAVITY_MAGNITUDE * R[2][1];
+        float gravityInBodyZ = GRAVITY_MAGNITUDE * R[2][2];
 
-    // TODO: What are the update equations?
-  }
-#endif
+        // TODO: What are the update equations?
+    }
+    #endif
 }
 
 #ifdef KALMAN_USE_BARO_UPDATE
@@ -1271,18 +1289,12 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
     	  // without DNN bias compensation
           measurement = tdoa->distanceDiff;
     }
-    // if(z<1.0f){
-    //     tdoa->stdDev = 0.5f - (0.25f)*z;
-    // }else{
-    //     tdoa->stdDev = 0.25f;
-    // }
 
     // innovation term 
     float error = measurement - predicted;
 
     float h[STATE_DIM] = {0};
     arm_matrix_instance_f32 H = {1, STATE_DIM, h};
-    
 
     if ((d0 != 0.0f) && (d1 != 0.0f)) {
         h[STATE_X] = (dx1 / d1 - dx0 / d0);
@@ -1303,55 +1315,55 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
         
         // Outlier rejection labels
         bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
-        // // model-based outlier rejection
-        // float vx = S[STATE_PX];
-        // float vy = S[STATE_PY];
-        // float vz = S[STATE_PZ];
-        // float Vpr = sqrtf(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
-        // float T_max;
-        // if(z <=1.5f){T_max = 400.0;}
-        // else{ T_max = 225.0;}
+            // // model-based outlier rejection
+            // float vx = S[STATE_PX];
+            // float vy = S[STATE_PY];
+            // float vz = S[STATE_PZ];
+            // float Vpr = sqrtf(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
+            // float T_max;
+            // if(z <=1.5f){T_max = 400.0;}
+            // else{ T_max = 225.0;}
 
-        // float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
-        // float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
-        // float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
-        // float a_max = sqrtf(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
-        // float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
+            // float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
+            // float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
+            // float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
+            // float a_max = sqrtf(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
+            // float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
 
-        // float r_max_2 = (float)2.0 * r_max;
+            // float r_max_2 = (float)2.0 * r_max;
 
-        // Chi-square test
-        // change all the variable names to avoid confusion
-        // float HTd_chi[STATE_DIM * 1]={0};
-        // arm_matrix_instance_f32 HTm_chi = {STATE_DIM, 1, HTd_chi};
+            // Chi-square test
+            // change all the variable names to avoid confusion
+            // float HTd_chi[STATE_DIM * 1]={0};
+            // arm_matrix_instance_f32 HTm_chi = {STATE_DIM, 1, HTd_chi};
 
-        // float PHTd_chi[STATE_DIM * 1]={0};
-        // arm_matrix_instance_f32 PHTm_chi = {STATE_DIM, 1, PHTd_chi};
+            // float PHTd_chi[STATE_DIM * 1]={0};
+            // arm_matrix_instance_f32 PHTm_chi = {STATE_DIM, 1, PHTd_chi};
 
-        // configASSERT(H.numRows == 1);
-        // configASSERT(H.numCols == STATE_DIM);
-        // ====== INNOVATION COVARIANCE ======
-        // mat_trans(&H, &HTm_chi);
-        // mat_mult(&Pm, &HTm_chi, &PHTm_chi); // PH'
-        // float R_chi = tdoa->stdDev * tdoa->stdDev;
-        // float HPHR_chi = R_chi; // HPH' + R 
+            // configASSERT(H.numRows == 1);
+            // configASSERT(H.numCols == STATE_DIM);
+            // ====== INNOVATION COVARIANCE ======
+            // mat_trans(&H, &HTm_chi);
+            // mat_mult(&Pm, &HTm_chi, &PHTm_chi); // PH'
+            // float R_chi = tdoa->stdDev * tdoa->stdDev;
+            // float HPHR_chi = R_chi; // HPH' + R 
 
-        // for (int i=0; i<STATE_DIM; i++) {   // Add the element of HPH' to the above
-        //     HPHR_chi += h[i]*PHTd_chi[i];   //  scaler update
-        // }
-        // // configASSERT(!isnan(HPHR_val));
-        // // log_errAbs = err_abs;  
-        // //************* Statistical Validation Test (Chi-squared test)***********//
-        // float err_sqr = error * error;
-        // float d_m = err_sqr/HPHR_chi;     // M distance
-        // DEBUG_PRINT("dm is : %f, \n", (double)d_m);
-        // log_dm = d_m;
-        // log_h1 = h[0]; log_h2 = h[1]; log_h3 = h[2];
-            // ------------- model-based approach ------------- // 
-        // if(OUTLIER_REJ && (err_abs >= r_max_2)){
-        //     Model_based_label = false;
-        // }
-        // ------------- over all outlier rejection ------------- //
+            // for (int i=0; i<STATE_DIM; i++) {   // Add the element of HPH' to the above
+            //     HPHR_chi += h[i]*PHTd_chi[i];   //  scaler update
+            // }
+            // // configASSERT(!isnan(HPHR_val));
+            // // log_errAbs = err_abs;  
+            // //************* Statistical Validation Test (Chi-squared test)***********//
+            // float err_sqr = error * error;
+            // float d_m = err_sqr/HPHR_chi;     // M distance
+            // DEBUG_PRINT("dm is : %f, \n", (double)d_m);
+            // log_dm = d_m;
+            // log_h1 = h[0]; log_h2 = h[1]; log_h3 = h[2];
+                // ------------- model-based approach ------------- // 
+            // if(OUTLIER_REJ && (err_abs >= r_max_2)){
+            //     Model_based_label = false;
+            // }
+            // ------------- over all outlier rejection ------------- //
         // if(Model_based_label && Chi_square_label && three_sigma_flag && sampleIsGood &&enable_UWB) {
         if(sampleIsGood &&enable_UWB){
             stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
@@ -1366,15 +1378,13 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 }
 
 // [CHANGE] Robust Extended Kalman Filter
-// Cholesky Decomposition (from scratch)
-// This function only used to factorized the covariance matrix of the state
+// Cholesky Decomposition for a nxn psd matrix(from scratch)
 // A function for a dynamic dim. of matrix can be implement for other cases.
-static void Cholesky_Decomposition(float matrix[STATE_DIM][STATE_DIM], int n, float lower[STATE_DIM][STATE_DIM]){
+static void Cholesky_Decomposition(int n, float matrix[n][n],  float lower[n][n]){
     // Decomposing a matrix into Lower Triangular 
     for (int i = 0; i < n; i++) { 
         for (int j = 0; j <= i; j++) { 
             float sum = 0.0; 
-  
             if (j == i) // summation for diagnols 
             { 
                 for (int k = 0; k < j; k++) 
@@ -1390,12 +1400,21 @@ static void Cholesky_Decomposition(float matrix[STATE_DIM][STATE_DIM], int n, fl
     }
 } 
 // [Help function] copy float matrix
-void matrixcopy(void *destmat, void * srcmat, int ROW, int COLUMN){
-    memcpy(destmat, srcmat, ROW*COLUMN*sizeof(float));
+static void matrixcopy(int ROW, int COLUMN, float destmat[ROW][COLUMN], float srcmat[ROW][COLUMN]){
+    for (int i=0; i<ROW; i++){
+        for(int j=0; j<COLUMN; j++){
+            destmat[i][j] = srcmat[i][j];
+        }
+    }
+}
+static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]){
+    for (int i=0; i<DIM; i++){
+        destVec[i] = srcVec[i];
+    }
 }
 // Weight function for GM Robust cost function
 static void GM_weight(float e, float * GM_e){
-    float sigma = 60.0;
+    float sigma = 0.95;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
@@ -1403,14 +1422,13 @@ static void GM_weight(float e, float * GM_e){
 // Robust EKF update for TDoA measurements
 static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 {
-//     if (tdoaCount >= 100)
-//   {
+    if (tdoaCount >= 100)
+  {
     /**
      * Measurement equation:
      * dR = dT + d1 - d0
      */
 	float measurement = 0.0f;
-    measurement = tdoa->distanceDiff;
     // x prior (x_check)
     float x = S[STATE_X];   float y = S[STATE_Y];   float z = S[STATE_Z];
 
@@ -1423,7 +1441,7 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
     float d1 = sqrtf(powf(dx1, 2) + powf(dy1, 2) + powf(dz1, 2));
     float d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
     // if measurements make sense and enable UWB
-    if ((d0 != 0.0f) && (d1 != 0.0f)&&(enable_UWB)) {
+    if ((d0 != 0.0f) && (d1 != 0.0f) && (enable_UWB)) {
         
         float predicted = d1 - d0;
         //[FIX ME] Add DNN here
@@ -1434,79 +1452,75 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             measurement = tdoa->distanceDiff;
         }
         // innovation term based on x_check
-        float error = measurement - predicted;
-        // Some initialization
-        float xpr[STATE_DIM] = {0.0};   // x prior (error state), set to be zeros 
-        float x_err[STATE_DIM] = {0.0}; // x_err comes from the KF update is the state of error state Kalman filter, set to be zero initially
+        float error_check = measurement - predicted;    // error_check
+        // debug
+        // error_check = 0.1f;
+        // ---------------------- matrix defination ----------------------------- //
+            static float P_chol[STATE_DIM][STATE_DIM]; 
+            static arm_matrix_instance_f32 Pc_m = {STATE_DIM, STATE_DIM, (float *)P_chol};
+            // Pc.T
+            static float Pc_tran[STATE_DIM][STATE_DIM];
+            static arm_matrix_instance_f32 Pc_tran_m = {STATE_DIM, STATE_DIM, (float *)Pc_tran};
 
-        float X_state[STATE_DIM] = {0.0};
-        matrixcopy(&X_state, &S, STATE_DIM, 1);      // copy Xpr to X_State and update in each iterations
+            float h[STATE_DIM] = {0};
+            arm_matrix_instance_f32 H = {1, STATE_DIM, h};    // H is a row vector
 
-        static float P_chol[STATE_DIM][STATE_DIM]; 
-        static arm_matrix_instance_f32 Pc_m = {STATE_DIM, STATE_DIM, (float *)P_chol};
-        // Pc.T
-        static float Pc_tran[STATE_DIM * STATE_DIM];
-        static arm_matrix_instance_f32 Pc_tran_m = {STATE_DIM, STATE_DIM, Pc_tran};
+            static float Kw[STATE_DIM];           // The Kalman gain as a column vector
+            static arm_matrix_instance_f32 Kwm = {STATE_DIM, 1, (float *)Kw};
 
+            // float error_x[STATE_DIM]={0}; // is not useful
+            // arm_matrix_instance_f32 error_x_mat = {STATE_DIM, 1, error_x};
+            
+            static float e_x[STATE_DIM];
+            static arm_matrix_instance_f32 e_x_m = {STATE_DIM, 1, e_x};
+            
+            static float Pc_inv[STATE_DIM][STATE_DIM];
+            static arm_matrix_instance_f32 Pc_inv_m = {STATE_DIM, STATE_DIM, (float *)Pc_inv};
+            
+            // rescale matrix
+            static float wx_inv[STATE_DIM][STATE_DIM];
+            static arm_matrix_instance_f32 wx_invm = {STATE_DIM, STATE_DIM, (float *)wx_inv};
+            
+            static float Pc_w_inv[STATE_DIM][STATE_DIM];
+            static arm_matrix_instance_f32 Pc_w_invm = {STATE_DIM, STATE_DIM, (float *)Pc_w_inv};
+
+            static float P_w[STATE_DIM][STATE_DIM];
+            static arm_matrix_instance_f32 P_w_m = {STATE_DIM, STATE_DIM, (float *)P_w};
+
+            // Temporary matrices for the covariance updates
+            static float tmpNN1d[STATE_DIM * STATE_DIM];
+            static arm_matrix_instance_f32 tmpNN1m = {STATE_DIM, STATE_DIM, tmpNN1d};
+
+            static float tmpNN2d[STATE_DIM * STATE_DIM];
+            static arm_matrix_instance_f32 tmpNN2m = {STATE_DIM, STATE_DIM, tmpNN2d};
+
+            static float tmpNN3d[STATE_DIM * STATE_DIM];
+            static arm_matrix_instance_f32 tmpNN3m = {STATE_DIM, STATE_DIM, tmpNN3d};
+
+            static float HTd[STATE_DIM];
+            static arm_matrix_instance_f32 HTm = {STATE_DIM, 1, HTd};
+
+            static float PHTd[STATE_DIM];
+            static arm_matrix_instance_f32 PHTm = {STATE_DIM, 1, PHTd};
+        // ------------------- Some initialization -----------------------//
+        // float xpr[STATE_DIM] = {0.0};                // x prior (error state), set to be zeros 
+        static float x_err[STATE_DIM] = {0.0};          // x_err comes from the KF update is the state of error state Kalman filter, set to be zero initially
+        static arm_matrix_instance_f32 x_errm = {STATE_DIM, 1, x_err};
+        static float X_state[STATE_DIM] = {0.0};
         float P_iter[STATE_DIM][STATE_DIM];
-        matrixcopy(&P_iter,&P, STATE_DIM, STATE_DIM);   // init P_iter as P_prior
+        matrixcopy(STATE_DIM, STATE_DIM, P_iter,P);     // init P_iter as P_prior
         // construct Q
-        // if(z<=1.5f){
-        //     tdoa->stdDev = (0.85f/1.0f)*(S[STATE_Z]) + 1.0f;
-        // }
-        // else{
-        //     tdoa->stdDev = (-0.85f/1.0f)*(S[STATE_Z]) + 1.0f;
-        // }          // check the correctness of this function in data
         float Q_iter = tdoa->stdDev * tdoa->stdDev;
-        // matrix definition
-        float h[STATE_DIM] = {0};
-        arm_matrix_instance_f32 H = {1, STATE_DIM, h};    // H is a row vector
+        vectorcopy(STATE_DIM, X_state, S);             // copy Xpr to X_State and update in each iterations
 
-        static float K[STATE_DIM];           // The Kalman gain as a column vector
-        static arm_matrix_instance_f32 Km = {STATE_DIM, 1, (float *)K};
-
-        float error_x[STATE_DIM]={0};
-        arm_matrix_instance_f32 error_x_mat = {STATE_DIM, 1, error_x};
-        
-        static float e_x[STATE_DIM * 1];
-        static arm_matrix_instance_f32 e_x_m = {STATE_DIM, 1, e_x};
-        
-        static float Pc_inv[STATE_DIM * STATE_DIM];
-        static arm_matrix_instance_f32 Pc_inv_m = {STATE_DIM, STATE_DIM, Pc_inv};
-        
-        // rescale matrix
-        static float psi_x_inv[STATE_DIM][STATE_DIM];
-        static arm_matrix_instance_f32 psi_x_inv_m = {STATE_DIM, STATE_DIM, (float *)psi_x_inv};
-        
-        static float Pc_psi_inv[STATE_DIM * STATE_DIM];
-        static arm_matrix_instance_f32 Pc_psi_inv_m = {STATE_DIM, STATE_DIM, Pc_psi_inv};
-
-        static float P_w[STATE_DIM * STATE_DIM];
-        static arm_matrix_instance_f32 P_w_m = {STATE_DIM, STATE_DIM, P_w};
-
-        // Temporary matrices for the covariance updates
-        static float tmpNN1d[STATE_DIM * STATE_DIM];
-        static arm_matrix_instance_f32 tmpNN1m = {STATE_DIM, STATE_DIM, tmpNN1d};
-
-        static float tmpNN2d[STATE_DIM * STATE_DIM];
-        static arm_matrix_instance_f32 tmpNN2m = {STATE_DIM, STATE_DIM, tmpNN2d};
-
-        static float tmpNN3d[STATE_DIM * STATE_DIM];
-        static arm_matrix_instance_f32 tmpNN3m = {STATE_DIM, STATE_DIM, tmpNN3d};
-
-        static float HTd[STATE_DIM * 1];
-        static arm_matrix_instance_f32 HTm = {STATE_DIM, 1, HTd};
-
-        static float PHTd[STATE_DIM * 1];
-        static arm_matrix_instance_f32 PHTm = {STATE_DIM, 1, PHTd};
         // --------------------------------- Start iteration --------------------------------- //
         // maximum iteration is 4. Setting iter to 5 leads to a problem of timer.c
         // consider the execution time of DNN, set iter to 3
         // matrix definations are not in the loop
         for (int iter = 0; iter < 3; iter++){
             // apply cholesky decomposition for the prior covariance matrix 
-            Cholesky_Decomposition(P_iter, STATE_DIM, P_chol);               // P_chol is a lower triangular matrix
-                      
+            Cholesky_Decomposition(STATE_DIM, P_iter, P_chol);               // P_chol is a lower triangular matrix
+
             mat_trans(&Pc_m, &Pc_tran_m);
 
             // decomposition for measurement covariance (scalar case)
@@ -1514,55 +1528,66 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             float Q_chol = sqrtf(Q_iter);           
             // construct H matrix
             // X_state updates in each iteration
-            float x = X_state[STATE_X];   float y = X_state[STATE_Y];   float z = X_state[STATE_Z];
+            float x_iter = X_state[STATE_X];   float y_iter = X_state[STATE_Y];   float z_iter = X_state[STATE_Z];
 
             float x1 = tdoa->anchorPosition[1].x, y1 = tdoa->anchorPosition[1].y, z1 = tdoa->anchorPosition[1].z;
             float x0 = tdoa->anchorPosition[0].x, y0 = tdoa->anchorPosition[0].y, z0 = tdoa->anchorPosition[0].z;
 
-            float dx1 = x - x1;  float dy1 = y - y1;  float dz1 = z - z1;
-            float dx0 = x - x0;  float dy0 = y - y0;  float dz0 = z - z0;
+            float dx1 = x_iter - x1;  float dy1 = y_iter - y1;  float dz1 = z_iter - z1;
+            float dx0 = x_iter - x0;  float dy0 = y_iter - y0;  float dz0 = z_iter - z0;
 
             float d1 = sqrtf(powf(dx1, 2) + powf(dy1, 2) + powf(dz1, 2));
             float d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
             float predicted_iter = d1 - d0;                         // predicted measurements in each iteration based on X_state
             float error_iter = measurement - predicted_iter;        // innovation term based on X_state
-
+            // debug
+            // error_iter = 0.1f;
+            float e_y = error_iter;
             if ((d0 != 0.0f) && (d1 != 0.0f)){
                 h[STATE_X] = (dx1 / d1 - dx0 / d0);  
                 h[STATE_Y] = (dy1 / d1 - dy0 / d0); 
                 h[STATE_Z] = (dz1 / d1 - dz0 / d0);
-
-                float e_y = error_iter / Q_chol;
-                
-                for(int j=0; j<STATE_DIM; j++){
-                    error_x[j] = x_err[j] - xpr[j];
+                // e_y = linalg.inv(Q_c).dot(err_uwb)
+                if (fabsf(Q_chol - 0.0f) < 0.0001f){
+                    e_y = error_iter / 0.0001f;
                 }
-
+                else{
+                    e_y = error_iter / Q_chol;}
+                // e_x = inv(Ppr_c) * (error_x), here error_x = x_err
                 mat_inv(&Pc_m, &Pc_inv_m);                          // Pc_inv_m = inv(Pc_m) = inv(P_chol)
-                mat_mult(&Pc_inv_m, &error_x_mat, &e_x_m);          // e_x_m = Pc_inv_m.dot(error_x_m) 
+                mat_mult(&Pc_inv_m, &x_errm, &e_x_m);                  // e_x_m = Pc_inv_m.dot(x_errm) 
 
-                // compute psi_x, psi_y --> weighting matrix
-                // Since psi_x is diagnal matrix, directly compute the inverse
-
+                // compute w_x, w_y --> weighting matrix
+                // Since w_x is diagnal matrix, directly compute the inverse
                 for (int state_k = 0; state_k < STATE_DIM; state_k++){
-                    GM_weight(e_x[state_k], &psi_x_inv[state_k][state_k]);
-                    psi_x_inv[state_k][state_k] = (float)1.0 / psi_x_inv[state_k][state_k];
+                    GM_weight(e_x[state_k], &wx_inv[state_k][state_k]);
+                    wx_inv[state_k][state_k] = (float)1.0 / wx_inv[state_k][state_k];
                 }
 
-                // get psi_y
-                float psi_y=0.0;
-                GM_weight(e_y, &psi_y);
-
+                // get w_y
+                float w_y=0.0;
+                GM_weight(e_y, &w_y);
+                // debug log
+                log_error = error_iter;   log_error_c = error_check;   log_ey = e_y;
+                log_wy = w_y;             log_qc = Q_chol;             log_qiter = Q_iter;
                 // rescale covariance matrix P and Q
-                mat_mult(&Pc_m, &psi_x_inv_m, &Pc_psi_inv_m);       // Pc_psi_inv_m = P_c.dot(linalg.inv(psi_x))
+                mat_mult(&Pc_m, &wx_invm, &Pc_w_invm);       // Pc_w_invm = P_c.dot(linalg.inv(w_x))
 
                 // rescale P matrix
-                mat_mult(&Pc_psi_inv_m, &Pc_tran_m, &P_w_m);        // P_w_m = Pc_psi_inv_m.dot(Pc_tran_m) = P_c.dot(linalg.inv(psi_x)).dot(P_c.T)
+                mat_mult(&Pc_w_invm, &Pc_tran_m, &P_w_m);        // P_w_m = Pc_w_invm.dot(Pc_tran_m) = P_c.dot(linalg.inv(w_x)).dot(P_c.T)
                 // rescale Q matrix
-                
-                float Q_w = (Q_chol * Q_chol) / psi_y;
+                float Q_w = 0.0f;
+                if (fabsf(w_y - 0.0f) < 0.0001f){
+                    Q_w = (Q_chol * Q_chol) / 0.0001f;
+                }
+                else{
+                    Q_w = (Q_chol * Q_chol) / w_y;
+                }
                 
                 // ====== INNOVATION COVARIANCE ====== //
+                // debug
+                // Q_w = tdoa->stdDev * tdoa->stdDev;
+                // matrixcopy(STATE_DIM, STATE_DIM, P_w, P); 
                 // H is a row vector
                 mat_trans(&H, &HTm);
                 mat_mult(&P_w_m, &HTm, &PHTm);     // PHTm = P_w.dot(H.T). The P is the updated P_w 
@@ -1575,13 +1600,13 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
                 // ====== MEASUREMENT UPDATE ======
                 // Calculate the Kalman gain and perform the state update
                 for (int i=0; i<STATE_DIM; i++) {
-                    K[i] = PHTd[i]/HPHR;               // rescaled kalman gain = (PH' (HPH' + R )^-1) with the updated P_w and Q_w
+                    Kw[i] = PHTd[i]/HPHR;               // rescaled kalman gain = (PH' (HPH' + R )^-1) with the updated P_w and Q_w
                     //[Note]: The 'error' here is the innovation term based on x_check
-                    x_err[i] = K[i] * error;           // error state for next iteration
-                    X_state[i] = S[i] + K[i] * error;  // convert to nominal state
+                    x_err[i] = Kw[i] * error_check;           // error state for next iteration
+                    X_state[i] = S[i] + x_err[i];  // convert to nominal state
                 }
                 // update P_iter matrix and Q matrix for next iteration
-                matrixcopy(&P_iter,&P_w, STATE_DIM, STATE_DIM);
+                matrixcopy(STATE_DIM, STATE_DIM, P_iter,P_w);
                 Q_iter = Q_w;
                 stateEstimatorAssertNotNaN();
             }
@@ -1590,35 +1615,40 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         // ---------------------------------- After 3 iterations --------------------------------------- //
         // P = P_iter =P_w, arm matrix: Pm = P_w_m
         // Q = Q_iter = Q_w
-            for (int i=0; i<STATE_DIM; i++){
-                S[i] = X_state[i];
-            }
-            // ====== COVARIANCE UPDATE ======
-            mat_mult(&Km, &H, &tmpNN1m);               // KH,  the Kalman Gain is the updated Kalman Gain   
-            for (int i=0; i<STATE_DIM; i++) { tmpNN1d[STATE_DIM*i+i] -= 1; } // KH - I
-            mat_trans(&tmpNN1m, &tmpNN2m);             // (KH - I)'
-            mat_mult(&tmpNN1m, &P_w_m, &tmpNN3m);      // tmpNN3m = (KH - I)*P
-            mat_mult(&tmpNN3m, &tmpNN2m, &Pm);         // Pm = (KH - I)*P*(KH - I)'  ???
-            stateEstimatorAssertNotNaN();
-            // add the measurement variance and ensure boundedness and symmetry
-            // TODO: Why would it hit these bounds? Needs to be investigated.
-            for (int i=0; i<STATE_DIM; i++) {
-                for (int j=i; j<STATE_DIM; j++) {
-                    float v = K[i] * Q_iter * K[j];
-                    float p = 0.5f*P[i][j] + 0.5f*P[j][i] + v; // add measurement noise
-                    if (isnan(p) || p > MAX_COVARIANCE) {
-                    P[i][j] = P[j][i] = MAX_COVARIANCE;
-                    } else if ( i==j && p < MIN_COVARIANCE ) {
-                    P[i][j] = P[j][i] = MIN_COVARIANCE;
-                    } else {
-                    P[i][j] = P[j][i] = p;
-                    }
+        // debug
+        // vectorcopy(9, log_xerr, Kw);
+        log_xerr[0] = error_check;      
+        log_xerr[1] = Kw[0];      log_xerr[2] = Kw[1];      log_xerr[3] = Kw[2];
+        for (int i=0; i<STATE_DIM; i++){
+            S[i] = S[i] + Kw[i] * error_check;
+        }
+        // ====== COVARIANCE UPDATE ======
+        mat_mult(&Kwm, &H, &tmpNN1m);               // KH,  the Kalman Gain and H are the updated Kalman Gain and H 
+        for (int i=0; i<STATE_DIM; i++) { tmpNN1d[STATE_DIM*i+i] -= 1; } // KH - I
+        mat_trans(&tmpNN1m, &tmpNN2m);             // (KH - I)'
+        mat_mult(&tmpNN1m, &P_w_m, &tmpNN3m);      // tmpNN3m = (KH - I)*P
+        mat_mult(&tmpNN3m, &tmpNN2m, &Pm);         // Pm = (KH - I)*P*(KH - I)'  ???
+        stateEstimatorAssertNotNaN();
+        // add the measurement variance and ensure boundedness and symmetry
+        // TODO: Why would it hit these bounds? Needs to be investigated.
+        for (int i=0; i<STATE_DIM; i++) {
+            for (int j=i; j<STATE_DIM; j++) {
+                float v = Kw[i] * Q_iter * Kw[j];
+                float p = 0.5f*P[i][j] + 0.5f*P[j][i] + v; // add measurement noise
+
+                if (isnan(p) || p > MAX_COVARIANCE) {
+                P[i][j] = P[j][i] = MAX_COVARIANCE;
+                } else if ( i==j && p < MIN_COVARIANCE ) {
+                P[i][j] = P[j][i] = MIN_COVARIANCE;
+                } else {
+                P[i][j] = P[j][i] = p;
                 }
             }
-            stateEstimatorAssertNotNaN();
+        }
+        stateEstimatorAssertNotNaN();
     } 
-//   }
-//   tdoaCount++;
+  }
+  tdoaCount++;
 }
 
 // TODO remove the temporary test variables (used for logging)
@@ -2161,15 +2191,22 @@ LOG_GROUP_START(kalman)
 //   LOG_ADD(LOG_FLOAT, h1,       &log_h1)
 //   LOG_ADD(LOG_FLOAT, h2,       &log_h2)
 //   LOG_ADD(LOG_FLOAT, h3,       &log_h3)
-//   LOG_ADD(LOG_FLOAT, pht1,     &log_pht[0])
-//   LOG_ADD(LOG_FLOAT, pht2,     &log_pht[1])
-//   LOG_ADD(LOG_FLOAT, pht3,     &log_pht[2])
-//   LOG_ADD(LOG_FLOAT, pht4,     &log_pht[3])
-//   LOG_ADD(LOG_FLOAT, pht5,     &log_pht[4])
-//   LOG_ADD(LOG_FLOAT, pht6,     &log_pht[5])
-//   LOG_ADD(LOG_FLOAT, pht7,     &log_pht[6])
-//   LOG_ADD(LOG_FLOAT, pht8,     &log_pht[7])
-//   LOG_ADD(LOG_FLOAT, pht9,     &log_pht[8])
+  LOG_ADD(LOG_FLOAT, wy,  &log_wy)
+  LOG_ADD(LOG_FLOAT, ey,  &log_ey)
+  LOG_ADD(LOG_FLOAT, yerror, &log_error)
+  LOG_ADD(LOG_FLOAT, yerror_c,&log_error_c)
+  LOG_ADD(LOG_FLOAT, Qc,     &log_qc)
+  LOG_ADD(LOG_FLOAT, Qiter,  &log_qiter)
+  LOG_ADD(LOG_FLOAT, xerr0,   &log_xerr[0])
+  LOG_ADD(LOG_FLOAT, xerr1,   &log_xerr[1])
+  LOG_ADD(LOG_FLOAT, xerr2,   &log_xerr[2])
+  LOG_ADD(LOG_FLOAT, xerr3,   &log_xerr[3])
+  LOG_ADD(LOG_FLOAT, xerr4,   &log_xerr[4])
+  LOG_ADD(LOG_FLOAT, xerr5,   &log_xerr[5])
+  LOG_ADD(LOG_FLOAT, xerr6,   &log_xerr[6])
+  LOG_ADD(LOG_FLOAT, xerr7,   &log_xerr[7])
+  LOG_ADD(LOG_FLOAT, xerr8,   &log_xerr[8])
+
 LOG_GROUP_STOP(kalman)
 
 PARAM_GROUP_START(kalman)
