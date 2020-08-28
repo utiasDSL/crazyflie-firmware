@@ -266,7 +266,7 @@ static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
 
 // Initial variances, uncertain of position, but know we're stationary and roughly flat
 // [Change]: we are certain about the initial position (for outlier rejection)
-static const float stdDevInitialPosition_xy = 1;
+static const float stdDevInitialPosition_xy = 100;
 static const float stdDevInitialPosition_z = 1;
 static const float stdDevInitialVelocity = 0.01;
 static const float stdDevInitialAttitude_rollpitch = 0.01;
@@ -301,9 +301,9 @@ static float log_h1 = 0.0f;
 static float log_h2 = 0.0f;
 static float log_h3 = 0.0f;
 
-static float log_new1[6] = {0};
-static float log_new2[6] = {0};
-static float log_new3[6] = {0};
+// static float log_new1[6] = {0};
+// static float log_new2[6] = {0};
+// static float log_new3[6] = {0};
 /**
  * Quadrocopter State
  *
@@ -1002,9 +1002,6 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
             K[i] = PHTd[i]/HPHR; // kalman gain = (PH' (HPH' + R )^-1)
             S[i] = S[i] + K[i] * error; // state update
         }
-        log_new1[0] = error;        log_new1[1] = K[0];           log_new1[2] = K[1];           log_new1[3] = K[2];
-        log_new2[0] = PHTd[0];      log_new2[1] = PHTd[1];        log_new2[2] = PHTd[2];        log_new2[3] = HPHR;
-        log_new3[0] = Hm->pData[0];             log_new3[1] = Hm->pData[1];         log_new3[2] = Hm->pData[2];
         stateEstimatorAssertNotNaN();
 
         // ====== COVARIANCE UPDATE ======
@@ -1317,56 +1314,6 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
         
         // Outlier rejection labels
         bool sampleIsGood = outlierFilterVaildateTdoaSteps(tdoa, error, &jacobian, &estimatedPosition);
-            // // model-based outlier rejection
-            // float vx = S[STATE_PX];
-            // float vy = S[STATE_PY];
-            // float vz = S[STATE_PZ];
-            // float Vpr = sqrtf(powf(vx, 2) + powf(vy, 2) + powf(vz, 2));    // prior velocity
-            // float T_max;
-            // if(z <=1.5f){T_max = 400.0;}
-            // else{ T_max = 225.0;}
-
-            // float F_max[3][1] ={{0.0},{0.0},{(float)4.0*T_max* GRAVITY_MAGNITUDE}};
-            // float g_body[3][1] = {{R[2][0]*GRAVITY_MAGNITUDE},{R[2][1]*GRAVITY_MAGNITUDE},{R[2][2]*GRAVITY_MAGNITUDE}};  // R^T [0;0;g]
-            // float ACC_max[3][1] = {{F_max[0][0]-g_body[0][0]},{F_max[1][0]-g_body[1][0]},{F_max[2][0]-g_body[2][0]}};    //F_max - R^T [0;0;g]
-            // float a_max = sqrtf(powf(ACC_max[0][0], 2) + powf(ACC_max[1][0], 2) + powf(ACC_max[2][0], 2));
-            // float r_max = Vpr * dt + (float)0.5*a_max*dt*dt;
-
-            // float r_max_2 = (float)2.0 * r_max;
-
-            // Chi-square test
-            // change all the variable names to avoid confusion
-            // float HTd_chi[STATE_DIM * 1]={0};
-            // arm_matrix_instance_f32 HTm_chi = {STATE_DIM, 1, HTd_chi};
-
-            // float PHTd_chi[STATE_DIM * 1]={0};
-            // arm_matrix_instance_f32 PHTm_chi = {STATE_DIM, 1, PHTd_chi};
-
-            // configASSERT(H.numRows == 1);
-            // configASSERT(H.numCols == STATE_DIM);
-            // ====== INNOVATION COVARIANCE ======
-            // mat_trans(&H, &HTm_chi);
-            // mat_mult(&Pm, &HTm_chi, &PHTm_chi); // PH'
-            // float R_chi = tdoa->stdDev * tdoa->stdDev;
-            // float HPHR_chi = R_chi; // HPH' + R 
-
-            // for (int i=0; i<STATE_DIM; i++) {   // Add the element of HPH' to the above
-            //     HPHR_chi += h[i]*PHTd_chi[i];   //  scaler update
-            // }
-            // // configASSERT(!isnan(HPHR_val));
-            // // log_errAbs = err_abs;  
-            // //************* Statistical Validation Test (Chi-squared test)***********//
-            // float err_sqr = error * error;
-            // float d_m = err_sqr/HPHR_chi;     // M distance
-            // DEBUG_PRINT("dm is : %f, \n", (double)d_m);
-            // log_dm = d_m;
-            // log_h1 = h[0]; log_h2 = h[1]; log_h3 = h[2];
-                // ------------- model-based approach ------------- // 
-            // if(OUTLIER_REJ && (err_abs >= r_max_2)){
-            //     Model_based_label = false;
-            // }
-            // ------------- over all outlier rejection ------------- //
-        // if(Model_based_label && Chi_square_label && three_sigma_flag && sampleIsGood &&enable_UWB) {
         if(sampleIsGood &&enable_UWB){
             stateEstimatorScalarUpdate(&H, error, tdoa->stdDev);
         }
@@ -1535,7 +1482,7 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         // maximum iteration is 4. Setting iter to 5 leads to a problem of timer.c
         // consider the execution time of DNN, set iter to 3
         // matrix definations are not in the loop
-        for (int iter = 0; iter < 3; iter++){
+        for (int iter = 0; iter < 2; iter++){
             // apply cholesky decomposition for the prior covariance matrix 
             Cholesky_Decomposition(STATE_DIM, P_iter, P_chol);               // P_chol is a lower triangular matrix
             mat_trans(&Pc_m, &Pc_tran_m);
@@ -1639,18 +1586,12 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
                 matrixcopy(STATE_DIM, STATE_DIM, P_iter, P_w);
                 Q_iter = Q_w;
                 stateEstimatorAssertNotNaN();
-                log_new2[0] = PHTd[0];      log_new2[1] = PHTd[1];      log_new2[2] = PHTd[2];  log_new2[3] = HPHR; 
             }
         }
 
         // ---------------------------------- After 3 iterations --------------------------------------- //
         // P = P_iter =P_w, arm matrix: Pm = P_w_m
         // Q = Q_iter = Q_w
-        // debug
-        // vectorcopy(9, log_xerr, Kw);
-        log_new1[0] = error_check;      log_new1[1] = Kw[0] * error_check;        log_new1[2] = Kw[1] * error_check;        log_new1[3] = Kw[2] * error_check;
-                  
-        log_new3[0] = P_w[0][0];             log_new3[1] = P_w[1][1];         log_new3[2] = P_w[2][2];
 
         for (int i=0; i<STATE_DIM; i++){
             S[i] = S[i] + Kw[i] * error_check;
@@ -2255,19 +2196,6 @@ LOG_GROUP_START(kalman)
 //   LOG_ADD(LOG_FLOAT, dm,       &log_dm)
 //   LOG_ADD(LOG_FLOAT, errAbs,   &log_errAbs)
 //   LOG_ADD(LOG_FLOAT, hphr_chi, &log_HPHR_chi)
-
-
-  LOG_ADD(LOG_FLOAT, log1_0,   &log_new1[0])
-  LOG_ADD(LOG_FLOAT, log1_1,   &log_new1[1])
-  LOG_ADD(LOG_FLOAT, log1_2,   &log_new1[2])
-  LOG_ADD(LOG_FLOAT, log1_3,   &log_new1[3])
-  LOG_ADD(LOG_FLOAT, log2_0, &log_new2[0])
-  LOG_ADD(LOG_FLOAT, log2_1,   &log_new2[1])
-  LOG_ADD(LOG_FLOAT, log2_2,   &log_new2[2])
-  LOG_ADD(LOG_FLOAT, log2_3,   &log_new2[3])
-  LOG_ADD(LOG_FLOAT, log3_0,    &log_new3[0])
-  LOG_ADD(LOG_FLOAT, log3_1,    &log_new3[1])
-  LOG_ADD(LOG_FLOAT, log3_2,    &log_new3[2])
 
 LOG_GROUP_STOP(kalman)
 
