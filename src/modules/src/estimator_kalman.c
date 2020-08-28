@@ -1461,14 +1461,14 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         // innovation term based on x_check
         float error_check = measurement - predicted;    // error_check
 
-        // debug
-        measurement = 2.45f;
-        error_check = 0.12f;
-        S[0]=1.5f;   S[1]=0.0f; S[2]=0.0f; S[3]=0.0f; S[4]=0.0f; S[5]=0.0f; S[6]=0.0f; S[7]=0.0f; S[8]=0.0f;
-        static float P[9][9]={0};
-        P[0][0] = 1.0f;  P[1][1] = 1.0f;  P[2][2] = 1.0f;
-        P[3][3] = 0.1f;  P[4][4] = 0.1f;  P[5][5] = 0.1f;
-        P[6][6] = 0.1f;  P[7][7] = 0.1f;  P[8][8] = 0.1f;
+        // ------------------------ debug inputs ------------------------ //
+        // measurement = 2.45f;
+        // error_check = 0.12f;
+        // S[0]=1.5f;   S[1]=0.0f; S[2]=0.0f; S[3]=0.0f; S[4]=0.0f; S[5]=0.0f; S[6]=0.0f; S[7]=0.0f; S[8]=0.0f;
+        // static float P[9][9]={0};
+        // P[0][0] = 1.0f;  P[1][1] = 1.0f;  P[2][2] = 1.0f;
+        // P[3][3] = 0.1f;  P[4][4] = 0.1f;  P[5][5] = 0.1f;
+        // P[6][6] = 0.1f;  P[7][7] = 0.1f;  P[8][8] = 0.1f;
         // ---------------------- matrix defination ----------------------------- //
             static float P_chol[STATE_DIM][STATE_DIM]; 
             static arm_matrix_instance_f32 Pc_m = {STATE_DIM, STATE_DIM, (float *)P_chol};
@@ -1494,14 +1494,17 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             // rescale matrix
             static float wx_inv[STATE_DIM][STATE_DIM];
             static arm_matrix_instance_f32 wx_invm = {STATE_DIM, STATE_DIM, (float *)wx_inv};
-            
+            // tmp matrix for P_chol inverse
+            static float tmp1[STATE_DIM][STATE_DIM];
+            static arm_matrix_instance_f32 tmp1m = {STATE_DIM, STATE_DIM, (float *)tmp1};
+
             static float Pc_w_inv[STATE_DIM][STATE_DIM];
             static arm_matrix_instance_f32 Pc_w_invm = {STATE_DIM, STATE_DIM, (float *)Pc_w_inv};
 
             static float P_w[STATE_DIM][STATE_DIM];
             static arm_matrix_instance_f32 P_w_m = {STATE_DIM, STATE_DIM, (float *)P_w};
 
-            // Temporary matrices for the covariance updates
+            // Temporary matrices for the covariance updates (one way to walk around)
             static float tmpNN1d[STATE_DIM][STATE_DIM];
             static arm_matrix_instance_f32 tmpNN1m = {STATE_DIM, STATE_DIM, (float *)tmpNN1d};
 
@@ -1536,12 +1539,6 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             Cholesky_Decomposition(STATE_DIM, P_iter, P_chol);               // P_chol is a lower triangular matrix
             mat_trans(&Pc_m, &Pc_tran_m);
             // test cholesky --> cholesky is correct !!!!
-            // float P_cTd[9][9] = {0};
-            // arm_matrix_instance_f32 P_cTm = {9, 9, (float *)P_cTd};
-            // mat_trans(&Pc_m, &P_cTm);
-            // float P_test[9][9] = {0};
-            // arm_matrix_instance_f32 P_testm ={9, 9, (float *)P_test};
-            // mat_mult(&Pc_m, &P_cTm, &P_testm);           //  P_test = P
             //----------------------------------------------//
             // decomposition for measurement covariance (scalar case)
             // only true in scalar case
@@ -1555,9 +1552,9 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 
             float dx1 = x_iter - x1;  float dy1 = y_iter - y1;  float dz1 = z_iter - z1;
             float dx0 = x_iter - x0;  float dy0 = y_iter - y0;  float dz0 = z_iter - z0;
-            // debug inputs
-            dx1 = x_iter + 3.0f;  dy1 = y_iter - 1.0f;  dz1 = z_iter - 2.0f;
-            dx0 = x_iter - 3.0f;  dy0 = y_iter - 1.0f;  dz0 = z_iter - 2.0f;
+            // ---------------- debug inputs ---------------- //
+            // dx1 = x_iter + 3.0f;  dy1 = y_iter - 1.0f;  dz1 = z_iter - 2.0f;
+            // dx0 = x_iter - 3.0f;  dy0 = y_iter - 1.0f;  dz0 = z_iter - 2.0f;
 
             float d1 = sqrtf(powf(dx1, 2) + powf(dy1, 2) + powf(dz1, 2));
             float d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
@@ -1578,7 +1575,12 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
                 else{
                     e_y = error_iter / Q_chol;}
                 // e_x = inv(Ppr_c) * (error_x), here error_x = x_err
-                mat_inv(&Pc_m, &Pc_inv_m);                          // Pc_inv_m = inv(Pc_m) = inv(P_chol)
+                // Problem: after deon mat_inv, Pc matrix becomes eye(9) !!!
+                // Reason: arm_mat_inverse_f32() overwrites the source matrix !!!
+                matrixcopy(STATE_DIM, STATE_DIM, tmp1, P_chol);
+                // in order to keep P_chol
+                mat_inv(&tmp1m, &Pc_inv_m);                          // Pc_inv_m = inv(Pc_m) = inv(P_chol)
+
                 mat_mult(&Pc_inv_m, &x_errm, &e_x_m);                  // e_x_m = Pc_inv_m.dot(x_errm) 
 
                 // compute w_x, w_y --> weighting matrix
@@ -1654,12 +1656,43 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         
         // ====== COVARIANCE UPDATE ======
         mat_mult(&Kwm, &H, &tmpNN1m);               // KH,  the Kalman Gain and H are the updated Kalman Gain and H 
-        for (int i=0; i<STATE_DIM; i++) { tmpNN1d[i][i] = 1.0f - tmpNN1d[i][i]; } //  I-KH
-        mat_mult(&tmpNN1m, &P_w_m, &Pm);      // Pm = (I-KH)*P_w_m
+        // ---------- method 1 ---------- //
+        //  I-KH
+        mat_scale(&tmpNN1m, -1.0f, &tmpNN1m);
+        for (int i=0; i<STATE_DIM; i++) { tmpNN1d[i][i] = 1.0f + tmpNN1d[i][i]; } 
+        // the last step matrix multiplication is wrong! (tmpNN1m and P_w_m are both correct)
+        // something wrong with the arm mat mult
+        // ---------- One way to walk around ---------- //
+        float Ppo[STATE_DIM][STATE_DIM]={0};
+        arm_matrix_instance_f32 Ppom = {STATE_DIM, STATE_DIM, (float *)Ppo};
+        mat_mult(&tmpNN1m, &P_w_m, &Ppom);      // Pm = (I-KH)*P_w_m
+        matrixcopy(STATE_DIM, STATE_DIM, P, Ppo);
+        // -------- method2 ---------//
+        // for (int i=0; i<STATE_DIM; i++) { tmpNN1d[STATE_DIM*i+i] -= 1; } // KH - I
+        // mat_trans(&tmpNN1m, &tmpNN2m); // (KH - I)'
+        // mat_mult(&tmpNN1m, &P_w_m, &tmpNN3m); // (KH - I)*Pw
+        
+        // float Ppo[STATE_DIM][STATE_DIM]={0};
+        // arm_matrix_instance_f32 Ppom = {STATE_DIM, STATE_DIM, (float *)Ppo};
+        // mat_mult(&tmpNN3m, &tmpNN2m, &Ppom); // Ppo = (KH - I)*Pw*(KH - I)'
+        // matrixcopy(9,9, P, Ppo);
 
-        // mat_trans(&tmpNN1m, &tmpNN2m);             // (KH - I)'
-        // mat_mult(&tmpNN1m, &P_w_m, &tmpNN3m);      // tmpNN3m = (KH - I)*P
-        // mat_mult(&tmpNN3m, &tmpNN2m, &Pm);         // Pm = (KH - I)*P*(KH - I)'  
+        stateEstimatorAssertNotNaN();
+        // add the measurement variance and ensure boundedness and symmetry
+        // TODO: Why would it hit these bounds? Needs to be investigated.
+        for (int i=0; i<STATE_DIM; i++) {
+            for (int j=i; j<STATE_DIM; j++) {
+            // float v = Kw[i] * Q_iter * K[j];
+            float p = 0.5f*P[i][j] + 0.5f*P[j][i];// + v; // add measurement noise
+            if (isnan(p) || p > MAX_COVARIANCE) {
+                P[i][j] = P[j][i] = MAX_COVARIANCE;
+            } else if ( i==j && p < MIN_COVARIANCE ) {
+                P[i][j] = P[j][i] = MIN_COVARIANCE;
+            } else {
+                P[i][j] = P[j][i] = p;
+            }
+            }
+        }
         stateEstimatorAssertNotNaN();
         // add the measurement variance and ensure boundedness and symmetry
         // TODO: Why would it hit these bounds? Needs to be investigated.
