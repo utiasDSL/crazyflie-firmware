@@ -87,6 +87,7 @@ static bool OUTLIER_REJ = false;           // Model based outlier rejection
 static bool CHI_SQRUARE = true;            // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
 static bool DNN_COM = false;               // DNN bias compensation for TDoA measurements
+// static bool ROBUST = true;      // Flag
 // -------------------- [FIXE ME]The normalization ranges for TDoA  --------------------------------- //
 // static float uwb_feature_max_tdoa[9] = {6.21086508, 6.18992005, 2.37577438, 6.21086508, 6.18992005, 2.37577438, 1.59163775, 0.73787737, 0.76607429 };
 // static float uwb_feature_min_tdoa[9] = {-6.7235915, -5.57063856, -3.37862096, -6.72375934, -5.57063856, -3.38030913,-1.57508455, -0.65031555, -0.51501978 };
@@ -280,9 +281,9 @@ static float procNoiseAtt = 0;
 static float measNoiseGyro_rollpitch = 0.1f; // radians per second
 static float measNoiseGyro_yaw = 0.1f; // radians per second
 
-static float initialX = 1.5;
-static float initialY = 0.0;
-static float initialZ = 0.0;
+static float initialX = 1.5f;
+static float initialY = 0.0f;
+static float initialZ = 0.0f;
 
 //static float dragXY = 0.19f;
 //static float dragZ = 0.05f;
@@ -1415,13 +1416,13 @@ static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]){
 }
 // Weight function for GM Robust cost function
 static void GM_UWB(float e, float * GM_e){
-    float sigma = 1.0;
+    float sigma = 3.0;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
 
 static void GM_state(float e, float * GM_e){
-    float sigma = 150;
+    float sigma = 2.0;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
@@ -1577,6 +1578,7 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
                 // e_x = inv(Ppr_c) * (error_x), here error_x = x_err
                 // Problem: after deon mat_inv, Pc matrix becomes eye(9) !!!
                 // Reason: arm_mat_inverse_f32() overwrites the source matrix !!!
+                // https://community.arm.com/developer/tools-software/tools/f/keil-forum/32946/cmsis-dsp-matrix-inverse-problem
                 matrixcopy(STATE_DIM, STATE_DIM, tmp1, P_chol);
                 // in order to keep P_chol
                 mat_inv(&tmp1m, &Pc_inv_m);                          // Pc_inv_m = inv(Pc_m) = inv(P_chol)
@@ -1646,7 +1648,7 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         // Q = Q_iter = Q_w
         // debug
         // vectorcopy(9, log_xerr, Kw);
-        log_new1[0] = error_check;      log_new1[1] = Kw[0];        log_new1[2] = Kw[1];        log_new1[3] = Kw[2];
+        log_new1[0] = error_check;      log_new1[1] = Kw[0] * error_check;        log_new1[2] = Kw[1] * error_check;        log_new1[3] = Kw[2] * error_check;
                   
         log_new3[0] = P_w[0][0];             log_new3[1] = P_w[1][1];         log_new3[2] = P_w[2][2];
 
@@ -2253,9 +2255,7 @@ LOG_GROUP_START(kalman)
 //   LOG_ADD(LOG_FLOAT, dm,       &log_dm)
 //   LOG_ADD(LOG_FLOAT, errAbs,   &log_errAbs)
 //   LOG_ADD(LOG_FLOAT, hphr_chi, &log_HPHR_chi)
-//   LOG_ADD(LOG_FLOAT, h1,       &log_h1)
-//   LOG_ADD(LOG_FLOAT, h2,       &log_h2)
-//   LOG_ADD(LOG_FLOAT, h3,       &log_h3)
+
 
   LOG_ADD(LOG_FLOAT, log1_0,   &log_new1[0])
   LOG_ADD(LOG_FLOAT, log1_1,   &log_new1[1])
