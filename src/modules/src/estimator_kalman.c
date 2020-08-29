@@ -87,8 +87,8 @@ static bool enable_UWB = true;
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = true;             // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
-static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
-// static bool ROBUST = true;               // Use robust Kalman filter
+static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
+static bool ROBUST = true;               // Use robust Kalman filter
 // --------------------  The normalization ranges for TDoA (dnn6) --------------------------------- //
 static float uwb_feature_max_tdoa[14] = {5.3807451 ,   5.47015603,    2.08124987,   5.3807451 ,   5.81455849,   2.08142063,
                                          263.00953024,  74.7470004 ,  263.00953024,  77.88786904,
@@ -639,7 +639,7 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
     }
     // [CHANGE] robust ekf for uwb tdoa measurements
     tdoaMeasurement_t tdoa;
-    bool ROBUST = true;      // Flag
+
     while (stateEstimatorHasTDOAPacket(&tdoa))
     {
         // [Change] Select EKF tdoa update method: EKF + Chi-square or robust EKF with M-estimation  

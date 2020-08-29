@@ -21,7 +21,6 @@
 float scaler_normalize(float x, float x_min, float x_max);
 float scaler_denormalize(float x, float x_min, float x_max);
 
-float wrap_angle(float angle_rad);
 // nn functions
 float nn_inference(float* input, int size);
 void float_matmul(float* input, int input_size, float* matrix, int matrix_size, float* output, int output_size);
