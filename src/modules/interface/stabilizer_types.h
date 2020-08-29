@@ -80,6 +80,8 @@ typedef struct quaternion_s {
 
 typedef struct tdoaMeasurement_s {
   point_t anchorPosition[2];
+  // if we change here, the firmware on the anchor also need to be changed
+  //   quaternion_t anchorQuaternion[2];
   float distanceDiff;
   float stdDev;
   int anchor_id;

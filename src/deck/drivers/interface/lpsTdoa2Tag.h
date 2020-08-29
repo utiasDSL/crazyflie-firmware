@@ -18,6 +18,9 @@ typedef struct {
   const locoAddress_t anchorAddress[LOCODECK_NR_OF_TDOA2_ANCHORS];
 
   point_t anchorPosition[LOCODECK_NR_OF_TDOA2_ANCHORS];
+  // [CHANGE] Add anchor quaternion: from anchor frame to Vicon inertial frame
+  // if we change here, the firmware on the anchor also need to be changed
+  //   quaternion_t anchorQuaternion[LOCODECK_NR_OF_TDOA2_ANCHORS];
   bool combinedAnchorPositionOk;
 } lpsTdoa2AlgoOptions_t;
 

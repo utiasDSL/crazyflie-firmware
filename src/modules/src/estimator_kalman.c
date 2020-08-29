@@ -74,6 +74,9 @@
 #include "cf_math.h"
 
 #include "debug.h"
+// [change] include the nn model
+#include "dsl_dnn.h"
+
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
@@ -86,13 +89,29 @@ static bool enable_UWB = true;
 static bool OUTLIER_REJ = false;           // Model based outlier rejection
 static bool CHI_SQRUARE = true;            // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
-static bool DNN_COM = false;               // DNN bias compensation for TDoA measurements
+static bool DNN_COM = true;               // DNN bias compensation for TDoA measurements
 // static bool ROBUST = true;      // Flag
-// -------------------- [FIXE ME]The normalization ranges for TDoA  --------------------------------- //
-// static float uwb_feature_max_tdoa[9] = {6.21086508, 6.18992005, 2.37577438, 6.21086508, 6.18992005, 2.37577438, 1.59163775, 0.73787737, 0.76607429 };
-// static float uwb_feature_min_tdoa[9] = {-6.7235915, -5.57063856, -3.37862096, -6.72375934, -5.57063856, -3.38030913,-1.57508455, -0.65031555, -0.51501978 };
-// static float uwb_err_max_tdoa =  0.69997349;
-// static float uwb_err_min_tdoa = -0.69990715;
+// --------------------  The normalization ranges for TDoA (dnn6) --------------------------------- //
+static float uwb_feature_max_tdoa[14] = {5.3807451,     5.47015603,    2.08124987,     5.3807451,     5.81455849,   2.08118708, 
+                                        263.00953024,   74.7470004,    263.00953024,   77.88786904,
+                                        229.43825724,   89.96292566,   227.91856123,   89.98783541  };
+static float uwb_feature_min_tdoa[14] = {-5.90293844,   -6.29867335,   -2.41177556,    -5.90293844,   -6.28783576,  -2.40953048,
+                                        -252.29595734,  -78.97112932,  -259.38441589,  -79.07010333,  
+                                        -224.64882742,  -89.94645195,  -222.84478054,  -89.96353348 };
+static float uwb_err_max_tdoa =  0.99997551;
+static float uwb_err_min_tdoa = -0.9999875;
+// [CHANGE] anchor quaternion 0817
+// add a structure for anchor quaternion
+            // {x: 0.57368192, y:  0.37878907, z: 0.60540023,  w: -0.40110664 },   //0
+            // {timestamp: 1, x: 0.70965068, y: -0.23988127, z: 0.62018589,  w:  0.23276886 },   //1
+            // {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //2
+            // {timestamp: 1, x:-0.33070679, y:-0.59588659,  z: -0.37463275, w:  0.6285969  },   //3
+            // {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //4
+            // {timestamp: 1, x:-0.33070679, y: -0.59588659, z: -0.37463275, w:  0.6285969  },   //5
+            // {timestamp: 1, x: 0.35706695, y: -0.60343212, z: 0.33397901,  w:  0.62994319 },   //6
+            // {timestamp: 1, x: 0.60102553, y: -0.34948114, z: 0.62287006,  w:  0.35869535 },   //7
+
+
 /**
  * Primary Kalman filter functions
  *
@@ -182,6 +201,11 @@ static void GM_state(float e, float * GM_e);
 static void matrixcopy(int ROW, int COLUMN, float destmat[ROW][COLUMN], float srcmat[ROW][COLUMN]);
 static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]);
 // --------------------------------------------------------------------- //
+// [CHANGE] help functions for dnn //
+static void quat2Rot(float q[4], float R[3][3]);
+static void RT_v(float v[3], float C[3][3], float v_b[3]);
+static void getAzEl_Angle(float v_cf0[3], float v_cf1[3], float v_an0[3], float v_an1[3], float C_IB[3][3], 
+                          float q_IA0[4], float q_IA1[4], float AzEl[8]);
 
 static inline bool stateEstimatorHasTDOAPacket(tdoaMeasurement_t *uwb) {
   return (pdTRUE == xQueueReceive(tdoaDataQueue, uwb, 0));
@@ -296,10 +320,6 @@ static float log_yaw = 0.0f;
 // Chi-square test debug
 static float log_dm = 0.0f;
 static float log_errAbs = 0.0f;
-static float log_HPHR_chi = 0.0f;
-static float log_h1 = 0.0f;
-static float log_h2 = 0.0f;
-static float log_h3 = 0.0f;
 
 // static float log_new1[6] = {0};
 // static float log_new2[6] = {0};
@@ -981,9 +1001,8 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
   float err_sqr = error * error;
   float d_m = err_sqr/HPHR;     // Chi-square
   log_dm = d_m;
-  log_HPHR_chi = HPHR;
   log_errAbs = err_abs;
-  log_h1 = Hm->pData[0]; log_h2 = Hm->pData[1]; log_h3 = Hm->pData[2];
+
   bool Chi_square_label = true;  bool three_sigma_flag = true;
 
     // ****************** Chi-squared test *********************//
@@ -1374,6 +1393,52 @@ static void GM_state(float e, float * GM_e){
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
 
+static void quat2Rot(float q[4], float R[3][3]){
+    // convert quaternion to rotation matrix
+    R[0][0] = q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3];
+    R[0][1] = 2 * q[1] * q[2] - 2 * q[0] * q[3];
+    R[0][2] = 2 * q[1] * q[3] + 2 * q[0] * q[2];
+
+    R[1][0] = 2 * q[1] * q[2] + 2 * q[0] * q[3];
+    R[1][1] = q[0] * q[0] - q[1] * q[1] + q[2] * q[2] - q[3] * q[3];
+    R[1][2] = 2 * q[2] * q[3] - 2 * q[0] * q[1];
+
+    R[2][0] = 2 * q[1] * q[3] - 2 * q[0] * q[2];
+    R[2][1] = 2 * q[2] * q[3] + 2 * q[0] * q[1];
+    R[2][2] = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
+}
+
+static void RT_v(float v[3], float C[3][3], float v_b[3]){
+    // matrix computation: v_b = C.T.dot(v)
+    v_b[0] = C[0][0]*v[0] + C[1][0]*v[1] + C[2][0]*v[2];
+    v_b[1] = C[0][1]*v[0] + C[1][1]*v[1] + C[2][1]*v[2];
+    v_b[2] = C[0][2]*v[0] + C[1][2]*v[1] + C[2][2]*v[2];
+}
+
+static void getAzEl_Angle(float v_cf0[3], float v_cf1[3], float v_an0[3], float v_an1[3], float C_IB[3][3], 
+                          float q_IA0[4], float q_IA1[4], float AzEl[8]){
+    // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
+    float v_cf0_b[3]={0};            float v_cf1_b[3]={0};
+    RT_v(v_cf0, C_IB, v_cf0_b);
+    AzEl[0] = atan2f(v_cf0_b[1], v_cf0_b[0]) * RAD_TO_DEG;
+    AzEl[1] = atan2f(v_cf0_b[2], sqrtf(powf(v_cf0_b[0], 2) + powf(v_cf0_b[1], 2) + powf(v_cf0_b[2], 2))) * RAD_TO_DEG;
+
+    RT_v(v_cf1, C_IB, v_cf1_b);
+    AzEl[2] = atan2f(v_cf1_b[1], v_cf1_b[0]) * RAD_TO_DEG;
+    AzEl[3] = atan2f(v_cf1_b[2], sqrtf(powf(v_cf1_b[0], 2) + powf(v_cf1_b[1], 2) + powf(v_cf1_b[2], 2))) * RAD_TO_DEG;
+
+    float C_IA0[3][3] = {0};        float C_IA1[3][3] = {0};
+    quat2Rot(q_IA0, C_IA0);         quat2Rot(q_IA1, C_IA1);
+    float v_an0_b[3]={0};           float v_an1_b[3]={0};
+    RT_v(v_an0, C_IA0, v_an0_b);
+    AzEl[4] = atan2f(v_an0_b[1], v_an0_b[0]) * RAD_TO_DEG;
+    AzEl[5] = atan2f(v_an0_b[2], sqrtf(powf(v_an0_b[0], 2) + powf(v_an0_b[1], 2) + powf(v_an0_b[2], 2))) * RAD_TO_DEG;
+
+    RT_v(v_an1, C_IA1, v_an1_b);
+    AzEl[6] = atan2f(v_an1_b[1], v_an1_b[0]) * RAD_TO_DEG;
+    AzEl[7] = atan2f(v_an1_b[2], sqrtf(powf(v_an1_b[0], 2) + powf(v_an1_b[1], 2) + powf(v_an1_b[2], 2))) * RAD_TO_DEG;
+}
+
 // Robust EKF update for TDoA measurements
 static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
 {
@@ -1401,7 +1466,37 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         float predicted = d1 - d0;
         //[FIX ME] Add DNN here
         if(DNN_COM){
-            measurement = tdoa->distanceDiff;
+            float v_an0[3] = { dx0,  dy0,  dz0};    float v_an1[3] = { dx1,  dy1,  dz1};
+            float v_cf0[3] = {-dx0, -dy0, -dz0};    float v_cf1[3] = {-dx1, -dy1, -dz1};
+            // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
+            float AzEl[8]= {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+            float q_IA0[4] = {tdoa->anchorQuaternion[0].w, tdoa->anchorQuaternion[0].x, tdoa->anchorQuaternion[0].y, tdoa->anchorQuaternion[0].z};
+            float q_IA1[4] = {tdoa->anchorQuaternion[1].w, tdoa->anchorQuaternion[1].x, tdoa->anchorQuaternion[1].y, tdoa->anchorQuaternion[1].z};
+            // get the Azimuth and Elevation angles
+            getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
+            // feature vector
+
+            float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
+                                       AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
+
+            // debug testing -- feature vector {3.0,    3.0,   1.0,    2.0,    3.0,    1.0, 
+            //                                  100.0,  30.0,  100.0,  40.0,
+            //                                  150.0,  28.0,  130.0,  48.0 }
+            feature_tdoa[0] = 3.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 1.0;   feature_tdoa[3] = 2.0;
+            feature_tdoa[4] = 3.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 100.0; feature_tdoa[7] = 30.0;
+            feature_tdoa[8] = 100.0;  feature_tdoa[9] = 40.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
+            feature_tdoa[12] = 130.0; feature_tdoa[13] = 48.0;
+
+            for(int idx=0; idx<14; idx++){
+			  feature_tdoa[idx] = scaler_normalize(feature_tdoa[idx], uwb_feature_min_tdoa[idx], uwb_feature_max_tdoa[idx]);
+		    }
+            // DNN inference
+            float bias = nn_inference(feature_tdoa, 14);
+            // denormalization
+            float Bias = scaler_denormalize(bias, uwb_err_min_tdoa, uwb_err_max_tdoa);
+            // measurements after bias compensation
+            measurement = tdoa->distanceDiff + Bias;
         }else{
             // without DNN bias compensation
             measurement = tdoa->distanceDiff;
