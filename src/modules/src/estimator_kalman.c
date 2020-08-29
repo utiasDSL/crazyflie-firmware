@@ -80,38 +80,42 @@
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
 
-// #define ZRANGE_MAX_HEIGHT 0.8f //maximum height for fusing flowdeck zrange sensor into the EKF
-// This method is proved to be not working.(flowdeck is the dominant sensor for now)
 static bool enable_flow = false;
 static bool enable_zrange = false;
 static bool enable_UWB = true;
 
-static bool OUTLIER_REJ = false;           // Model based outlier rejection
-static bool CHI_SQRUARE = true;            // Chi-square test
+static bool OUTLIER_REJ = false;            // Model based outlier rejection
+static bool CHI_SQRUARE = true;             // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
-static bool DNN_COM = true;               // DNN bias compensation for TDoA measurements
-// static bool ROBUST = true;      // Flag
+static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
+// static bool ROBUST = true;               // Use robust Kalman filter
 // --------------------  The normalization ranges for TDoA (dnn6) --------------------------------- //
-static float uwb_feature_max_tdoa[14] = {5.3807451,     5.47015603,    2.08124987,     5.3807451,     5.81455849,   2.08118708, 
-                                        263.00953024,   74.7470004,    263.00953024,   77.88786904,
-                                        229.43825724,   89.96292566,   227.91856123,   89.98783541  };
-static float uwb_feature_min_tdoa[14] = {-5.90293844,   -6.29867335,   -2.41177556,    -5.90293844,   -6.28783576,  -2.40953048,
-                                        -252.29595734,  -78.97112932,  -259.38441589,  -79.07010333,  
-                                        -224.64882742,  -89.94645195,  -222.84478054,  -89.96353348 };
-static float uwb_err_max_tdoa =  0.99997551;
+static float uwb_feature_max_tdoa[14] = {5.3807451 ,   5.47015603,    2.08124987,   5.3807451 ,   5.81455849,   2.08142063,
+                                         263.00953024,  74.7470004 ,  263.00953024,  77.88786904,
+                                         229.43825724,  89.98783541,  229.43825724,  89.96292566  };
+static float uwb_feature_min_tdoa[14] = {-5.90278725,   -6.29867335,   -2.41177556,   -5.90293844,  -6.28783576,   -2.40952656,
+                                         -252.07452201,  -79.04828341,   -259.38441589,  -79.07010333,
+                                         -224.64882742,  -89.96353348,   -224.64882742,  -89.96353348  };
+static float uwb_err_max_tdoa =  0.99999636;
 static float uwb_err_min_tdoa = -0.9999875;
 // [CHANGE] anchor quaternion 0817
-// add a structure for anchor quaternion
-            // {x: 0.57368192, y:  0.37878907, z: 0.60540023,  w: -0.40110664 },   //0
-            // {timestamp: 1, x: 0.70965068, y: -0.23988127, z: 0.62018589,  w:  0.23276886 },   //1
-            // {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //2
-            // {timestamp: 1, x:-0.33070679, y:-0.59588659,  z: -0.37463275, w:  0.6285969  },   //3
-            // {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //4
-            // {timestamp: 1, x:-0.33070679, y: -0.59588659, z: -0.37463275, w:  0.6285969  },   //5
-            // {timestamp: 1, x: 0.35706695, y: -0.60343212, z: 0.33397901,  w:  0.62994319 },   //6
-            // {timestamp: 1, x: 0.60102553, y: -0.34948114, z: 0.62287006,  w:  0.35869535 },   //7
-
-
+typedef struct {
+    quaternion_t anchorQuaternion[8];
+}anchorPose; 
+// anchor orientation with Total Station Survey (or Vicon) 
+static anchorPose q_an={
+    .anchorQuaternion = {
+              {timestamp: 1,x: 0.57368192, y:  0.37878907, z: 0.60540023,  w: -0.40110664 },   //0
+              {timestamp: 1, x: 0.70965068, y: -0.23988127, z: 0.62018589,  w:  0.23276886 },   //1
+              {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //2
+              {timestamp: 1, x:-0.33070679, y:-0.59588659,  z: -0.37463275, w:  0.6285969  },   //3
+              {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //4
+              {timestamp: 1, x:-0.33070679, y: -0.59588659, z: -0.37463275, w:  0.6285969  },   //5
+              {timestamp: 1, x: 0.35706695, y: -0.60343212, z: 0.33397901,  w:  0.62994319 },   //6
+              {timestamp: 1, x: 0.60102553, y: -0.34948114, z: 0.62287006,  w:  0.35869535 },   //7
+            }
+};
+// --------------------  ------------------------------------- --------------------------------- //
 /**
  * Primary Kalman filter functions
  *
@@ -1470,8 +1474,19 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             float v_cf0[3] = {-dx0, -dy0, -dz0};    float v_cf1[3] = {-dx1, -dy1, -dz1};
             // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
             float AzEl[8]= {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-            float q_IA0[4] = {tdoa->anchorQuaternion[0].w, tdoa->anchorQuaternion[0].x, tdoa->anchorQuaternion[0].y, tdoa->anchorQuaternion[0].z};
-            float q_IA1[4] = {tdoa->anchorQuaternion[1].w, tdoa->anchorQuaternion[1].x, tdoa->anchorQuaternion[1].y, tdoa->anchorQuaternion[1].z};
+            // index the anchor pose based on measurement ID
+            int ID[8] ={0,1,2,3,4,5,6,7};
+            float q_IA0[4] = {0}; float q_IA1[4] ={0};
+            if (tdoa->anchor_id == 0){
+                q_IA0[0] = q_an.anchorQuaternion[7].w;  q_IA0[1] = q_an.anchorQuaternion[7].x; q_IA0[2] = q_an.anchorQuaternion[7].y;  q_IA0[2] = q_an.anchorQuaternion[7].z;
+                q_IA1[0] = q_an.anchorQuaternion[0].w;  q_IA1[1] = q_an.anchorQuaternion[0].x; q_IA1[2] = q_an.anchorQuaternion[0].y;  q_IA1[2] = q_an.anchorQuaternion[0].z; 
+            }else{
+                q_IA0[0] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].w;  q_IA0[1] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].x;
+                q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].y;  q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].z;
+
+                q_IA0[0] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].w;  q_IA0[1] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].x;
+                q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].y;  q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].z;
+            }
             // get the Azimuth and Elevation angles
             getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
             // feature vector
@@ -1483,10 +1498,10 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             // debug testing -- feature vector {3.0,    3.0,   1.0,    2.0,    3.0,    1.0, 
             //                                  100.0,  30.0,  100.0,  40.0,
             //                                  150.0,  28.0,  130.0,  48.0 }
-            feature_tdoa[0] = 3.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 1.0;   feature_tdoa[3] = 2.0;
-            feature_tdoa[4] = 3.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 100.0; feature_tdoa[7] = 30.0;
-            feature_tdoa[8] = 100.0;  feature_tdoa[9] = 40.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
-            feature_tdoa[12] = 130.0; feature_tdoa[13] = 48.0;
+            feature_tdoa[0] = 23.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 13.0;   feature_tdoa[3] = 2.0;
+            feature_tdoa[4] = 7.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
+            feature_tdoa[8] = 100.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
+            feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
 
             for(int idx=0; idx<14; idx++){
 			  feature_tdoa[idx] = scaler_normalize(feature_tdoa[idx], uwb_feature_min_tdoa[idx], uwb_feature_max_tdoa[idx]);

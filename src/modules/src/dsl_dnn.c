@@ -11,11 +11,15 @@
 
 #define LAYER_1_SIZE 50
 #define LAYER_2_SIZE 50
-#define LAYER_3_SIZE 1
+#define LAYER_3_SIZE 50
+// #define LAYER_4_SIZE 50
+#define LAYER_4_SIZE 1
 
 float layer_1[LAYER_1_SIZE] = {0};
 float layer_2[LAYER_2_SIZE] = {0};
 float layer_3[LAYER_3_SIZE] = {0};
+float layer_4[LAYER_4_SIZE] = {0};
+// float layer_5[LAYER_5_SIZE] = {0};
 
 float wrap_angle(float angle_rad){
 // wrap the angle [rad]
@@ -54,26 +58,43 @@ float nn_inference(float* input, int size){
 
 	int weight_size1 = size * LAYER_1_SIZE;
 	int weight_size2 = LAYER_1_SIZE * LAYER_2_SIZE;
-	int output_size = LAYER_2_SIZE * LAYER_3_SIZE;
+    int weight_size3 = LAYER_2_SIZE * LAYER_3_SIZE;
+    int weight_size4 = LAYER_3_SIZE * LAYER_4_SIZE;
+	// int output_size = LAYER_4_SIZE * LAYER_5_SIZE;
     //layer 1
     float_matmul(input, size, weights_1, weight_size1, layer_1, LAYER_1_SIZE);
     float_bias_add(layer_1, LAYER_1_SIZE, bias_1);
     // activate function
     float_relu(layer_1,LAYER_1_SIZE);
     //layer 2
-    float_matmul(layer_1, LAYER_1_SIZE,weights_2, weight_size2, layer_2, LAYER_2_SIZE);
+    float_matmul(layer_1, LAYER_1_SIZE, weights_2, weight_size2, layer_2, LAYER_2_SIZE);
     float_bias_add(layer_2, LAYER_2_SIZE, bias_2);
     // activate function
     float_relu(layer_2,LAYER_2_SIZE);
 
-    float_matmul(layer_2, LAYER_2_SIZE,weights_3, output_size, layer_3, LAYER_3_SIZE);
+    //layer 3
+    float_matmul(layer_2, LAYER_2_SIZE, weights_3, weight_size3, layer_3, LAYER_3_SIZE);
     float_bias_add(layer_3, LAYER_3_SIZE, bias_3);
+    // activate function
+    float_relu(layer_3,LAYER_3_SIZE);
 
-    float output = layer_3[0];
+    //layer 4
+    float_matmul(layer_3, LAYER_3_SIZE, weights_4, weight_size4, layer_4, LAYER_4_SIZE);
+    float_bias_add(layer_4, LAYER_4_SIZE, bias_4);
+    // activate function
+    // float_relu(layer_4, LAYER_4_SIZE);
+
+    //layer 5
+    // float_matmul(layer_4, LAYER_4_SIZE, weights_5, output_size, layer_5, LAYER_5_SIZE);
+    // float_bias_add(layer_5, LAYER_5_SIZE, bias_5);
+
+    float output = layer_4[0];
 
     zero_tensor(layer_1,LAYER_1_SIZE);
     zero_tensor(layer_2,LAYER_2_SIZE);
     zero_tensor(layer_3,LAYER_3_SIZE);
+    zero_tensor(layer_4,LAYER_4_SIZE);
+    // zero_tensor(layer_5,LAYER_5_SIZE);
 
     return output;
 
