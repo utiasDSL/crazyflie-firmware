@@ -87,35 +87,8 @@ static bool enable_UWB = true;
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = true;             // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
-static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
+static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;               // Use robust Kalman filter
-// --------------------  The normalization ranges for TDoA (dnn6) --------------------------------- //
-static float uwb_feature_max_tdoa[14] = {5.3807451 ,   5.47015603,    2.08124987,   5.3807451 ,   5.81455849,   2.08142063,
-                                         263.00953024,  74.7470004 ,  263.00953024,  77.88786904,
-                                         229.43825724,  89.98783541,  229.43825724,  89.96292566  };
-static float uwb_feature_min_tdoa[14] = {-5.90278725,   -6.29867335,   -2.41177556,   -5.90293844,  -6.28783576,   -2.40952656,
-                                         -252.07452201,  -79.04828341,   -259.38441589,  -79.07010333,
-                                         -224.64882742,  -89.96353348,   -224.64882742,  -89.96353348  };
-static float uwb_err_max_tdoa =  0.99999636;
-static float uwb_err_min_tdoa = -0.9999875;
-// [CHANGE] anchor quaternion 0817
-typedef struct {
-    quaternion_t anchorQuaternion[8];
-}anchorPose; 
-// anchor orientation with Total Station Survey (or Vicon) 
-static anchorPose q_an={
-    .anchorQuaternion = {
-              {timestamp: 1,x: 0.57368192, y:  0.37878907, z: 0.60540023,  w: -0.40110664 },   //0
-              {timestamp: 1, x: 0.70965068, y: -0.23988127, z: 0.62018589,  w:  0.23276886 },   //1
-              {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //2
-              {timestamp: 1, x:-0.33070679, y:-0.59588659,  z: -0.37463275, w:  0.6285969  },   //3
-              {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //4
-              {timestamp: 1, x:-0.33070679, y: -0.59588659, z: -0.37463275, w:  0.6285969  },   //5
-              {timestamp: 1, x: 0.35706695, y: -0.60343212, z: 0.33397901,  w:  0.62994319 },   //6
-              {timestamp: 1, x: 0.60102553, y: -0.34948114, z: 0.62287006,  w:  0.35869535 },   //7
-            }
-};
-// --------------------  ------------------------------------- --------------------------------- //
 /**
  * Primary Kalman filter functions
  *
@@ -1273,40 +1246,62 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
     float d0 = sqrtf(powf(dx0, 2) + powf(dy0, 2) + powf(dz0, 2));
 
     float predicted = d1 - d0;
-    // fixed here
+    // DNN bias compensation
     if(DNN_COM){
-        // 		  float f_yaw = yaw;
-        // 		  float f_roll = roll;
-        // 		  float f_pitch = pitch;
-        // 		  // original feature
-        // 		  float feature_tdoa[9] = {dx1, dy1, dz1, dx0, dy0, dz0, f_yaw, f_roll, f_pitch};
-        // 		  // debug feature
-        // //		  float feature[6] ={1.3, 1.5, 0.1, 0.15, 0.03, 0.06};
-        // 		  log_feature_yaw = f_yaw;
-        // 		  log_feature_roll = f_roll;
-        // 		  log_feature_pitch = f_pitch;
-        // 		  // normalize the feature elements
-        // 		  for(int idx=0; idx<9; idx++){
-        // 			  feature_tdoa[idx] = scaler_normalize(feature_tdoa[idx], uwb_feature_min_tdoa[idx], uwb_feature_max_tdoa[idx]);
-        // 		  }
-        // //		  DEBUG_PRINT("Features after normalization: %f,%f,%f,%f,%f,%f \n", (double)feature[0],(double)feature[1],(double)feature[2],(double)feature[3],(double)feature[4],(double)feature[5]);
-        // //		   use hand-written nn for inference
-        // //		  xStart = xTaskGetTickCount();
-        // 		  float bias = nn_inference(feature_tdoa, 9);  // get the results in bias
-        // //		  DEBUG_PRINT("NN_inference result: %f\n", (double)bias);
-        // //		  xEnd = xTaskGetTickCount();
-        // //		  xDifference = xEnd - xStart;
-        // //		  DEBUG_PRINT( "Time of nn inference: %i \n", xDifference );
-        // 		  //  denormalize the predicted bias
-        // 		  float Bias = scaler_denormalize(bias, uwb_err_min_tdoa, uwb_err_max_tdoa);
+            float v_an0[3] = { dx0,  dy0,  dz0};    float v_an1[3] = { dx1,  dy1,  dz1};
+            float v_cf0[3] = {-dx0, -dy0, -dz0};    float v_cf1[3] = {-dx1, -dy1, -dz1};
+            // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
+            float AzEl[8]= {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+            // index the anchor pose based on measurement ID
+            int ID[8] ={0,1,2,3,4,5,6,7};
+            float q_IA0[4] = {0}; float q_IA1[4] ={0};
+            // Initialize a dummy anchor quaternion struct
+            anchorPose q_an={
+                .anchorQuaternion = {{0}}
+                };       
+            // get anchor quaternion 
+            getQan(q_an);
+            if (tdoa->anchor_id == 0){
+                q_IA0[0] = q_an.anchorQuaternion[7].w;  q_IA0[1] = q_an.anchorQuaternion[7].x; q_IA0[2] = q_an.anchorQuaternion[7].y;  q_IA0[2] = q_an.anchorQuaternion[7].z;
+                q_IA1[0] = q_an.anchorQuaternion[0].w;  q_IA1[1] = q_an.anchorQuaternion[0].x; q_IA1[2] = q_an.anchorQuaternion[0].y;  q_IA1[2] = q_an.anchorQuaternion[0].z; 
+            }else{
+                q_IA0[0] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].w;  q_IA0[1] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].x;
+                q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].y;  q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id - 1]].z;
 
-        // //		  DEBUG_PRINT("NN_inference result after denormalization: %f\n", (double)Bias);
-        // 		  // log the predicted bias for debug
-        // 		  nn_Bias_log = Bias;
-        // 		  // TDoA measurement after DNN bias compensation
-        // 		  measurement = tdoa->distanceDiff + Bias;
+                q_IA0[0] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].w;  q_IA0[1] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].x;
+                q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].y;  q_IA0[2] = q_an.anchorQuaternion[ID[tdoa->anchor_id]].z;
+            }
+            // get the Azimuth and Elevation angles
+            getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
+            // feature vector
+            float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
+                                       AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
 
-          measurement = tdoa->distanceDiff;
+            // debug testing -- feature vector {3.0,    3.0,   1.0,    2.0,    3.0,    1.0, 
+            //                                  100.0,  30.0,  100.0,  40.0,
+            //                                  150.0,  28.0,  130.0,  48.0 }
+            // feature_tdoa[0] = 23.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 13.0;   feature_tdoa[3] = 2.0;
+            // feature_tdoa[4] = 7.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
+            // feature_tdoa[8] = 100.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
+            // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
+            // ------------------ get feature normalization range --------------------- //
+            float uwb_feature_max_tdoa[14]={0};   float uwb_feature_min_tdoa[14] ={0};
+            float uwb_err_max_tdoa = 0;           float uwb_err_min_tdoa = 0;
+            getErrMax(uwb_err_max_tdoa);          getErrMin(uwb_err_min_tdoa);
+            getFeatureMax(uwb_feature_max_tdoa);  getFeatureMin(uwb_feature_min_tdoa);
+            // ----------------------------------------------------------------------- //
+            for(int idx=0; idx<14; idx++){
+			  feature_tdoa[idx] = scaler_normalize(feature_tdoa[idx], uwb_feature_min_tdoa[idx], uwb_feature_max_tdoa[idx]);
+		    }
+            // DNN inference
+            float bias = nn_inference(feature_tdoa, 14);
+            // denormalization
+            float Bias = scaler_denormalize(bias, uwb_err_min_tdoa, uwb_err_max_tdoa);
+            // debug setting
+            Bias = 0.0f;
+            // measurements after bias compensation
+            measurement = tdoa->distanceDiff + Bias;
     }else{
     	  // without DNN bias compensation
           measurement = tdoa->distanceDiff;
@@ -1477,6 +1472,12 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             // index the anchor pose based on measurement ID
             int ID[8] ={0,1,2,3,4,5,6,7};
             float q_IA0[4] = {0}; float q_IA1[4] ={0};
+            // Initialize a dummy anchor quaternion struct     
+            anchorPose q_an={
+                .anchorQuaternion = {{0}}
+                };   
+            // get anchor quaternion
+            getQan(q_an);
             if (tdoa->anchor_id == 0){
                 q_IA0[0] = q_an.anchorQuaternion[7].w;  q_IA0[1] = q_an.anchorQuaternion[7].x; q_IA0[2] = q_an.anchorQuaternion[7].y;  q_IA0[2] = q_an.anchorQuaternion[7].z;
                 q_IA1[0] = q_an.anchorQuaternion[0].w;  q_IA1[1] = q_an.anchorQuaternion[0].x; q_IA1[2] = q_an.anchorQuaternion[0].y;  q_IA1[2] = q_an.anchorQuaternion[0].z; 
@@ -1490,7 +1491,6 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             // get the Azimuth and Elevation angles
             getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
             // feature vector
-
             float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
                                        AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
                                        AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
@@ -1498,11 +1498,16 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             // debug testing -- feature vector {3.0,    3.0,   1.0,    2.0,    3.0,    1.0, 
             //                                  100.0,  30.0,  100.0,  40.0,
             //                                  150.0,  28.0,  130.0,  48.0 }
-            feature_tdoa[0] = 23.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 13.0;   feature_tdoa[3] = 2.0;
-            feature_tdoa[4] = 7.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
-            feature_tdoa[8] = 100.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
-            feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
-
+            // feature_tdoa[0] = 23.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 13.0;   feature_tdoa[3] = 2.0;
+            // feature_tdoa[4] = 7.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
+            // feature_tdoa[8] = 100.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
+            // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
+            // ------------------ get feature normalization range --------------------- //
+            float uwb_feature_max_tdoa[14]={0};   float uwb_feature_min_tdoa[14] ={0};
+            float uwb_err_max_tdoa = 0;           float uwb_err_min_tdoa = 0;
+            getErrMax(uwb_err_max_tdoa);          getErrMin(uwb_err_min_tdoa);
+            getFeatureMax(uwb_feature_max_tdoa);  getFeatureMin(uwb_feature_min_tdoa);
+            // ----------------------------------------------------------------------- //
             for(int idx=0; idx<14; idx++){
 			  feature_tdoa[idx] = scaler_normalize(feature_tdoa[idx], uwb_feature_min_tdoa[idx], uwb_feature_max_tdoa[idx]);
 		    }
@@ -1510,6 +1515,8 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             float bias = nn_inference(feature_tdoa, 14);
             // denormalization
             float Bias = scaler_denormalize(bias, uwb_err_min_tdoa, uwb_err_max_tdoa);
+            // debug setting
+            Bias = 0.0f;
             // measurements after bias compensation
             measurement = tdoa->distanceDiff + Bias;
         }else{
@@ -1699,7 +1706,7 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             }
         }
 
-        // ---------------------------------- After 3 iterations --------------------------------------- //
+        // ---------------------------------- After n iterations --------------------------------------- //
         // P = P_iter =P_w, arm matrix: Pm = P_w_m
         // Q = Q_iter = Q_w
 
@@ -1713,8 +1720,8 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         //  I-KH
         mat_scale(&tmpNN1m, -1.0f, &tmpNN1m);
         for (int i=0; i<STATE_DIM; i++) { tmpNN1d[i][i] = 1.0f + tmpNN1d[i][i]; } 
-        // the last step matrix multiplication is wrong! (tmpNN1m and P_w_m are both correct)
-        // something wrong with the arm mat mult
+        // the last step matrix multiplication does not work! 
+        // mat_mult(&tmpNN1m, &P_w_m, &Pm); (tmpNN1m and P_w_m are both correct)
         // ---------- One way to walk around ---------- //
         float Ppo[STATE_DIM][STATE_DIM]={0};
         arm_matrix_instance_f32 Ppom = {STATE_DIM, STATE_DIM, (float *)Ppo};
@@ -1729,7 +1736,6 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         // arm_matrix_instance_f32 Ppom = {STATE_DIM, STATE_DIM, (float *)Ppo};
         // mat_mult(&tmpNN3m, &tmpNN2m, &Ppom); // Ppo = (KH - I)*Pw*(KH - I)'
         // matrixcopy(9,9, P, Ppo);
-
         stateEstimatorAssertNotNaN();
         // add the measurement variance and ensure boundedness and symmetry
         // TODO: Why would it hit these bounds? Needs to be investigated.
@@ -1744,23 +1750,6 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             } else {
                 P[i][j] = P[j][i] = p;
             }
-            }
-        }
-        stateEstimatorAssertNotNaN();
-        // add the measurement variance and ensure boundedness and symmetry
-        // TODO: Why would it hit these bounds? Needs to be investigated.
-        for (int i=0; i<STATE_DIM; i++) {
-            for (int j=i; j<STATE_DIM; j++) {
-                // float v = Kw[i] * Q_iter * Kw[j];
-                float p = 0.5f*P[i][j] + 0.5f*P[j][i]; // force symmetry
-
-                if (isnan(p) || p > MAX_COVARIANCE) {
-                P[i][j] = P[j][i] = MAX_COVARIANCE;
-                } else if ( i==j && p < MIN_COVARIANCE ) {
-                P[i][j] = P[j][i] = MIN_COVARIANCE;
-                } else {
-                P[i][j] = P[j][i] = p;
-                }
             }
         }
         stateEstimatorAssertNotNaN();

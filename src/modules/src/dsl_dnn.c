@@ -19,6 +19,49 @@ float layer_2[LAYER_2_SIZE] = {0};
 float layer_3[LAYER_3_SIZE] = {0};
 float layer_4[LAYER_4_SIZE] = {0};
 
+// get the input/output normalization data --> modify w.r.t the DNN
+void getErrMax(float err_max){
+    err_max = 0.99999636;
+}
+void getErrMin(float err_min){
+    err_min = -0.9999875;
+}
+void getFeatureMax(float uwb_feature_max_tdoa[14]){
+    float feature_max[14] =  {5.3807451 ,   5.47015603,    2.08124987,   5.3807451 ,    5.81455849,   2.08142063,
+                                            263.00953024,  74.7470004 ,  263.00953024,  77.88786904,
+                                            229.43825724,  89.98783541,  229.43825724,  89.96292566  };
+    for(int i=0; i<14; i++){
+        uwb_feature_max_tdoa[i] = feature_max[i];
+    }
+}
+void getFeatureMin(float uwb_feature_min_tdoa[14]){
+    float feature_min[14] = {-5.90278725,   -6.29867335,    -2.41177556,    -5.90293844,    -6.28783576,   -2.40952656,
+                                            -252.07452201,  -79.04828341,   -259.38441589,  -79.07010333,
+                                            -224.64882742,  -89.96353348,   -224.64882742,  -89.96353348  };
+    for(int i=0; i<14; i++){
+        uwb_feature_min_tdoa[i] = feature_min[i];
+    }
+}
+//------------------------------------------------------------------------------- //
+// [CHANGE] anchor quaternion 0817
+
+void getQan(anchorPose q){
+// anchor orientation with Total Station Survey (or Vicon) 
+anchorPose q_an={
+    .anchorQuaternion = {
+              {timestamp: 1,x: 0.57368192, y:  0.37878907, z: 0.60540023,  w: -0.40110664 },   //0
+              {timestamp: 1, x: 0.70965068, y: -0.23988127, z: 0.62018589,  w:  0.23276886 },   //1
+              {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //2
+              {timestamp: 1, x:-0.33070679, y:-0.59588659,  z: -0.37463275, w:  0.6285969  },   //3
+              {timestamp: 1, x: 0.2946621,  y: -0.61468356, z: 0.2884659,   w:  0.67240289 },   //4
+              {timestamp: 1, x:-0.33070679, y: -0.59588659, z: -0.37463275, w:  0.6285969  },   //5
+              {timestamp: 1, x: 0.35706695, y: -0.60343212, z: 0.33397901,  w:  0.62994319 },   //6
+              {timestamp: 1, x: 0.60102553, y: -0.34948114, z: 0.62287006,  w:  0.35869535 },   //7
+            }
+};
+    q = q_an;
+}
+//------------------------------------------------------------------------------- //
 // normalization
 float scaler_normalize(float x, float x_min, float x_max){
 	float min_range = 0.0;  float max_range = 1.0;
@@ -93,7 +136,6 @@ void float_matmul(float* input, int input_size, float* matrix, int matrix_size, 
         }
     }
     return;
-
 }
 
 void float_bias_add(float* input, int input_size, float* matrix){
@@ -116,5 +158,4 @@ void zero_tensor(float* tensor, int tensor_size){
     for(int i = 0; i< tensor_size; i++){
         tensor[i] = 0.0;
     }
-
 }
