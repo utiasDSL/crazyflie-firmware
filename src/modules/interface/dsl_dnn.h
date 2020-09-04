@@ -13,8 +13,8 @@
 #include "task.h"
 #include "stabilizer_types.h"   // for quaternion data structure
 // normalization range
-void getErrMax(float err_max);
-void getErrMin(float err_min);
+void getErrMax(float * err_max);
+void getErrMin(float * err_min);
 void getFeatureMax(float uwb_feature_max_tdoa[14]);
 void getFeatureMin(float uwb_feature_min_tdoa[14]);
 // get quaternion

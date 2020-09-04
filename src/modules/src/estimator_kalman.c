@@ -79,16 +79,15 @@
 
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
-
 static bool enable_flow = false;
 static bool enable_zrange = false;
-static bool enable_UWB = true;
+static bool enable_UWB = false;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
-static bool CHI_SQRUARE = true;             // Chi-square test
+static bool CHI_SQRUARE = false;             // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
-static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
-static bool ROBUST = true;               // Use robust Kalman filter
+static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
+static bool ROBUST = false;                  // Use robust Kalman filter
 /**
  * Primary Kalman filter functions
  *
@@ -164,10 +163,6 @@ static inline bool stateEstimatorHasPosVelYawMeasurement(posvelyawMeasurement_t 
   return (pdTRUE == xQueueReceive(posvelyawDataQueue, posvelyaw, 0));
 }
 
-// Measurements of a UWB Tx/Rx
-static xQueueHandle tdoaDataQueue;
-#define UWB_QUEUE_LENGTH (10)
-
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *uwb, float dt);
 
 // [CHANGE] Define a new robust update EKF with tdoa measurements (with help functions)
@@ -177,13 +172,17 @@ static void GM_UWB(float e, float * GM_e);
 static void GM_state(float e, float * GM_e);
 static void matrixcopy(int ROW, int COLUMN, float destmat[ROW][COLUMN], float srcmat[ROW][COLUMN]);
 static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]);
-// --------------------------------------------------------------------- //
+
 // [CHANGE] help functions for dnn //
 static void quat2Rot(float q[4], float R[3][3]);
 static void RT_v(float v[3], float C[3][3], float v_b[3]);
 static void getAzEl_Angle(float v_cf0[3], float v_cf1[3], float v_an0[3], float v_an1[3], float C_IB[3][3], 
                           float q_IA0[4], float q_IA1[4], float AzEl[8]);
 
+// --------------------------------------------------------------------- //
+// Measurements of a UWB Tx/Rx
+static xQueueHandle tdoaDataQueue;
+#define UWB_QUEUE_LENGTH (10)
 static inline bool stateEstimatorHasTDOAPacket(tdoaMeasurement_t *uwb) {
   return (pdTRUE == xQueueReceive(tdoaDataQueue, uwb, 0));
 }
@@ -298,6 +297,7 @@ static float log_yaw = 0.0f;
 static float log_dm = 0.0f;
 static float log_errAbs = 0.0f;
 
+static float log_bias = 0.0f;
 // static float log_new1[6] = {0};
 // static float log_new2[6] = {0};
 // static float log_new3[6] = {0};
@@ -983,7 +983,7 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
   bool Chi_square_label = true;  bool three_sigma_flag = true;
 
     // ****************** Chi-squared test *********************//
-    if(CHI_SQRUARE && (d_m >= 5.0f)){
+    if(CHI_SQRUARE && (d_m >= 4.5f)){   // tuning param
         Chi_square_label = false;
     }
     //
@@ -1288,7 +1288,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
             // ------------------ get feature normalization range --------------------- //
             float uwb_feature_max_tdoa[14]={0};   float uwb_feature_min_tdoa[14] ={0};
             float uwb_err_max_tdoa = 0;           float uwb_err_min_tdoa = 0;
-            getErrMax(uwb_err_max_tdoa);          getErrMin(uwb_err_min_tdoa);
+            getErrMax(&uwb_err_max_tdoa);          getErrMin(&uwb_err_min_tdoa);
             getFeatureMax(uwb_feature_max_tdoa);  getFeatureMin(uwb_feature_min_tdoa);
             // ----------------------------------------------------------------------- //
             for(int idx=0; idx<14; idx++){
@@ -1381,13 +1381,13 @@ static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]){
 }
 // Weight function for GM Robust cost function
 static void GM_UWB(float e, float * GM_e){
-    float sigma = 2.0;
+    float sigma = 3.0;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
 
 static void GM_state(float e, float * GM_e){
-    float sigma = 1.0;
+    float sigma = 2.0;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
@@ -1498,14 +1498,14 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             // debug testing -- feature vector {3.0,    3.0,   1.0,    2.0,    3.0,    1.0, 
             //                                  100.0,  30.0,  100.0,  40.0,
             //                                  150.0,  28.0,  130.0,  48.0 }
-            // feature_tdoa[0] = 23.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 13.0;   feature_tdoa[3] = 2.0;
-            // feature_tdoa[4] = 7.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
-            // feature_tdoa[8] = 100.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
-            // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
+            feature_tdoa[0] = 23.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 13.0;   feature_tdoa[3] = 2.0;
+            feature_tdoa[4] = 7.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
+            feature_tdoa[8] = 100.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
+            feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
             // ------------------ get feature normalization range --------------------- //
             float uwb_feature_max_tdoa[14]={0};   float uwb_feature_min_tdoa[14] ={0};
             float uwb_err_max_tdoa = 0;           float uwb_err_min_tdoa = 0;
-            getErrMax(uwb_err_max_tdoa);          getErrMin(uwb_err_min_tdoa);
+            getErrMax(&uwb_err_max_tdoa);          getErrMin(&uwb_err_min_tdoa);
             getFeatureMax(uwb_feature_max_tdoa);  getFeatureMin(uwb_feature_min_tdoa);
             // ----------------------------------------------------------------------- //
             for(int idx=0; idx<14; idx++){
@@ -1515,6 +1515,7 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             float bias = nn_inference(feature_tdoa, 14);
             // denormalization
             float Bias = scaler_denormalize(bias, uwb_err_min_tdoa, uwb_err_max_tdoa);
+            log_bias = Bias;
             // debug setting
             Bias = 0.0f;
             // measurements after bias compensation
@@ -2063,7 +2064,7 @@ void estimatorKalmanInit(void) {
     posDataQueue = xQueueCreate(POS_QUEUE_LENGTH, sizeof(positionMeasurement_t));
     posvelDataQueue = xQueueCreate(POSVEL_QUEUE_LENGTH, sizeof(posvelMeasurement_t));
     posvelyawDataQueue = xQueueCreate(POSVELYAW_QUEUE_LENGTH, sizeof(posvelyawMeasurement_t)); // [CHANGE] yaw estimation
-    tdoaDataQueue = xQueueCreate(UWB_QUEUE_LENGTH, sizeof(tdoaMeasurement_t));
+    tdoaDataQueue = xQueueCreate(UWB_QUEUE_LENGTH, sizeof(tdoaMeasurement_t));                 // [Note] the tdoa Queue size, each time 10 tdoa meas. are in the queue
     flowDataQueue = xQueueCreate(FLOW_QUEUE_LENGTH, sizeof(flowMeasurement_t));
     tofDataQueue = xQueueCreate(TOF_QUEUE_LENGTH, sizeof(tofMeasurement_t));
     heightDataQueue = xQueueCreate(HEIGHT_QUEUE_LENGTH, sizeof(heightMeasurement_t));
@@ -2295,6 +2296,8 @@ LOG_GROUP_START(kalman)
 //   LOG_ADD(LOG_FLOAT, dm,       &log_dm)
 //   LOG_ADD(LOG_FLOAT, errAbs,   &log_errAbs)
 //   LOG_ADD(LOG_FLOAT, hphr_chi, &log_HPHR_chi)
+    // DNN debug
+  LOG_ADD(LOG_FLOAT, dnn_bias, &log_bias)
 
 LOG_GROUP_STOP(kalman)
 

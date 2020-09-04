@@ -9,9 +9,9 @@
 #include "weights_tdoa.h"       // The weights for UWB TDoA
 #include "debug.h"
 
-#define LAYER_1_SIZE 50
-#define LAYER_2_SIZE 50
-#define LAYER_3_SIZE 50
+#define LAYER_1_SIZE 30
+#define LAYER_2_SIZE 30
+#define LAYER_3_SIZE 30
 #define LAYER_4_SIZE 1
 
 float layer_1[LAYER_1_SIZE] = {0};
@@ -20,11 +20,11 @@ float layer_3[LAYER_3_SIZE] = {0};
 float layer_4[LAYER_4_SIZE] = {0};
 
 // get the input/output normalization data --> modify w.r.t the DNN
-void getErrMax(float err_max){
-    err_max = 0.99999636;
+void getErrMax(float *err_max){
+    *err_max = 0.99999636;
 }
-void getErrMin(float err_min){
-    err_min = -0.9999875;
+void getErrMin(float *err_min){
+    *err_min = -0.9999875;
 }
 void getFeatureMax(float uwb_feature_max_tdoa[14]){
     float feature_max[14] =  {5.3807451 ,   5.47015603,    2.08124987,   5.3807451 ,    5.81455849,   2.08142063,

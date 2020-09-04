@@ -78,7 +78,20 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
             {timestamp: 1, x:  3.9850, y:  3.9757, z: 3.3841},   //6
             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
    },
+//DSL-2020-0904 test
+//     .anchorPosition = {
+//         {timestamp: 1, x: -3.1486, y: -4.0094, z: 0.1606},   //0   -3.14857187 -4.00940697  0.16057077
+//         {timestamp: 1, x: -3.7521, y: 3.8009,  z: 3.0096},   //1   -3.75214314  3.80088583  3.00960267
+//         {timestamp: 1, x:  3.0923, y: 3.6037,  z: 0.1777},    //2    3.09226576  3.60366015  0.1776867 
+//         {timestamp: 1, x:  4.1103, y: -4.1236, z: 2.9926},   //3    4.11028676 -4.12362621  2.99258299
+//         {timestamp: 1, x: -3.5169, y: -4.4226, z: 2.9350},   //4   -3.51693404 -4.42263609  2.93498546 
+//         {timestamp: 1, x:  3.0861, y: -4.0277, z: 0.1573},   //5    3.08607805 -4.02774503  0.15733656
+//         {timestamp: 1, x:  4.0560, y: 3.9039,  z: 3.0068},   //6    4.05596198  3.90386685  3.00681767
+//         {timestamp: 1, x: -3.1805, y: 3.4059,  z: 0.1725},   //7   -3.18054446  3.40593361  0.17246807
+//    },
 };
+// Set a counter to reduce the TDoA update freqeuncy
+static int counter = 0;
 
 static lpsTdoa2AlgoOptions_t* options = &defaultOptions;
 
@@ -324,7 +337,16 @@ static bool rxcallback(dwDevice_t *dev) {
         float tdoaDistDiff = 0.0;
         if (calcDistanceDiff(&tdoaDistDiff, previousAnchor, anchor, packet, &arrival)) {
           rangingOk = true;
-          enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);        // update measurements
+          // [CHANGE]: drop the tdoa measurement 3 out of 4 to reduce the EKF burden
+          if (counter == 3){
+                // update measurements
+                enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);        
+                counter=0;   // reset counter
+          }else{
+                // drop the measurement 
+                counter++;
+          }
+        //   enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);
           addToLog(anchor, previousAnchor, tdoaDistDiff, packet);   // recall the measurements in round-robbin fashion (7-0,0-1, ... ,6-7)
         }
       }
