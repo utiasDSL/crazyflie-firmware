@@ -18,10 +18,10 @@ void getErrMin(float * err_min);
 void getFeatureMax(float uwb_feature_max_tdoa[14]);
 void getFeatureMin(float uwb_feature_min_tdoa[14]);
 // get quaternion
-typedef struct {
-    quaternion_t anchorQuaternion[8];
-}anchorPose; 
-void getQan(anchorPose q);
+// typedef struct {
+//     quaternion_t anchorQuaternion[8];
+// }anchorPose; 
+// void getQan(anchorPose * q);
 // normalization functions
 float scaler_normalize(float x, float x_min, float x_max);
 float scaler_denormalize(float x, float x_min, float x_max);
