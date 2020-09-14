@@ -6,7 +6,8 @@
  */
 
 #include "dsl_dnn.h"
-#include "weights_tdoa.h"       // The weights for UWB TDoA
+#include "weights_tdoa.h"       // The weights for UWB TDoA dnn
+// #include "weights_dnn5.h"          // dnn without anchor infor
 #include "debug.h"
 
 #define LAYER_1_SIZE 30
@@ -20,6 +21,7 @@ float layer_3[LAYER_3_SIZE] = {0};
 float layer_4[LAYER_4_SIZE] = {0};
 
 // get the input/output normalization data --> modify w.r.t the DNN
+// -------------------------- DNN (0911_dnn3)--------------------------------- //
 void getErrMax(float *err_max){
     *err_max = 0.9999115;
 }
@@ -43,6 +45,31 @@ void getFeatureMin(float uwb_feature_min_tdoa[14]){
         uwb_feature_min_tdoa[i] = feature_min[i];
     }
 }
+// -------------------------- DNN without anchor infor. ------------------------- // 
+// void getErrMax(float *err_max){
+//     *err_max = 0.9999115;
+// }
+// void getErrMin(float *err_min){
+//     *err_min = -0.99996239;
+// }
+
+// void getFeatureMax(float uwb_feature_max_tdoa[10]){
+//     float feature_max[10] =  {
+//         5.43476342,    6.18791616,   1.93577989,   5.43302092,   6.18791616,   1.93439576, 263.00953024,  58.58216968, 254.00971492,  61.47142955};
+
+//     for(int i=0; i<10; i++){
+//         uwb_feature_max_tdoa[i] = feature_max[i];
+//     }
+// }
+// void getFeatureMin(float uwb_feature_min_tdoa[10]){
+//     float feature_min[10] = {
+//         -6.03388409,    -5.64084422,   -2.80429533,    -6.03352958,   -5.64088289,   -2.80505419, -257.49818464,  -58.83316539,  -259.38441589,  -58.83316539};
+
+//     for(int i=0; i<10; i++){
+//         uwb_feature_min_tdoa[i] = feature_min[i];
+//     }
+// }
+
 //------------------------------------------------------------------------------- //
 // [CHANGE] anchor quaternion 0817
 
