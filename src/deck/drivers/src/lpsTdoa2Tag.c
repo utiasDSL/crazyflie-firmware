@@ -78,23 +78,24 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //             {timestamp: 1, x:  3.9850, y:  3.9757, z: 3.3841},   //6
 //             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
 //    },
-//DSL-2020-0912 test
+
+//DSL-2020-0914_G1
     .anchorPosition = {
-        {timestamp: 1, x: -2.7298, y: -3.5735, z: 0.1555},   
+        {timestamp: 1, x: -2.7180, y: -3.5789, z: 0.1567},   
 
-        {timestamp: 1, x: -2.7880, y: 3.3809,  z: 2.8218},   
+        {timestamp: 1, x: -2.8549, y: 3.6040,  z: 2.8232},   
 
-        {timestamp: 1, x:  3.0172, y: 2.8975,  z: 0.1743},    
+        {timestamp: 1, x:  2.7753, y: 3.3425,  z: 0.1777},    
 
-        {timestamp: 1, x:  3.2423, y: -3.8772, z: 2.8231},   
+        {timestamp: 1, x:  3.5239, y: -3.8771, z: 2.8187},   
 
-        {timestamp: 1, x: -2.9582, y: -3.8974, z: 2.8172},   
+        {timestamp: 1, x: -3.0065, y: -3.9973, z: 2.8055},   
 
-        {timestamp: 1, x:  3.0969, y: -3.4303, z: 0.1553},   
+        {timestamp: 1, x:  3.3685, y: -3.5727, z: 0.1520},   
 
-        {timestamp: 1, x:  3.3373, y: 3.4174,  z: 2.8257},   
+        {timestamp: 1, x:  3.4889, y: 3.4842,  z: 2.8255},   
 
-        {timestamp: 1, x: -2.5578, y: 3.0453,  z: 0.1723},   
+        {timestamp: 1, x: -2.6023, y: 3.0714,  z: 0.1744},   
    },
 };
 // Set a counter to reduce the TDoA update freqeuncy

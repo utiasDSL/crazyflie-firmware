@@ -84,20 +84,20 @@ static bool enable_zrange = false;
 static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
-static bool CHI_SQRUARE = false;             // Chi-square test
+static bool CHI_SQRUARE = true;             // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
 static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
-// 0912
-static float q_an[8][4] ={{-0.32855428,  0.62340112,  0.31318984,  0.63665944},  // 0
-                          { 0.59999234,  0.79323699,  0.10362054,  0.00685946},  // 1
-                          {0.65082884,   0.29064111, -0.64062828,  0.28556081},   // 2
-                          {-0.06297648, -0.09271534,  0.73607473,  0.6675566},  // 3
-                          {-0.61563234,  0.78300854, -0.0733227,   0.05018209 },  // 4
-                          {0.60832498,  -0.38012147, -0.58610896, -0.3767289},  // 5
-                          {-0.14442833,  0.21802605,  0.75479003, -0.60157884},  // 6
-                          {0.29906281,   0.62233458, -0.32174032,  0.64787674}   // 7
+// 0914_G1
+static float q_an[8][4] ={{-0.39355243,  0.58765346,  0.37903556,  0.59675115},  // 0
+                          { 0.60001627,  0.78597227,  0.14520426,  0.03381982},  // 1
+                          { 0.62596622,  0.33967744, -0.61368061,  0.34085428},   // 2
+                          {-0.07321422, -0.10945445,  0.73459267,  0.66560725},  // 3
+                          {-0.61630017,  0.78337472, -0.07956374,  0.01295244},  // 4
+                          { 0.6792385,  -0.24266763, -0.64997263, -0.23933882},  // 5
+                          {-0.16622463,  0.2318459,   0.75103174, -0.59545628},  // 6
+                          { 0.27415173,  0.64046923, -0.30376936,  0.64989551}   // 7
                                 };
 /**
  * Primary Kalman filter functions
@@ -294,7 +294,7 @@ static float measNoiseGyro_yaw = 0.1f; // radians per second
 
 static float initialX = 1.5f;
 static float initialY = 0.0f;
-static float initialZ = 0.0f;
+static float initialZ = 0.2f;
 
 //static float dragXY = 0.19f;
 //static float dragZ = 0.05f;
@@ -994,7 +994,7 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
   bool Chi_square_label = true;  bool three_sigma_flag = true;
 
     // ****************** Chi-squared test *********************//
-    if(CHI_SQRUARE && (d_m >= 5.0f)){   // tuning param
+    if(CHI_SQRUARE && (d_m >= 6.0f)){   // tuning param
         Chi_square_label = false;
     }
     //
@@ -1384,7 +1384,7 @@ static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]){
 }
 // Weight function for GM Robust cost function
 static void GM_UWB(float e, float * GM_e){
-    float sigma = 2.5;
+    float sigma = 2.0;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
