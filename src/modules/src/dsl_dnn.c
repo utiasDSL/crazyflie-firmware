@@ -7,8 +7,8 @@
 
 #include "dsl_dnn.h"
 // #include "weights_tdoa.h"       // The weights for UWB TDoA dnn
-// #include "weights_dnn5.h"          // dnn without anchor infor
-#include "weights_dnn7.h"
+#include "weights_dnn5.h"          // dnn without anchor infor
+// #include "weights_dnn7.h"
 #include "debug.h"
 
 #define LAYER_1_SIZE 30
@@ -23,55 +23,55 @@ float layer_4[LAYER_4_SIZE] = {0};
 
 // get the input/output normalization data --> modify w.r.t the DNN
 // -------------------------- DNN (dnn7)--------------------------------- //
-void getErrMax(float *err_max){
-    *err_max = 0.99995458;
-}
-void getErrMin(float *err_min){
-    *err_min = -0.99996239;
-}
-
-void getFeatureMax(float uwb_feature_max_tdoa[14]){
-    float feature_max[14] =  {
-         5.43296018,   6.18791616,   1.93577989,   5.43332027,   6.18791616,   1.93530656,263.00953024,  57.46528596, 263.00953024, 61.47142955,
-         252.79877115,  89.98783541, 222.52710071,  89.98783541
-    };
-    for(int i=0; i<14; i++){
-        uwb_feature_max_tdoa[i] = feature_max[i];
-    }
-}
-void getFeatureMin(float uwb_feature_min_tdoa[14]){
-    float feature_min[14] = {
-        -6.03352958,   -5.64088289,   -2.80429533,   -6.03388409,   -5.64088289,
-        -2.80488561, -257.49818464,  -58.80484131, -252.52822871,  -58.90730597,
-        -222.45937366,  -89.57143765, -220.85935032,  -89.58265322 };
-    for(int i=0; i<14; i++){
-        uwb_feature_min_tdoa[i] = feature_min[i];
-    }
-}
-// -------------------------- DNN without anchor infor. ------------------------- // 
 // void getErrMax(float *err_max){
-//     *err_max = 0.9999115;
+//     *err_max = 0.99995458;
 // }
 // void getErrMin(float *err_min){
 //     *err_min = -0.99996239;
 // }
 
-// void getFeatureMax(float uwb_feature_max_tdoa[10]){
-//     float feature_max[10] =  {
-//         5.43476342,    6.18791616,   1.93577989,   5.43302092,   6.18791616,   1.93439576, 263.00953024,  58.58216968, 254.00971492,  61.47142955};
-
-//     for(int i=0; i<10; i++){
+// void getFeatureMax(float uwb_feature_max_tdoa[14]){
+//     float feature_max[14] =  {
+//          5.43296018,   6.18791616,   1.93577989,   5.43332027,   6.18791616,   1.93530656,263.00953024,  57.46528596, 263.00953024, 61.47142955,
+//          252.79877115,  89.98783541, 222.52710071,  89.98783541
+//     };
+//     for(int i=0; i<14; i++){
 //         uwb_feature_max_tdoa[i] = feature_max[i];
 //     }
 // }
-// void getFeatureMin(float uwb_feature_min_tdoa[10]){
-//     float feature_min[10] = {
-//         -6.03388409,    -5.64084422,   -2.80429533,    -6.03352958,   -5.64088289,   -2.80505419, -257.49818464,  -58.83316539,  -259.38441589,  -58.83316539};
-
-//     for(int i=0; i<10; i++){
+// void getFeatureMin(float uwb_feature_min_tdoa[14]){
+//     float feature_min[14] = {
+//         -6.03352958,   -5.64088289,   -2.80429533,   -6.03388409,   -5.64088289,
+//         -2.80488561, -257.49818464,  -58.80484131, -252.52822871,  -58.90730597,
+//         -222.45937366,  -89.57143765, -220.85935032,  -89.58265322 };
+//     for(int i=0; i<14; i++){
 //         uwb_feature_min_tdoa[i] = feature_min[i];
 //     }
 // }
+// -------------------------- DNN without anchor infor. ------------------------- // 
+void getErrMax(float *err_max){
+    *err_max = 0.9999115;
+}
+void getErrMin(float *err_min){
+    *err_min = -0.99996239;
+}
+
+void getFeatureMax(float uwb_feature_max_tdoa[10]){
+    float feature_max[10] =  {
+        5.43476342,    6.18791616,   1.93577989,   5.43302092,   6.18791616,   1.93439576, 263.00953024,  58.58216968, 254.00971492,  61.47142955};
+
+    for(int i=0; i<10; i++){
+        uwb_feature_max_tdoa[i] = feature_max[i];
+    }
+}
+void getFeatureMin(float uwb_feature_min_tdoa[10]){
+    float feature_min[10] = {
+        -6.03388409,    -5.64084422,   -2.80429533,    -6.03352958,   -5.64088289,   -2.80505419, -257.49818464,  -58.83316539,  -259.38441589,  -58.83316539};
+
+    for(int i=0; i<10; i++){
+        uwb_feature_min_tdoa[i] = feature_min[i];
+    }
+}
 
 //------------------------------------------------------------------------------- //
 // [CHANGE] anchor quaternion 0817

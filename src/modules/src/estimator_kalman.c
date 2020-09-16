@@ -84,9 +84,8 @@ static bool enable_zrange = false;
 static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
-static bool CHI_SQRUARE = false;             // Chi-square test
-static bool THREE_SIGMA = false;            // 3 sigma test
-static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
+static bool CHI_SQRUARE = true;             // Chi-square test
+static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
@@ -318,7 +317,6 @@ static float log_yaw = 0.0f;
 // Chi-square test debug
 static float log_dm = 0.0f;
 static float log_errAbs = 0.0f;
-
 static float log_bias = 0.0f;
 // static float log_new1[6] = {0};
 // static float log_new2[6] = {0};
@@ -1002,18 +1000,14 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
   log_dm = d_m;
   log_errAbs = err_abs;
 
-  bool Chi_square_label = true;  bool three_sigma_flag = true;
+  bool Chi_square_label = true;  
 
     // ****************** Chi-squared test *********************//
     if(CHI_SQRUARE && (d_m >= 6.0f)){   // tuning param
         Chi_square_label = false;
     }
-    //
-    if(THREE_SIGMA && (err_abs > 3.0f*stdMeasNoise)){
-        three_sigma_flag = false;
-    }
 
-    if(Chi_square_label & three_sigma_flag){
+    if(Chi_square_label){
         // ====== MEASUREMENT UPDATE ======
         // Calculate the Kalman gain and perform the state update
         for (int i=0; i<STATE_DIM; i++) {
@@ -1352,13 +1346,13 @@ static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]){
 }
 // Weight function for GM Robust cost function
 static void GM_UWB(float e, float * GM_e){
-    float sigma = 1.5;
+    float sigma = 1.5;                        // 2.5
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
 
 static void GM_state(float e, float * GM_e){
-    float sigma = 3.0;
+    float sigma = 3.0;                      // 1.5
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
@@ -1470,24 +1464,24 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
             // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
             // feature vector
-            float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
-                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
-                                       AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
+            // float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+            //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
+            //                            AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
 
             // DNN without anchor infor.
-            // float feature_tdoa[10] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
-            //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
+            float feature_tdoa[10] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
 
             // ---------------------- DNN unit test --> feature vector {...} ---------------------- //
             // feature_tdoa[0] = 3.0;    feature_tdoa[1] = 2.0; feature_tdoa[2] = 1.0;   feature_tdoa[3] = 2.0;
             // feature_tdoa[4] = -2.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
             // feature_tdoa[8] = 60.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 75.0; feature_tdoa[11] = 28.0;
             // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
-            int feat_num = 14;
+            int feat_num = 10;
             // -------------- normal DNN -------------//
-            float uwb_feature_max_tdoa[14]={0};    float uwb_feature_min_tdoa[14] ={0};
+            // float uwb_feature_max_tdoa[14]={0};    float uwb_feature_min_tdoa[14] ={0};
             // ------------- DNN without anchor infor. ------------- //
-            // float uwb_feature_max_tdoa[10]={0};    float uwb_feature_min_tdoa[10] ={0};
+            float uwb_feature_max_tdoa[10]={0};    float uwb_feature_min_tdoa[10] ={0};
 
             float uwb_err_max_tdoa = 0;            float uwb_err_min_tdoa = 0;
             getErrMax(&uwb_err_max_tdoa);          getErrMin(&uwb_err_min_tdoa);
@@ -1727,8 +1721,8 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         // TODO: Why would it hit these bounds? Needs to be investigated.
         for (int i=0; i<STATE_DIM; i++) {
             for (int j=i; j<STATE_DIM; j++) {
-            float v = Kw[i] * Q_iter * Kw[j];
-            float p = 0.5f*P[i][j] + 0.5f*P[j][i] + v; // add measurement noise
+            // float v = Kw[i] * Q_iter * Kw[j];
+            float p = 0.5f*P[i][j] + 0.5f*P[j][i];// + v; // add measurement noise
             if (isnan(p) || p > MAX_COVARIANCE) {
                 P[i][j] = P[j][i] = MAX_COVARIANCE;
             } else if ( i==j && p < MIN_COVARIANCE ) {
