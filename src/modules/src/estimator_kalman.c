@@ -84,20 +84,31 @@ static bool enable_zrange = false;
 static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
-static bool CHI_SQRUARE = true;             // Chi-square test
+static bool CHI_SQRUARE = false;             // Chi-square test
 static bool THREE_SIGMA = false;            // 3 sigma test
 static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
-static float q_an[8][4] ={{-0.39355243,  0.58765346,  0.37903556,  0.59675115},  // 0
-                          { 0.60001627,  0.78597227,  0.14520426,  0.03381982},  // 1
-                          { 0.62596622,  0.33967744, -0.61368061,  0.34085428},   // 2
-                          {-0.07321422, -0.10945445,  0.73459267,  0.66560725},  // 3
-                          {-0.61630017,  0.78337472, -0.07956374,  0.01295244},  // 4
-                          { 0.6792385,  -0.24266763, -0.64997263, -0.23933882},  // 5
-                          {-0.16622463,  0.2318459,   0.75103174, -0.59545628},  // 6
-                          { 0.27415173,  0.64046923, -0.30376936,  0.64989551}   // 7
+// static float q_an[8][4] ={{-0.39355243,  0.58765346,  0.37903556,  0.59675115},  // 0
+//                           { 0.60001627,  0.78597227,  0.14520426,  0.03381982},  // 1
+//                           { 0.62596622,  0.33967744, -0.61368061,  0.34085428},   // 2
+//                           {-0.07321422, -0.10945445,  0.73459267,  0.66560725},  // 3
+//                           {-0.61630017,  0.78337472, -0.07956374,  0.01295244},  // 4
+//                           { 0.6792385,  -0.24266763, -0.64997263, -0.23933882},  // 5
+//                           {-0.16622463,  0.2318459,   0.75103174, -0.59545628},  // 6
+//                           { 0.27415173,  0.64046923, -0.30376936,  0.64989551}   // 7
+//                                 };
+
+// 0916_G1
+static float q_an[8][4] ={{-0.16832341,  0.68324142,  0.17140589,  0.68954218},  // 0
+                          { 0.60171026,  0.77255482,  0.18961937,  0.07175174},  // 1
+                          { 0.69579083,  0.16219905, -0.68028253,  0.1636529},   // 2
+                          {-0.06717481, -0.09712855,  0.73230265,  0.67066118},  // 3
+                          {-0.61797785,  0.7760538,  -0.1179048,   0.04407182},  // 4
+                          { 0.5366815,  -0.45507139, -0.53413415, -0.46859759},  // 5
+                          {-0.04041953,  0.0873823,   0.78047377, -0.61773076},  // 6
+                          { 0.44042786,  0.53828273, -0.45815222,  0.5535084}   // 7
                                 };
 /**
  * Primary Kalman filter functions
@@ -1259,52 +1270,9 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
     float predicted = d1 - d0;
     // DNN bias compensation
     if(DNN_COM){
-            float v_an0[3] = { dx0,  dy0,  dz0};    float v_an1[3] = { dx1,  dy1,  dz1};
-            float v_cf0[3] = {-dx0, -dy0, -dz0};    float v_cf1[3] = {-dx1, -dy1, -dz1};
-            // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
-            float AzEl[8]= {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-            // index the anchor pose based on measurement ID
-            int ID[8] ={0,1,2,3,4,5,6,7};
-            float q_IA0[4] = {0}; float q_IA1[4] ={0};
-
-            if (tdoa->anchor_id == 0){
-                vectorcopy(4, q_IA0, q_an[7]);
-                vectorcopy(4, q_IA1, q_an[0]);
-            }else{
-                vectorcopy(4, q_IA0, q_an[ID[tdoa->anchor_id - 1]]);
-                vectorcopy(4, q_IA1, q_an[ID[tdoa->anchor_id]]);
-            }
-            // get the Azimuth and Elevation angles
-            getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
-            // feature vector
-            float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
-                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
-                                       AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
-
-            // debug testing -- feature vector {3.0,    3.0,   1.0,    2.0,    3.0,    1.0, 
-            //                                  100.0,  30.0,  100.0,  40.0,
-            //                                  150.0,  28.0,  130.0,  48.0 }
-            // feature_tdoa[0] = 23.0;    feature_tdoa[1] = 3.0; feature_tdoa[2] = 13.0;   feature_tdoa[3] = 2.0;
-            // feature_tdoa[4] = 7.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
-            // feature_tdoa[8] = 100.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 150.0; feature_tdoa[11] = 28.0;
-            // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
-            // ------------------ get feature normalization range --------------------- //
-            float uwb_feature_max_tdoa[14]={0};   float uwb_feature_min_tdoa[14] ={0};
-            float uwb_err_max_tdoa = 0;           float uwb_err_min_tdoa = 0;
-            getErrMax(&uwb_err_max_tdoa);          getErrMin(&uwb_err_min_tdoa);
-            getFeatureMax(uwb_feature_max_tdoa);  getFeatureMin(uwb_feature_min_tdoa);
-            // ----------------------------------------------------------------------- //
-            for(int idx=0; idx<14; idx++){
-			  feature_tdoa[idx] = scaler_normalize(feature_tdoa[idx], uwb_feature_min_tdoa[idx], uwb_feature_max_tdoa[idx]);
-		    }
-            // DNN inference
-            float bias = nn_inference(feature_tdoa, 14);
-            // denormalization
-            float Bias = scaler_denormalize(bias, uwb_err_min_tdoa, uwb_err_max_tdoa);
-            // debug setting
-            Bias = 0.0f;
+            //TODO
             // measurements after bias compensation
-            measurement = tdoa->distanceDiff + Bias;
+            measurement = tdoa->distanceDiff;
     }else{
     	  // without DNN bias compensation
           measurement = tdoa->distanceDiff;
@@ -1384,13 +1352,13 @@ static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]){
 }
 // Weight function for GM Robust cost function
 static void GM_UWB(float e, float * GM_e){
-    float sigma = 2.0;
+    float sigma = 1.5;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
 
 static void GM_state(float e, float * GM_e){
-    float sigma = 1.5;
+    float sigma = 3.0;
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
@@ -1759,8 +1727,8 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
         // TODO: Why would it hit these bounds? Needs to be investigated.
         for (int i=0; i<STATE_DIM; i++) {
             for (int j=i; j<STATE_DIM; j++) {
-            // float v = Kw[i] * Q_iter * K[j];
-            float p = 0.5f*P[i][j] + 0.5f*P[j][i];// + v; // add measurement noise
+            float v = Kw[i] * Q_iter * Kw[j];
+            float p = 0.5f*P[i][j] + 0.5f*P[j][i] + v; // add measurement noise
             if (isnan(p) || p > MAX_COVARIANCE) {
                 P[i][j] = P[j][i] = MAX_COVARIANCE;
             } else if ( i==j && p < MIN_COVARIANCE ) {

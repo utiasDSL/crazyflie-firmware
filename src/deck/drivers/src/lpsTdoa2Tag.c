@@ -41,7 +41,7 @@
 
 #include "physicalConstants.h"
 
-#define MEASUREMENT_NOISE_STD 0.10f                   // tdoa measurement noise      
+#define MEASUREMENT_NOISE_STD 0.15f                   // tdoa measurement noise      
 #define STATS_INTERVAL 500
 #define ANCHOR_OK_TIMEOUT 1500
 
@@ -79,23 +79,42 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
 //    },
 
-//DSL-2020-0914_G1
+// //DSL-2020-0914_G1
+//     .anchorPosition = {
+//         {timestamp: 1, x: -2.7180, y: -3.5789, z: 0.1567},   
+
+//         {timestamp: 1, x: -2.8549, y: 3.6040,  z: 2.8232},   
+
+//         {timestamp: 1, x:  2.7753, y: 3.3425,  z: 0.1777},    
+
+//         {timestamp: 1, x:  3.5239, y: -3.8771, z: 2.8187},   
+
+//         {timestamp: 1, x: -3.0065, y: -3.9973, z: 2.8055},   
+
+//         {timestamp: 1, x:  3.3685, y: -3.5727, z: 0.1520},   
+
+//         {timestamp: 1, x:  3.4889, y: 3.4842,  z: 2.8255},   
+
+//         {timestamp: 1, x: -2.6023, y: 3.0714,  z: 0.1744},   
+//    },
+// };
+//DSL-2020-0916_G1
     .anchorPosition = {
-        {timestamp: 1, x: -2.7180, y: -3.5789, z: 0.1567},   
+        {timestamp: 1, x: -3.0696, y: -1.8439, z: 0.1529},   
 
-        {timestamp: 1, x: -2.8549, y: 3.6040,  z: 2.8232},   
+        {timestamp: 1, x: -2.8345, y: 3.5357,  z: 2.8227},   
 
-        {timestamp: 1, x:  2.7753, y: 3.3425,  z: 0.1777},    
+        {timestamp: 1, x:  3.5237, y: 1.5811,  z: 0.1658},    
 
-        {timestamp: 1, x:  3.5239, y: -3.8771, z: 2.8187},   
+        {timestamp: 1, x:  2.9979, y: -3.9763, z: 2.8240},   
 
-        {timestamp: 1, x: -3.0065, y: -3.9973, z: 2.8055},   
+        {timestamp: 1, x: -2.8521, y: -3.9553, z: 2.6305},   
 
-        {timestamp: 1, x:  3.3685, y: -3.5727, z: 0.1520},   
+        {timestamp: 1, x:  1.3777, y: -3.6481, z: 0.1548},   
 
-        {timestamp: 1, x:  3.4889, y: 3.4842,  z: 2.8255},   
+        {timestamp: 1, x:  3.0644, y: 3.4245,  z: 2.8257},   
 
-        {timestamp: 1, x: -2.6023, y: 3.0714,  z: 0.1744},   
+        {timestamp: 1, x: -0.7945, y: 3.3467,  z: 0.1800},   
    },
 };
 // Set a counter to reduce the TDoA update freqeuncy
