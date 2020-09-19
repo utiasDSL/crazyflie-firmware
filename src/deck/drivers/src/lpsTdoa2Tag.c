@@ -41,7 +41,7 @@
 
 #include "physicalConstants.h"
 
-#define MEASUREMENT_NOISE_STD 0.1f                   // tdoa measurement noise    param1: 0.1  
+#define MEASUREMENT_NOISE_STD 0.10f                   // tdoa measurement noise    param1: 0.1  
 #define STATS_INTERVAL 500
 #define ANCHOR_OK_TIMEOUT 1500
 
@@ -79,44 +79,46 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
 //    },
 
-// //DSL-2020-0914_G1
+
+//DSL-2020-0919_G1
 //     .anchorPosition = {
-//         {timestamp: 1, x: -2.7180, y: -3.5789, z: 0.1567},   
+//         {timestamp: 1, x: -1.80108331, y: -3.55029552, z: 0.15480395},   
 
-//         {timestamp: 1, x: -2.8549, y: 3.6040,  z: 2.8232},   
+//         {timestamp: 1, x: -2.76369322, y: 3.46780459,  z: 2.78734759},   
 
-//         {timestamp: 1, x:  2.7753, y: 3.3425,  z: 0.1777},    
+//         {timestamp: 1, x:  1.87702914, y: 3.26747979,  z: 0.17639695},    
 
-//         {timestamp: 1, x:  3.5239, y: -3.8771, z: 2.8187},   
+//         {timestamp: 1, x:  3.18151033, y: -4.03582144, z: 2.81488049},   
 
-//         {timestamp: 1, x: -3.0065, y: -3.9973, z: 2.8055},   
+//         {timestamp: 1, x: -3.12602648, y: -3.62398844, z: 2.81026046},   
 
-//         {timestamp: 1, x:  3.3685, y: -3.5727, z: 0.1520},   
+//         {timestamp: 1, x:  3.38214416, y: -1.52173111, z: 0.1532301},   
 
-//         {timestamp: 1, x:  3.4889, y: 3.4842,  z: 2.8255},   
+//         {timestamp: 1, x:  3.34900554, y: 3.36436179,  z: 2.81561482},   
 
-//         {timestamp: 1, x: -2.6023, y: 3.0714,  z: 0.1744},   
+//         {timestamp: 1, x: -3.2954231, y: 1.74383609,  z: 0.16576046},   
 //    },
-// };
-//DSL-2020-0916_G1
+
+// DSL-2020-0919_G1_new
     .anchorPosition = {
-        {timestamp: 1, x: -3.0696, y: -1.8439, z: 0.1529},   
+        {timestamp: 1, x: -1.80204503, y: -3.55038428, z: 0.15405524},   
 
-        {timestamp: 1, x: -2.8345, y: 3.5357,  z: 2.8227},   
+        {timestamp: 1, x: -2.74919939, y: 3.51807639,  z:  2.82626428},   
 
-        {timestamp: 1, x:  3.5237, y: 1.5811,  z: 0.1658},    
+        {timestamp: 1, x:  1.87753812, y: 3.26646439,  z: 0.17768285},    
 
-        {timestamp: 1, x:  2.9979, y: -3.9763, z: 2.8240},   
+        {timestamp: 1, x: 3.18052635, y: -4.03841255, z: 2.81373389},   
 
-        {timestamp: 1, x: -2.8521, y: -3.9553, z: 2.6305},   
+        {timestamp: 1, x: -3.12631437, y: -3.62480866, z: 2.80789215},   
 
-        {timestamp: 1, x:  1.3777, y: -3.6481, z: 0.1548},   
+        {timestamp: 1, x:  3.38091478, y: -1.52577871, z:  0.15329415},   
 
-        {timestamp: 1, x:  3.0644, y: 3.4245,  z: 2.8257},   
+        {timestamp: 1, x:  3.34892413, y: 3.36064835,  z: 2.81093419},   
 
-        {timestamp: 1, x: -0.7945, y: 3.3467,  z: 0.1800},   
+        {timestamp: 1, x: -3.29463345, y: 1.74299405,  z: 0.16638724},   
    },
 };
+
 // Set a counter to reduce the TDoA update freqeuncy
 static int counter = 0;
 

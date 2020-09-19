@@ -84,8 +84,8 @@ static bool enable_zrange = false;
 static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
-static bool CHI_SQRUARE = true;             // Chi-square test
-static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
+static bool CHI_SQRUARE = false;             // Chi-square test
+static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
@@ -100,15 +100,44 @@ static bool ROBUST = true;                  // Use robust Kalman filter
 //                                 };
 
 // 0916_G1
-static float q_an[8][4] ={{-0.16832341,  0.68324142,  0.17140589,  0.68954218},  // 0
-                          { 0.60171026,  0.77255482,  0.18961937,  0.07175174},  // 1
-                          { 0.69579083,  0.16219905, -0.68028253,  0.1636529},   // 2
-                          {-0.06717481, -0.09712855,  0.73230265,  0.67066118},  // 3
-                          {-0.61797785,  0.7760538,  -0.1179048,   0.04407182},  // 4
-                          { 0.5366815,  -0.45507139, -0.53413415, -0.46859759},  // 5
-                          {-0.04041953,  0.0873823,   0.78047377, -0.61773076},  // 6
-                          { 0.44042786,  0.53828273, -0.45815222,  0.5535084}   // 7
+// static float q_an[8][4] ={{-0.16832341,  0.68324142,  0.17140589,  0.68954218},  // 0
+//                           { 0.60171026,  0.77255482,  0.18961937,  0.07175174},  // 1
+//                           { 0.69579083,  0.16219905, -0.68028253,  0.1636529},   // 2
+//                           {-0.06717481, -0.09712855,  0.73230265,  0.67066118},  // 3
+//                           {-0.61797785,  0.7760538,  -0.1179048,   0.04407182},  // 4
+//                           { 0.5366815,  -0.45507139, -0.53413415, -0.46859759},  // 5
+//                           {-0.04041953,  0.0873823,   0.78047377, -0.61773076},  // 6
+//                           { 0.44042786,  0.53828273, -0.45815222,  0.5535084}   // 7
+//                                 };
+
+// 0919_G1
+// static float q_an[8][4] ={{-0.3728352,   0.60507412,  0.35423781,  0.60777858},  // 0
+//                           { 0.59209051,  0.7897548,   0.15653219,  0.03484044},  // 1
+//                           { 0.63313287,  0.32456474, -0.61879042,  0.33301489},   // 2
+//                           {-0.04980302, -0.09128799,  0.79734487,  0.59449754},  // 3
+//                           {-0.5988872 ,  0.69486973, -0.32606202,  0.22841572},  // 4
+//                           { 0.69699937, -0.15259634, -0.68468055, -0.14872385},  // 5
+//                           {-0.09984697,  0.17249581,  0.71244417, -0.67282916},  // 6
+//                           { 0.11198368,  0.68779808, -0.13952007,  0.70351091}   // 7
+//                                 };
+// 0919_G1_new
+static float q_an[8][4] ={{-0.38331314,  0.59462939,  0.36742136,  0.60372881},  // 0
+
+                          {0.59270303,  0.79899963,  0.09982598,  0.01837076},  // 1
+
+                          { 0.63147816,  0.32543454, -0.62013168,  0.33281284},   // 2
+
+                          {-0.05254505, -0.09485434,  0.79602424,  0.59547215},  // 3
+
+                          {-0.60215721,  0.69299796, -0.32623706,  0.22523299},  // 4
+
+                          { 0.69283506, -0.1568149,  -0.6873386,  -0.15150683},  // 5
+
+                          {-0.07160912,  0.17461997,  0.70914108, -0.67933712},  // 6
+
+                          { 0.11523251,  0.68580687, -0.14039305,  0.70475541}   // 7
                                 };
+
 /**
  * Primary Kalman filter functions
  *
@@ -304,7 +333,7 @@ static float measNoiseGyro_yaw = 0.1f; // radians per second
 
 static float initialX = 1.5f;
 static float initialY = 0.0f;
-static float initialZ = 0.2f;
+static float initialZ = 0.0f;
 
 //static float dragXY = 0.19f;
 //static float dragZ = 0.05f;
@@ -1464,24 +1493,24 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
             // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
             // feature vector
-            // float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
-            //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
-            //                            AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
+            float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
+                                       AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
 
             // DNN without anchor infor.
-            float feature_tdoa[10] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
-                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
+            // float feature_tdoa[10] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+            //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
 
             // ---------------------- DNN unit test --> feature vector {...} ---------------------- //
             // feature_tdoa[0] = 3.0;    feature_tdoa[1] = 2.0; feature_tdoa[2] = 1.0;   feature_tdoa[3] = 2.0;
             // feature_tdoa[4] = -2.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
             // feature_tdoa[8] = 60.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 75.0; feature_tdoa[11] = 28.0;
             // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
-            int feat_num = 10;
+            int feat_num = 14;
             // -------------- normal DNN -------------//
-            // float uwb_feature_max_tdoa[14]={0};    float uwb_feature_min_tdoa[14] ={0};
+            float uwb_feature_max_tdoa[14]={0};    float uwb_feature_min_tdoa[14] ={0};
             // ------------- DNN without anchor infor. ------------- //
-            float uwb_feature_max_tdoa[10]={0};    float uwb_feature_min_tdoa[10] ={0};
+            // float uwb_feature_max_tdoa[10]={0};    float uwb_feature_min_tdoa[10] ={0};
 
             float uwb_err_max_tdoa = 0;            float uwb_err_min_tdoa = 0;
             getErrMax(&uwb_err_max_tdoa);          getErrMin(&uwb_err_min_tdoa);
@@ -2269,7 +2298,7 @@ LOG_GROUP_START(kalman)
 //   LOG_ADD(LOG_FLOAT, q1, &q[1])
 //   LOG_ADD(LOG_FLOAT, q2, &q[2])
 //   LOG_ADD(LOG_FLOAT, q3, &q[3])
-//   LOG_ADD(LOG_FLOAT, yaw, &yaw_logback)
+  LOG_ADD(LOG_FLOAT, yaw, &yaw_logback)
 //   LOG_ADD(LOG_FLOAT, yaw_error, &yaw_error_logback)
   // Chi-square debug
 //   LOG_ADD(LOG_FLOAT, dm,       &log_dm)
