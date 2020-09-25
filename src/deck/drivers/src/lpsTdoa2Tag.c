@@ -79,43 +79,25 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
 //    },
 
-// // DSL-2020-0919_G1_new
-//     .anchorPosition = {
-//         {timestamp: 1, x: -1.80204503, y: -3.55038428, z: 0.15405524},   
-
-//         {timestamp: 1, x: -2.74919939, y: 3.51807639,  z:  2.82626428},   
-
-//         {timestamp: 1, x:  1.87753812, y: 3.26646439,  z: 0.17768285},    
-
-//         {timestamp: 1, x: 3.18052635, y: -4.03841255, z: 2.81373389},   
-
-//         {timestamp: 1, x: -3.12631437, y: -3.62480866, z: 2.80789215},   
-
-//         {timestamp: 1, x:  3.38091478, y: -1.52577871, z:  0.15329415},   
-
-//         {timestamp: 1, x:  3.34892413, y: 3.36064835,  z: 2.81093419},   
-
-//         {timestamp: 1, x: -3.29463345, y: 1.74299405,  z: 0.16638724},   
-//    },
-
-// DSL-2020-0924_G2
+// DSL-2020-0925_G1
     .anchorPosition = {
-        {timestamp: 1, x: -0.2955454,  y: -3.67327774, z: 0.15215252},   
+        {timestamp: 1, x: -3.0,  y: -3.88, z: 0.16},   
 
-        {timestamp: 1, x: -2.50750699, y: 3.42506123,  z: 2.84100311},   
+        {timestamp: 1, x: -3.11, y: 3.94,  z: 2.84},   
 
-        {timestamp: 1, x: 0.51818333,  y: 3.2848707,   z: 0.17516982},    
+        {timestamp: 1, x: 3.07,  y: 3.55,  z: 0.18},    
 
-        {timestamp: 1, x: 3.20742469,  y: -3.97535371, z: 2.81456646},   
+        {timestamp: 1, x: 3.55,  y: -4.14, z: 2.82},   
 
-        {timestamp: 1, x: -2.97000932, y: -3.92247596, z: 2.81461808},   
+        {timestamp: 1, x: -3.39, y: -4.35, z:  2.81},   
 
-        {timestamp: 1, x: 3.52364329,  y: -0.75513776, z: 0.15473164 },   
+        {timestamp: 1, x: 3.15,  y: -3.88, z: 0.16 },   
 
-        {timestamp: 1, x: 3.23540863 , y: 3.37097142,  z: 2.81689098},   
+        {timestamp: 1, x: 3.62 , y: 3.81,  z: 2.81},   
 
-        {timestamp: 1, x: -2.91836204, y: 0.788576,    z: 0.16123894},   
+        {timestamp: 1, x: -3.12, y: 3.38,  z: 0.17},   
     },
+
 
 };
 
@@ -366,8 +348,8 @@ static bool rxcallback(dwDevice_t *dev) {
         float tdoaDistDiff = 0.0;
         if (calcDistanceDiff(&tdoaDistDiff, previousAnchor, anchor, packet, &arrival)) {
           rangingOk = true;
-          // [CHANGE]: drop the tdoa measurement 3 out of 4 to reduce the EKF burden
-          if (counter == 3){
+          // [CHANGE]: drop the tdoa measurement 2 out of 3 to reduce the EKF burden
+          if (counter == 2){
                 // update measurements
                 enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);        
                 counter=0;   // reset counter

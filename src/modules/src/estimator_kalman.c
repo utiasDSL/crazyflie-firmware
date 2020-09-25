@@ -85,7 +85,7 @@ static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = false;             // Chi-square test
-static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
+static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
@@ -99,34 +99,24 @@ static bool ROBUST = true;                  // Use robust Kalman filter
 //                           { 0.27415173,  0.64046923, -0.30376936,  0.64989551}   // 7
 //                                 };
 
-// 0916_G1
-// static float q_an[8][4] ={{-0.16832341,  0.68324142,  0.17140589,  0.68954218},  // 0
-//                           { 0.60171026,  0.77255482,  0.18961937,  0.07175174},  // 1
-//                           { 0.69579083,  0.16219905, -0.68028253,  0.1636529},   // 2
-//                           {-0.06717481, -0.09712855,  0.73230265,  0.67066118},  // 3
-//                           {-0.61797785,  0.7760538,  -0.1179048,   0.04407182},  // 4
-//                           { 0.5366815,  -0.45507139, -0.53413415, -0.46859759},  // 5
-//                           {-0.04041953,  0.0873823,   0.78047377, -0.61773076},  // 6
-//                           { 0.44042786,  0.53828273, -0.45815222,  0.5535084}   // 7
-//                                 };
+// 0925_G1
+static float q_an[8][4] ={{-0.352,  0.615,  0.333,  0.622},  // 0
 
-// 0924_G2
-static float q_an[8][4] ={{0.58785398, -0.39571665, -0.56972323, -0.41623487},  // 0
+                          {0.587,  0.796,  0.125,  0.073},  // 1
 
-                          {0.59119134,  0.80174518,  0.0756668,   0.04440721},  // 1
+                          {0.65,   0.289, -0.638,  0.296},   // 2
 
-                          {0.60885958,  0.36521925, -0.59958278,  0.36933103},   // 2
+                          {-0.079, -0.133,  0.791,  0.592},  // 3
 
-                          {-0.05814345, -0.10319297,  0.79692479,  0.59235246},  // 3
+                          {-0.635,  0.751, -0.15 ,  0.099},  // 4
 
-                          {-0.63734062,  0.75864041, -0.11819929,  0.06550253},  // 4
+                          {0.607, -0.372, -0.596, -0.371},  // 5
 
-                          { 0.71703134, -0.03076511, -0.69599287, -0.02266049},  // 5
+                          {-0.053,  0.161,  0.811, -0.559},  // 6
 
-                          {-0.05228595,  0.12699723,  0.8178591,  -0.5587883 },  // 6
-
-                          { 0.07553203,  0.69233542, -0.09581908,  0.71118583}   // 7
+                          { 0.262,  0.648, -0.273,  0.661}   // 7
                                 };
+
 /**
  * Primary Kalman filter functions
  *
@@ -336,7 +326,7 @@ static float log_yaw = 0.0f;
 static float log_dm = 0.0f;
 static float log_errAbs = 0.0f;
 static float log_bias = 0.0f;
-// static float log_new1[6] = {0};
+static float log_new1[6] = {0};
 // static float log_new2[6] = {0};
 // static float log_new3[6] = {0};
 /**
@@ -648,9 +638,9 @@ void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, 
         stateEstimatorUpdateWithPosVelYaw(&posvelyaw,sensors);
         doneUpdate = true;
     }
+
     // [CHANGE] robust ekf for uwb tdoa measurements
     tdoaMeasurement_t tdoa;
-
     while (stateEstimatorHasTDOAPacket(&tdoa))
     {
         // [Change] Select EKF tdoa update method: EKF + Chi-square or robust EKF with M-estimation  
@@ -1364,13 +1354,13 @@ static void vectorcopy(int DIM, float destVec[DIM], float srcVec[DIM]){
 }
 // Weight function for GM Robust cost function
 static void GM_UWB(float e, float * GM_e){
-    float sigma = 2.3;                        // param1: 2.0,   param2: 1.5
+    float sigma = 2.0;                        // param1: 2.0,   param2: 2.5
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
 
 static void GM_state(float e, float * GM_e){
-    float sigma = 1.5;                        // param1: 1.5,   param2:  3.0
+    float sigma = 1.5;                        // param1: 1.5
     float GM_dn = sigma + e*e;
     *GM_e = (sigma * sigma)/(GM_dn * GM_dn);
 }
@@ -1390,8 +1380,8 @@ static void quat2Rot(float q[4], float R[3][3]){
     R[2][2] = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
 }
 
+// matrix computation: v_b = C.T.dot(v)
 static void RT_v(float v[3], float C[3][3], float v_b[3]){
-    // matrix computation: v_b = C.T.dot(v)
     v_b[0] = C[0][0]*v[0] + C[1][0]*v[1] + C[2][0]*v[2];
     v_b[1] = C[0][1]*v[0] + C[1][1]*v[1] + C[2][1]*v[2];
     v_b[2] = C[0][2]*v[0] + C[1][2]*v[1] + C[2][2]*v[2];
@@ -1512,6 +1502,12 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             float bias = nn_inference(feature_tdoa, feat_num);
             // denormalization
             float Bias = scaler_denormalize(bias, uwb_err_min_tdoa, uwb_err_max_tdoa);
+            // debugging
+            log_new1[0] = tdoa->anchor_id;
+            log_new1[1] = tdoa->anchorPosition[0].x;   log_new1[2] = tdoa->anchorPosition[0].y;
+            log_new1[3] = tdoa->anchorPosition[0].z;   log_new1[4] = tdoa->anchorPosition[1].x;
+            log_new1[5] = tdoa->distanceDiff;  
+
             log_bias = Bias;
             // debug setting
             // Bias = 0.0f;
@@ -2294,8 +2290,18 @@ LOG_GROUP_START(kalman)
 //   LOG_ADD(LOG_FLOAT, errAbs,   &log_errAbs)
 //   LOG_ADD(LOG_FLOAT, hphr_chi, &log_HPHR_chi)
     // DNN debug
+    // log_new1[0] = tdoa->anchor_id;
+    // log_new1[1] = tdoa->anchorPosition[0].x;   log_new1[2] = tdoa->anchorPosition[0].y;
+    // log_new1[3] = tdoa->anchorPosition[0].z;   log_new1[4] = tdoa->anchorPosition[1].x;
+    // log_new1[5] = tdoa->distanceDiff; 
   LOG_ADD(LOG_FLOAT, dnn_bias, &log_bias)
-
+  LOG_ADD(LOG_FLOAT, id,    &log_new1[0])
+  LOG_ADD(LOG_FLOAT, ani_x, &log_new1[1])  
+  LOG_ADD(LOG_FLOAT, ani_y, &log_new1[2])
+  LOG_ADD(LOG_FLOAT, ani_z, &log_new1[3])
+  LOG_ADD(LOG_FLOAT, anj_x, &log_new1[4])  
+  LOG_ADD(LOG_FLOAT, meas,  &log_new1[5])
+ 
 LOG_GROUP_STOP(kalman)
 
 PARAM_GROUP_START(kalman)

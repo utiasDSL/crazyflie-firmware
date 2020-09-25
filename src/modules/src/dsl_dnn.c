@@ -6,7 +6,6 @@
  */
 
 #include "dsl_dnn.h"
-// #include "weights_tdoa.h"          // 0911_dnn3 
 // #include "weights_dnn5.h"             // dnn without anchor infor
 #include "weights_dnn7.h"          // dnn 7
 #include "debug.h"
