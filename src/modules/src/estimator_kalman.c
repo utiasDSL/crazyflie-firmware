@@ -85,7 +85,7 @@ static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = false;             // Chi-square test
-static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
+static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
@@ -1472,24 +1472,24 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             getAzEl_Angle(v_cf0, v_cf1, v_an0, v_an1, R, q_IA0, q_IA1, AzEl);
             // AzEl[8] = {cf_Az0, cf_Ele0, cf_Az1, cf_Ele1, An_Az0, An_Ele0, An_Az1, An_Ele1}
             // feature vector
-            float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
-                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
-                                       AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
+            // float feature_tdoa[14] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+            //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3],
+            //                            AzEl[4],  AzEl[5],  AzEl[6],  AzEl[7] };
 
             // DNN without anchor infor.
-            // float feature_tdoa[10] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
-            //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
+            float feature_tdoa[10] = { dx0,   dy0,   dz0,  dx1,   dy1,   dz1,
+                                       AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
 
             // ---------------------- DNN unit test --> feature vector {...} ---------------------- //
             // feature_tdoa[0] = 3.0;    feature_tdoa[1] = 2.0; feature_tdoa[2] = 1.0;   feature_tdoa[3] = 2.0;
             // feature_tdoa[4] = -2.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
             // feature_tdoa[8] = 60.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 75.0; feature_tdoa[11] = 28.0;
             // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
-            int feat_num = 14;
+            int feat_num = 10;
             // -------------- normal DNN -------------//
-            float uwb_feature_max_tdoa[14]={0};    float uwb_feature_min_tdoa[14] ={0};
+            // float uwb_feature_max_tdoa[14]={0};    float uwb_feature_min_tdoa[14] ={0};
             // ------------- DNN without anchor infor. ------------- //
-            // float uwb_feature_max_tdoa[10]={0};    float uwb_feature_min_tdoa[10] ={0};
+            float uwb_feature_max_tdoa[10]={0};    float uwb_feature_min_tdoa[10] ={0};
 
             float uwb_err_max_tdoa = 0;            float uwb_err_min_tdoa = 0;
             getErrMax(&uwb_err_max_tdoa);          getErrMin(&uwb_err_min_tdoa);

@@ -16,11 +16,11 @@
 void getErrMax(float * err_max);
 void getErrMin(float * err_min);
 // // dnn7
-void getFeatureMax(float uwb_feature_max_tdoa[14]);
-void getFeatureMin(float uwb_feature_min_tdoa[14]);
+// void getFeatureMax(float uwb_feature_max_tdoa[14]);
+// void getFeatureMin(float uwb_feature_min_tdoa[14]);
 // dnn 5 (without anchor information)
-// void getFeatureMax(float uwb_feature_max_tdoa[10]);
-// void getFeatureMin(float uwb_feature_min_tdoa[10]);
+void getFeatureMax(float uwb_feature_max_tdoa[10]);
+void getFeatureMin(float uwb_feature_min_tdoa[10]);
 
 // get quaternion
 // typedef struct {
