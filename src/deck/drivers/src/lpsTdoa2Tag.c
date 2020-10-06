@@ -41,7 +41,7 @@
 
 #include "physicalConstants.h"
 
-#define MEASUREMENT_NOISE_STD 0.11f                   // tdoa measurement noise    param1: 0.1  
+#define MEASUREMENT_NOISE_STD 0.12f                   // tdoa measurement noise    param1: 0.1  
 #define STATS_INTERVAL 500
 #define ANCHOR_OK_TIMEOUT 1500
 
