@@ -98,7 +98,7 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
     //     {timestamp: 1, x: -3.12, y: 3.38,  z: 0.17},   
     // },
 
-// DSL-2020-0925_G1
+// DSL-2020-1005_G1
     .anchorPosition = {
         {timestamp: 1, x: -2.95,  y: -3.86, z: 0.16},   
 
