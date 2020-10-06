@@ -79,24 +79,24 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
 //             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
 //    },
 
-// DSL-2020-0925_G1
+// DSL-2020-1005_G1
     .anchorPosition = {
-        {timestamp: 1, x: -3.0,  y: -3.88, z: 0.16},   
+        {timestamp: 1, x: -2.95,  y: -3.86, z: 0.16},   
 
-        {timestamp: 1, x: -3.11, y: 3.94,  z: 2.84},   
+        {timestamp: 1, x: -3.25, y: 3.64,  z: 2.81},   
 
-        {timestamp: 1, x: 3.07,  y: 3.55,  z: 0.18},    
+        {timestamp: 1, x: 2.67,  y: 3.94,  z: 0.17},    
 
-        {timestamp: 1, x: 3.55,  y: -4.14, z: 2.82},   
+        {timestamp: 1, x: 3.62,  y: -3.93, z: 2.83},   
 
-        {timestamp: 1, x: -3.39, y: -4.35, z:  2.81},   
+        {timestamp: 1, x: -3.08, y: -4.21, z: 2.82},   
 
-        {timestamp: 1, x: 3.15,  y: -3.88, z: 0.16 },   
+        {timestamp: 1, x:  3.2,  y: -3.7, z: 0.17 },   
 
-        {timestamp: 1, x: 3.62 , y: 3.81,  z: 2.81},   
+        {timestamp: 1, x: 3.74 , y: 3.75,  z: 2.81},   
 
-        {timestamp: 1, x: -3.12, y: 3.38,  z: 0.17},   
-    },
+        {timestamp: 1, x: -3.02, y: 3.05,  z: 0.16},   
+    },      
 
 
 };
