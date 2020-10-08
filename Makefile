@@ -79,6 +79,9 @@ CFLAGS += -DSTM32F4XX -DSTM32F40_41xxx -DHSE_VALUE=8000000 -DUSE_STDPERIPH_DRIVE
 
 LOAD_ADDRESS_stm32f4 = 0x8000000
 LOAD_ADDRESS_CLOAD_stm32f4 = 0x8004000
+# [CHANGE]
+MEM_SIZE_FLASH_K = 1008
+MEM_SIZE_RAM_K = 128
 endif
 
 ################ Build configuration ##################
@@ -360,7 +363,7 @@ ifeq ($(FATFS_DISKIO_TESTS), 1)
 endif
 
 size:
-	@$(SIZE) -B $(PROG).elf
+	@$(PYTHON) /home/william/Crazyflie_Repo/crazyflie-firmware/tools/make/size.py $(SIZE) $(PROG).elf $(MEM_SIZE_FLASH_K) $(MEM_SIZE_RAM_K) 
 
 #Radio bootloader
 cload:
