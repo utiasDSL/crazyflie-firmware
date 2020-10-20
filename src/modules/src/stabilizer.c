@@ -198,7 +198,6 @@ static void stabilizerTask(void* param)
       }
 
       stateEstimator(&state, &sensorData, &control, tick);
-      // Create a trilateration function and call it in here.
       
       commanderGetSetpoint(&setpoint, &state);
 

@@ -81,12 +81,12 @@
 //#define KALMAN_NAN_CHECK
 static bool enable_flow = false;
 static bool enable_zrange = false;
-static bool enable_UWB = false;
+static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = false;             // Chi-square test
-static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
-static bool ROBUST = false;                  // Use robust Kalman filter
+static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
+static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
 // static float q_an[8][4] ={{-0.39355243,  0.58765346,  0.37903556,  0.59675115},  // 0

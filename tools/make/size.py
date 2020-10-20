@@ -24,7 +24,7 @@ if __name__ == "__main__":
     parser.add_argument("source", help=".elf file to use")
     parser.add_argument("flash_size_k", help="size of the flash, in k bytes", type=int)
     parser.add_argument("ram_size_k", help="size of the RAM, in k bytes", type=int)
-    # parser.add_argument("ccm_size_k", help="size of the CCM, in k bytes", type=int)
+    parser.add_argument("ccm_size_k", help="size of the CCM, in k bytes", type=int)
     args = parser.parse_args()
 
     output = check_output([args.size_app, '-A', args.source])
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     flash_available = args.flash_size_k * 1024
     # print(sizes)
     # print("\n\n")
-    flash_used = sizes['.text'] + sizes['.data'] #+ sizes['.ccmdata']
+    flash_used = sizes['.text'] + sizes['.data'] + sizes['.ccmdata']
     flash_free = flash_available - flash_used
     flash_fill = 100 * flash_used / flash_available
 
@@ -46,11 +46,11 @@ if __name__ == "__main__":
     ram_free = ram_available - ram_used
     ram_fill = 100 * ram_used / ram_available
 
-    # ccm_available = args.ccm_size_k * 1024
-    # ccm_used = sizes['.ccmbss'] + sizes['.ccmdata']
-    # ccm_free = ccm_available - ccm_used
-    # ccm_fill = 100 * ccm_used / ccm_available
+    ccm_available = args.ccm_size_k * 1024
+    ccm_used = sizes['.ccmbss'] + sizes['.ccmdata']
+    ccm_free = ccm_available - ccm_used
+    ccm_fill = 100 * ccm_used / ccm_available
 
     print("Flash | {:7d}/{:<7d} ({:2.0f}%), {:7d} free | text: {}, data: {}".format(flash_used, flash_available, flash_fill, flash_free, sizes['.text'], sizes['.data']))
     print("RAM   | {:7d}/{:<7d} ({:2.0f}%), {:7d} free | bss: {}, data: {}".format(ram_used, ram_available, ram_fill, ram_free, sizes['.bss'], sizes['.data']))
-    # print("CCM   | {:7d}/{:<7d} ({:2.0f}%), {:7d} free | ccmbss: {}, ccmdata: {}".format(ccm_used, ccm_available, ccm_fill, ccm_free, sizes['.ccmbss'], sizes['.ccmdata']))
+    print("CCM   | {:7d}/{:<7d} ({:2.0f}%), {:7d} free | ccmbss: {}, ccmdata: {}".format(ccm_used, ccm_available, ccm_fill, ccm_free, sizes['.ccmbss'], sizes['.ccmdata']))
