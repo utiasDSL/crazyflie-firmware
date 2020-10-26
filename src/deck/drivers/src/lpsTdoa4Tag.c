@@ -101,23 +101,25 @@ typedef struct {
 // lppShortAnchorPos_s is defined in locodeck.h, here we define a new msg for TDoA4 
 // [New] lpp packet (transmission data): limitation is 11 float num
 struct lppShortAnchorPosition_s {
-  float position[3];
-  float quaternion[4];
+    //   float position[3];
+    //   float quaternion[4];
   float imu[6];
 } __attribute__((packed));
 // [New] Define a struct containing the info of remote "anchor" --> agent
 // global variable
+/*------ it is not used for now. Will organize TDOA4 code for inter-drone ranging only---*/
 static struct remoteAgentInfo_s{
     int remoteAgentID;           // source Agent 
     int destAgentID;             // destination Agent
     bool hasDistance;
-    struct lppShortAnchorPosition_s Pose;
+    struct lppShortAnchorPosition_s remoteData;
     double ranging;
 }remoteAgentInfo;                //[re-design]
 //----------------------------------------------------------------------------------------//
 //[change]: log parameter
-static int log_range;    // distance is uint16_t
-
+static float log_range;          // distance 
+static float log_imu[6]={0};     // remote imu
+static int   log_rAgentID;       // remote agent ID 
 /*--------------------------------------------------------------------*/
 int switchAgentMode(){
     return MODE;
@@ -395,16 +397,15 @@ static bool updateClockCorrection(anchorContext_t* anchorCtx, double clockCorrec
 static void handleLppShortPacket(const uint8_t *data, const int length) {
   uint8_t type = data[0];
   if (type == LPP_SHORT_ANCHORPOS) {
-    struct lppShortAnchorPosition_s *pose = (struct lppShortAnchorPosition_s*)&data[1];
+    struct lppShortAnchorPosition_s *rData = (struct lppShortAnchorPosition_s*)&data[1];
     // printf("Position data is: (%f,%f,%f) \r\n", pos->x, pos->y, pos->z);
-    // save and use the remote angent data
-    remoteAgentInfo.Pose.position[0] = pose->position[0];
-    remoteAgentInfo.Pose.position[1] = pose->position[1];
-    remoteAgentInfo.Pose.position[2] = pose->position[2];
-    remoteAgentInfo.Pose.quaternion[0] = pose->quaternion[0];
-    remoteAgentInfo.Pose.quaternion[1] = pose->quaternion[1];
-    remoteAgentInfo.Pose.quaternion[2] = pose->quaternion[2];
-    remoteAgentInfo.Pose.quaternion[3] = pose->quaternion[3];
+    // save and use the remote angent data                 # [LOG]: log imu parameter
+    remoteAgentInfo.remoteData.imu[0] = rData->imu[0];     log_imu[0] = rData->imu[0];
+    remoteAgentInfo.remoteData.imu[1] = rData->imu[1];     log_imu[1] = rData->imu[1];
+    remoteAgentInfo.remoteData.imu[2] = rData->imu[2];     log_imu[2] = rData->imu[2];
+    remoteAgentInfo.remoteData.imu[3] = rData->imu[3];     log_imu[3] = rData->imu[3];
+    remoteAgentInfo.remoteData.imu[4] = rData->imu[4];     log_imu[4] = rData->imu[4];
+    remoteAgentInfo.remoteData.imu[5] = rData->imu[5];     log_imu[5] = rData->imu[5];
     }
 }
 // [New]
@@ -426,10 +427,12 @@ static void handleLppPacket(const int dataLength, int rangePacketLength, const p
 
 // [New]: Update the remote agent info, also get the rangeDataLength --> for LPP packet
 // [Note]: store the remote agent info. for tdoa computation
+// [Note]: In tdoa4, the remote anchor infor. is not used (for tdoa range computing). 
+// This function is only used to extract the appended LPP msg
 static int updateRemoteAgentData(const void* payload){
     const rangePacket3_t* packet = (rangePacket3_t*)payload;
     const void* anchorDataPtr = &packet->remoteAnchorData;
-    // loop over all remote agent packe info, should save the remote agent data
+    // loop over all remote agent packet info, should save the remote agent data
     for(uint8_t i = 0; i<packet->header.remoteCount; i++){
         remoteAnchorDataFull_t* anchorData = (remoteAnchorDataFull_t*)anchorDataPtr;
         /* comment out unused value*/
@@ -458,9 +461,9 @@ static int updateRemoteAgentData(const void* payload){
         //     }
         // }
         /* ----------------- --------------------------- ----------------- */
-        anchorDataPtr += sizeof(remoteAnchorDataFull_t);
+            anchorDataPtr += sizeof(remoteAnchorDataFull_t);
         } else {
-        anchorDataPtr += sizeof(remoteAnchorDataShort_t);
+            anchorDataPtr += sizeof(remoteAnchorDataShort_t);
         }
     }
     return (uint8_t*)anchorDataPtr - (uint8_t*)packet;
@@ -474,6 +477,8 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
   // in anchor: uint8_t sourceAddress[8]
   // similar to destAddress
   const uint8_t remoteAnchorId = rxPacket->sourceAddress;
+  log_rAgentID = remoteAnchorId;           // [LOG] log the remote Agent ID (mobile anchor) 
+
   ctx.anchorRxCount[remoteAnchorId]++;
   anchorContext_t* anchorCtx = getContext(remoteAnchorId);
   if (anchorCtx) {
@@ -484,24 +489,26 @@ static void handleRangePacket(const uint32_t rxTime, const packet_t* rxPacket, c
 
     double clockCorrection = calculateClockCorrection(anchorCtx, remoteTxSeqNr, remoteTx, rxTime);
     if (updateClockCorrection(anchorCtx, clockCorrection)) {
-      anchorCtx->isDataGoodForTransmission = true;
+        anchorCtx->isDataGoodForTransmission = true;
 
-      uint32_t remoteRx = 0;
-      uint8_t remoteRxSeqNr = 0;
-      bool dataFound = extractFromPacket(rangePacket, &remoteRx, &remoteRxSeqNr);
-      if (dataFound) {
-        //[note]: here is the range distance data!
-        uint16_t distance = calculateDistance(anchorCtx, remoteRxSeqNr, remoteTx, remoteRx, rxTime);
-        // TODO krri Remove outliers in distances
-        if (distance > MIN_TOF) {
-          anchorCtx->distance = distance;
-          anchorCtx->distanceUpdateTime = xTaskGetTickCount();
-        //[note]: log range
-        log_range = anchorCtx->distance;
+        uint32_t remoteRx = 0;
+        uint8_t remoteRxSeqNr = 0;
+        bool dataFound = extractFromPacket(rangePacket, &remoteRx, &remoteRxSeqNr);
+        if (dataFound) {
+            //[note]: here is the range distance data!
+            uint16_t distance = calculateDistance(anchorCtx, remoteRxSeqNr, remoteTx, remoteRx, rxTime);
+            // TODO krri Remove outliers in distances
+            if (distance > MIN_TOF) {
+            anchorCtx->distance = distance;     // The distance here is the tick count, need to time M_PER_TICK to compute range [m]
+            anchorCtx->distanceUpdateTime = xTaskGetTickCount();
+            //[note]: log range
+            float M_PER_TICK = 0.0046917639786157855;
+            // [LOG] log the ranging distance
+            log_range = (float) distance * M_PER_TICK - (float)ANTENNA_OFFSET;   // compute the range in meters. 
+            }
         }
-      }
     } else {
-      anchorCtx->isDataGoodForTransmission = false;
+        anchorCtx->isDataGoodForTransmission = false;
     }
     // [change]
     rangingOk = anchorCtx->isDataGoodForTransmission;
@@ -520,44 +527,44 @@ static void lppHandleShortPacket(uint8_t *data, size_t length)
     if (length < 1) return;
     int type  = data[0];
 
-  switch(type) {
-    case LPP_SHORT_ANCHOR_POSITION:
-    {
-      // not used now. do nothing
-      break;
+    switch(type) {
+        case LPP_SHORT_ANCHOR_POSITION:
+        {
+            // not used now. do nothing
+            break;
+        }
+        case LPP_SHORT_REBOOT:
+        { // not used now. do nothing
+            break;
+        }
+        case LPP_SHORT_MODE:
+        { // used to switch Agent mode
+            struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
+            //   DEBUG_PRINT("Switch mode!!!!! \n");
+            //   // Set new mode
+            //   DEBUG_PRINT("MODE is %d\n",(int)modeInfo->mode);
+            //   DEBUG_PRINT("TDoA3 is %d\n",(int)LPP_SHORT_MODE_TDOA3);
+            if (modeInfo->mode == LPP_SHORT_MODE_TWR) {
+                MODE = lpsMode_TWR;
+            } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA2) {
+                MODE = lpsMode_TDoA2;
+            } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA3) {
+                // DEBUG_PRINT("Set mode to be tdoa3!!!!! \n");
+                MODE = lpsMode_TDoA3;
+            }else if (modeInfo->mode == LPP_SHORT_MODE_TDOA4) {
+                MODE = lpsMode_TDoA4;
+            }
+            break;
+        }
+        case LPP_SHORT_UWB:
+        { // not used for now. Do nothing
+            break;
+        }
+        case LPP_SHORT_UWB_MODE:
+        { // not used for now. Do nothing
+            break;
+        }
     }
-    case LPP_SHORT_REBOOT:
-    { // not used now. do nothing
-      break;
-    }
-    case LPP_SHORT_MODE:
-    { // used to switch Agent mode
-      struct lppShortMode_s* modeInfo = (struct lppShortMode_s*)&data[1];
-    //   DEBUG_PRINT("Switch mode!!!!! \n");
-    //   // Set new mode
-    //   DEBUG_PRINT("MODE is %d\n",(int)modeInfo->mode);
-    //   DEBUG_PRINT("TDoA3 is %d\n",(int)LPP_SHORT_MODE_TDOA3);
-      if (modeInfo->mode == LPP_SHORT_MODE_TWR) {
-        MODE = lpsMode_TWR;
-      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA2) {
-        MODE = lpsMode_TDoA2;
-      } else if (modeInfo->mode == LPP_SHORT_MODE_TDOA3) {
-        // DEBUG_PRINT("Set mode to be tdoa3!!!!! \n");
-        MODE = lpsMode_TDoA3;
-      }else if (modeInfo->mode == LPP_SHORT_MODE_TDOA4) {
-        MODE = lpsMode_TDoA4;
-      }
-      break;
-    }
-    case LPP_SHORT_UWB:
-    { // not used for now. Do nothing
-      break;
-    }
-    case LPP_SHORT_UWB_MODE:
-    { // not used for now. Do nothing
-      break;
-    }
-  }
 }
 
 //[note]: main function after receive an uwb message
@@ -566,20 +573,20 @@ static void lppHandleShortPacket(uint8_t *data, size_t length)
 // int xStart_s=0;        // testing for switching mode, used in lpsTdoa3Tag.c
 static void handleRxPacket(dwDevice_t *dev)
 {
-  //   int xEnd=0; int xDifference=0;
-  static packet_t rxPacket;
-  dwTime_t rxTime = { .full = 0 };
+    //   int xEnd=0; int xDifference=0;
+    static packet_t rxPacket;
+    dwTime_t rxTime = { .full = 0 };
 
-  dwGetRawReceiveTimestamp(dev, &rxTime);
-  dwCorrectTimestamp(dev, &rxTime);
+    dwGetRawReceiveTimestamp(dev, &rxTime);
+    dwCorrectTimestamp(dev, &rxTime);
 
-  int dataLength = dwGetDataLength(dev);
-  rxPacket.payload[0] = 0;
-  dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
+    int dataLength = dwGetDataLength(dev);
+    rxPacket.payload[0] = 0;
+    dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
 
-  if (dataLength == 0) {
-    return;
-  }
+    if (dataLength == 0) {
+        return;
+    }
     // DEBUG_PRINT("Receive radio packet \n");
     switch(rxPacket.payload[0]) {
     case PACKET_TYPE_TDOA4:       //[change]
@@ -688,58 +695,58 @@ static void setTxData(dwDevice_t *dev)
     txPacket.payload[rangePacketSize + LPP_TYPE] = LPP_SHORT_ANCHOR_POSITION;
 
     struct lppShortAnchorPosition_s *pos = (struct lppShortAnchorPosition_s*) &txPacket.payload[rangePacketSize + LPP_PAYLOAD];
-    // test with dummy positions: it works!
-    float dummy_pos[3] = {0.0, 0.1, 0.2};
-    float dummy_quater[4] = {0.01, 0.02, 0.03, 0.04};
+    /*------ Send the info. of interest--------*/
+    // float dummy_pos[3] = {1.0, 1.1, 1.2};
+    // float dummy_quater[4] = {1.01, 1.02, 1.03, 1.04};
     float dummy_imu[6] = {0.11, 0.22, 0.33, 0.44, 0.55, 0.66};
-    memcpy(pos->position, dummy_pos, 3 * sizeof(float));
-    memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
+    // memcpy(pos->position, dummy_pos, 3 * sizeof(float));
+    // memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
     memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
     lppLength = 2 + sizeof(struct lppShortAnchorPosition_s);
 
-  dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
+    dwSetData(dev, (uint8_t*)&txPacket, MAC802154_HEADER_LENGTH + rangePacketSize + lppLength);
 }
 
 // Setup the radio to send a packet
 static void setupTx(dwDevice_t *dev)
 {
-  dwTime_t txTime = findTransmitTimeAsSoonAsPossible(dev);
-  ctx.txTime = txTime.low32;
-  ctx.seqNr = (ctx.seqNr + 1) & 0x7f;
+    dwTime_t txTime = findTransmitTimeAsSoonAsPossible(dev);
+    ctx.txTime = txTime.low32;
+    ctx.seqNr = (ctx.seqNr + 1) & 0x7f;
 
-  setTxData(dev);
+    setTxData(dev);
 
-  dwNewTransmit(dev);
-  dwSetDefaults(dev);
-  dwSetTxRxTime(dev, txTime);
+    dwNewTransmit(dev);
+    dwSetDefaults(dev);
+    dwSetTxRxTime(dev, txTime);
 
-  dwStartTransmit(dev);
+    dwStartTransmit(dev);
 }
 
 static uint32_t randomizeDelayToNextTx()
 {
-  const uint32_t interval = 10;
+    const uint32_t interval = 10;
 
-  uint32_t r = rand();
-  uint32_t delay = ctx.averageTxDelay + r % interval - interval / 2;
+    uint32_t r = rand();
+    uint32_t delay = ctx.averageTxDelay + r % interval - interval / 2;
 
-  return delay;
+    return delay;
 }
 
 static uint32_t startNextEvent(dwDevice_t *dev, uint32_t now)
 {
-  dwIdle(dev);
+    dwIdle(dev);
 
-  if (ctx.nextTxTick < now) {
-    uint32_t newDelay = randomizeDelayToNextTx();
-    ctx.nextTxTick = now + M2T(newDelay);
+    if (ctx.nextTxTick < now) {
+        uint32_t newDelay = randomizeDelayToNextTx();
+        ctx.nextTxTick = now + M2T(newDelay);
 
-    setupTx(dev);
-  } else {
-    setupRx(dev);
-  }
+        setupTx(dev);
+    } else {
+        setupRx(dev);
+    }
 
-  return ctx.nextTxTick - now;
+    return ctx.nextTxTick - now;
 }
 
 //// [change]: not used now, comment out
@@ -755,53 +762,53 @@ static uint32_t startNextEvent(dwDevice_t *dev, uint32_t now)
 static void tdoa4Init(dwDevice_t *dev)
 {
  
-  dwSetReceiveWaitTimeout(dev, TDOA4_RECEIVE_TIMEOUT);
+    dwSetReceiveWaitTimeout(dev, TDOA4_RECEIVE_TIMEOUT);
 
-  dwCommitConfiguration(dev);
+    dwCommitConfiguration(dev);
 
-  rangingOk = false;
-  // manually set the Agent ID
-  ctx.anchorId = 0;   // initialize to be int 0
-  ctx.seqNr = 0;
-  ctx.txTime = 0;
-  ctx.nextTxTick = 0;
-  ctx.averageTxDelay = 1000.0 / ANCHOR_MAX_TX_FREQ;
-  ctx.remoteTxIdCount = 0;
-  ctx.nextAnchorListUpdate = 0;
+    rangingOk = false;
+    // manually set the Agent ID
+    ctx.anchorId = 0;   // initialize to be int 0
+    ctx.seqNr = 0;
+    ctx.txTime = 0;
+    ctx.nextTxTick = 0;
+    ctx.averageTxDelay = 1000.0 / ANCHOR_MAX_TX_FREQ;
+    ctx.remoteTxIdCount = 0;
+    ctx.nextAnchorListUpdate = 0;
 
-  memset(&ctx.anchorCtxLookup, ID_WITHOUT_CONTEXT, ID_COUNT);
-  for (int i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
-    ctx.anchorCtx[i].isUsed = false;
-  }
+    memset(&ctx.anchorCtxLookup, ID_WITHOUT_CONTEXT, ID_COUNT);
+    for (int i = 0; i < ANCHOR_STORAGE_COUNT; i++) {
+        ctx.anchorCtx[i].isUsed = false;
+    }
 
-  clearAnchorRxCount();
+    clearAnchorRxCount();
 
-  srand(ctx.anchorId);
+    srand(ctx.anchorId);
 }
 //------------------------------------------------------------------//
 
 // Called for each DW radio event
 static uint32_t tdoa4UwbEvent(dwDevice_t *dev, uwbEvent_t event)
 {
-//   int xStart=0; int xEnd=0; int xDifference=0;
-  switch (event) {
-    case eventPacketReceived: {
-        handleRxPacket(dev);
-      }
-      break;
-    default:
-      // Nothing here
-      break;
-  }
+    //   int xStart=0; int xEnd=0; int xDifference=0;
+    switch (event) {
+        case eventPacketReceived: {
+            handleRxPacket(dev);
+        }
+        break;
+        default:
+        // Nothing here
+        break;
+    }
 
-  uint32_t now = xTaskGetTickCount();
-  if (now > ctx.nextAnchorListUpdate) {
-    updateAnchorLists();
-    ctx.nextAnchorListUpdate = now + ANCHOR_LIST_UPDATE_INTERVAL;
-  }
+    uint32_t now = xTaskGetTickCount();
+    if (now > ctx.nextAnchorListUpdate) {
+        updateAnchorLists();
+        ctx.nextAnchorListUpdate = now + ANCHOR_LIST_UPDATE_INTERVAL;
+    }
 
-  uint32_t timeout_ms = startNextEvent(dev, now);
-  return timeout_ms;
+    uint32_t timeout_ms = startNextEvent(dev, now);
+    return timeout_ms;
 }
 
 //-----------------Move the algorithm from lpstdoa3--------------------//
@@ -886,20 +893,26 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
 // [Note]: The implementation of algorithm on the anchor and on CF are different
 // need to check tdoa engine on CF and uwb.c on lps-node-firmware 
 
-uwbAlgorithm_t uwbTdoa4TagAlgorithm = { //[change]: the name changed
-  .init = tdoa4Init,   // the config is changed in init func
-  .onEvent = tdoa4UwbEvent,
-  //[change]: The following are needed
-  .isRangingOk = isRangingOk,
-  .getAnchorPosition = getAnchorPosition,
-  .getAnchorIdList = getAnchorIdList,           // return the active id num: uint8_t
-  .getActiveAnchorIdList = getActiveAnchorIdList,
+uwbAlgorithm_t uwbTdoa4TagAlgorithm = { // [change]: the name changed
+    .init = tdoa4Init,   // the config is changed in init func
+    .onEvent = tdoa4UwbEvent,
+    // [change]: The following are needed (used for the GUI)
+    .isRangingOk = isRangingOk,
+    .getAnchorPosition = getAnchorPosition,
+    .getAnchorIdList = getAnchorIdList,              // return the active id num: uint8_t
+    .getActiveAnchorIdList = getActiveAnchorIdList,
 };
 
-//[note]: test for log parameter
+//[note]: Add inter-drone range logging
 LOG_GROUP_START(tdoa4)
-
-LOG_ADD(LOG_INT16,Range, &log_range)
+LOG_ADD(LOG_FLOAT, inter_range,  &log_range)
+LOG_ADD(LOG_FLOAT, acc_x,        &log_imu[0])
+LOG_ADD(LOG_FLOAT, acc_y,        &log_imu[1])
+LOG_ADD(LOG_FLOAT, acc_z,        &log_imu[2])
+LOG_ADD(LOG_FLOAT, gyro_x,       &log_imu[3])
+LOG_ADD(LOG_FLOAT, gyro_y,       &log_imu[4])
+LOG_ADD(LOG_FLOAT, gyro_z,       &log_imu[5])
+LOG_ADD(LOG_INT16, rAgentID,     &log_rAgentID)
 LOG_GROUP_STOP(tdoa4)
 
 
