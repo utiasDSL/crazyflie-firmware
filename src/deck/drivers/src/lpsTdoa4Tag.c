@@ -698,7 +698,7 @@ static void setTxData(dwDevice_t *dev)
     /*------ Send the info. of interest--------*/
     // float dummy_pos[3] = {1.0, 1.1, 1.2};
     // float dummy_quater[4] = {1.01, 1.02, 1.03, 1.04};
-    float dummy_imu[6] = {0.11, 0.22, 0.33, 0.44, 0.55, 0.66};
+    float dummy_imu[6] = {4.11, 4.22, 4.33, 4.44, 4.55, 4.66};
     // memcpy(pos->position, dummy_pos, 3 * sizeof(float));
     // memcpy(pos->quaternion, dummy_quater, 4 * sizeof(float));
     memcpy(pos->imu, dummy_imu, 6 * sizeof(float) );
@@ -768,7 +768,7 @@ static void tdoa4Init(dwDevice_t *dev)
 
     rangingOk = false;
     // manually set the Agent ID
-    ctx.anchorId = 0;   // initialize to be int 0
+    ctx.anchorId = 4;   // initialize to be int 0
     ctx.seqNr = 0;
     ctx.txTime = 0;
     ctx.nextTxTick = 0;

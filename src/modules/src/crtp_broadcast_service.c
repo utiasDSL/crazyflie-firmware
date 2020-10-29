@@ -1,3 +1,4 @@
+// [DSL code] 
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
@@ -177,11 +178,11 @@ bool getExtPositionBC(state_t *state){
     posvel.y = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].y;
     posvel.z = crtpExtPosCache.currVal[crtpExtPosCache.activeSide].z;
 
-#ifndef PLATFORM_CF1
-//    estimatorKalmanEnqueuePosition(&broadcast_pos);
-    if (useVicon)
-        estimatorKalmanEnqueuePosVel(&posvel);
-#endif
+    #ifndef PLATFORM_CF1
+    //    estimatorKalmanEnqueuePosition(&broadcast_pos);
+        if (useVicon)
+            estimatorKalmanEnqueuePosVel(&posvel);
+    #endif
 
     return true;
   }

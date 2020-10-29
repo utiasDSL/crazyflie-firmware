@@ -251,7 +251,7 @@ typedef struct setpoint_s {
     stab_mode_t yaw;
     stab_mode_t quat;
   } mode;
-
+  // [DSL] customized code
   // Data from and for the new controller
   bool setEmergency;
   bool resetEmergency;
