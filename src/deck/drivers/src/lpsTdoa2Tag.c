@@ -68,16 +68,16 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
    // following code:
 
 //DSL-2020-0824vicon
-//     .anchorPosition = {
-//             {timestamp: 1, x: -3.0933, y: -4.0651, z: 0.1549},   //0
-//             {timestamp: 1, x: -3.7058, y: 3.8305, z: 3.1872},   //1
-//             {timestamp: 1, x:  3.0488, y: 3.6443, z: 0.1768},   //2
-//             {timestamp: 1, x:  4.2329, y: -4.3812, z: 3.4116},   //3
-//             {timestamp: 1, x: -3.5236, y: -4.5195, z: 3.1245},   //4
-//             {timestamp: 1, x:  3.1501, y: -3.9946, z: 0.1587},   //5
-//             {timestamp: 1, x:  3.9850, y:  3.9757, z: 3.3841},   //6
-//             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
-//    },
+    .anchorPosition = {
+            {timestamp: 1, x: -3.0933, y: -4.0651, z: 0.1549},   //0
+            {timestamp: 1, x: -3.7058, y: 3.8305, z: 3.1872},   //1
+            {timestamp: 1, x:  3.0488, y: 3.6443, z: 0.1768},   //2
+            {timestamp: 1, x:  4.2329, y: -4.3812, z: 3.4116},   //3
+            {timestamp: 1, x: -3.5236, y: -4.5195, z: 3.1245},   //4
+            {timestamp: 1, x:  3.1501, y: -3.9946, z: 0.1587},   //5
+            {timestamp: 1, x:  3.9850, y:  3.9757, z: 3.3841},   //6
+            {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
+   },
 
 // DSL-2020-0925_G1
     // .anchorPosition = {
@@ -99,23 +99,23 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
     // },
 
 // DSL-2020-1005_G1
-    .anchorPosition = {
-        {timestamp: 1, x: -2.95,  y: -3.86, z: 0.16},   
+    // .anchorPosition = {
+    //     {timestamp: 1, x: -2.95,  y: -3.86, z: 0.16},   
 
-        {timestamp: 1, x: -3.25, y: 3.64,  z: 2.81},   
+    //     {timestamp: 1, x: -3.25, y: 3.64,  z: 2.81},   
 
-        {timestamp: 1, x: 2.67,  y: 3.94,  z: 0.17},    
+    //     {timestamp: 1, x: 2.67,  y: 3.94,  z: 0.17},    
 
-        {timestamp: 1, x: 3.62,  y: -3.93, z: 2.83},   
+    //     {timestamp: 1, x: 3.62,  y: -3.93, z: 2.83},   
 
-        {timestamp: 1, x: -3.08, y: -4.21, z: 2.82},   
+    //     {timestamp: 1, x: -3.08, y: -4.21, z: 2.82},   
 
-        {timestamp: 1, x:  3.2,  y: -3.7, z: 0.17 },   
+    //     {timestamp: 1, x:  3.2,  y: -3.7, z: 0.17 },   
 
-        {timestamp: 1, x: 3.74 , y: 3.75,  z: 2.81},   
+    //     {timestamp: 1, x: 3.74 , y: 3.75,  z: 2.81},   
 
-        {timestamp: 1, x: -3.02, y: 3.05,  z: 0.16},   
-    },
+    //     {timestamp: 1, x: -3.02, y: 3.05,  z: 0.16},   
+    // },
 
 
 };

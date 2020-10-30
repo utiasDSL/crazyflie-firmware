@@ -79,13 +79,13 @@
 
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
-static bool enable_flow = false;
-static bool enable_zrange = false;
-static bool enable_UWB = true;
+static bool enable_flow = true;
+static bool enable_zrange = true;
+static bool enable_UWB = false;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = false;             // Chi-square test
-static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
+static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
