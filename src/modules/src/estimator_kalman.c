@@ -81,7 +81,7 @@
 //#define KALMAN_NAN_CHECK
 static bool enable_flow = true;
 static bool enable_zrange = true;
-static bool enable_UWB = false;
+static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = false;             // Chi-square test
@@ -1028,10 +1028,11 @@ static void stateEstimatorScalarUpdate(arm_matrix_instance_f32 *Hm, float error,
 
   bool Chi_square_label = true;  
 
-    // ****************** Chi-squared test *********************//
+    // ****************** Chi-squared test ********************* //
     if(CHI_SQRUARE && (d_m >= 6.0f)){   // tuning param
         Chi_square_label = false;
     }
+    // -------------------------------------------------------- //
 
     if(Chi_square_label){
         // ====== MEASUREMENT UPDATE ======
@@ -1261,7 +1262,7 @@ static void stateEstimatorUpdateWithDistance(distanceMeasurement_t *d, float dt)
 	  }
 }
 
-//TDoA
+//TDoA (normal update equations for TDoA)
 static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
 {
   if (tdoaCount >= 100)
@@ -1335,6 +1336,7 @@ static void stateEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa, float dt)
   tdoaCount++;
 }
 
+// ------------------------ Robust Extended Kalman Filter ----------------------------- //
 // [CHANGE] Robust Extended Kalman Filter
 // Cholesky Decomposition for a nxn psd matrix(from scratch)
 // A function for a dynamic dim. of matrix can be implement for other cases.
@@ -1658,7 +1660,6 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
                 matrixcopy(STATE_DIM, STATE_DIM, tmp1, P_chol);
                 // in order to keep P_chol
                 mat_inv(&tmp1m, &Pc_inv_m);                          // Pc_inv_m = inv(Pc_m) = inv(P_chol)
-
                 mat_mult(&Pc_inv_m, &x_errm, &e_x_m);                  // e_x_m = Pc_inv_m.dot(x_errm) 
 
                 // compute w_x, w_y --> weighting matrix
@@ -1693,7 +1694,6 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
                 // matrixcopy(STATE_DIM, STATE_DIM, P_w, P); 
                 // H is a row vector
                 mat_trans(&H, &HTm);
-
                 mat_mult(&P_w_m, &HTm, &PHTm);     // PHTm = P_w.dot(H.T). The P is the updated P_w 
 
                 float HPHR = Q_w;                  // HPH' + R.            The Q(R) is the updated Q_w 
@@ -1769,6 +1769,7 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
   }
   tdoaCount++;
 }
+// -------------------------------------------------------------------------------------- //
 
 // TODO remove the temporary test variables (used for logging)
 static float omegax_b;
@@ -1785,76 +1786,70 @@ static void stateEstimatorUpdateWithFlow(flowMeasurement_t *flow, sensorData_t *
 {
   // Inclusion of flow measurements in the EKF done by two scalar updates
   if (enable_flow){    // if enable flow when using flowdeck.
-  // ~~~ Camera constants ~~~
-  // The angle of aperture is guessed from the raw data register and thankfully look to be symmetric
-  float Npix = 30.0;                      // [pixels] (same in x and y)
-  //float thetapix = DEG_TO_RAD * 4.0f;     // [rad]    (same in x and y)
-  float thetapix = DEG_TO_RAD * 4.2f;
-  //~~~ Body rates ~~~
-  // TODO check if this is feasible or if some filtering has to be done
-  omegax_b = sensors->gyro.x * DEG_TO_RAD;
-  omegay_b = sensors->gyro.y * DEG_TO_RAD;
+    // ~~~ Camera constants ~~~
+    // The angle of aperture is guessed from the raw data register and thankfully look to be symmetric
+    float Npix = 30.0;                      // [pixels] (same in x and y)
+    //float thetapix = DEG_TO_RAD * 4.0f;     // [rad]    (same in x and y)
+    float thetapix = DEG_TO_RAD * 4.2f;
+    //~~~ Body rates ~~~
+    // TODO check if this is feasible or if some filtering has to be done
+    omegax_b = sensors->gyro.x * DEG_TO_RAD;
+    omegay_b = sensors->gyro.y * DEG_TO_RAD;
 
-  // ~~~ Moves the body velocity into the global coordinate system ~~~
-  // [bar{x},bar{y},bar{z}]_G = R*[bar{x},bar{y},bar{z}]_B
-  //
-  // \dot{x}_G = (R^T*[dot{x}_B,dot{y}_B,dot{z}_B])\dot \hat{x}_G
-  // \dot{x}_G = (R^T*[dot{x}_B,dot{y}_B,dot{z}_B])\dot \hat{x}_G
-  //
-  // where \hat{} denotes a basis vector, \dot{} denotes a derivative and
-  // _G and _B refer to the global/body coordinate systems.
+    // ~~~ Moves the body velocity into the global coordinate system ~~~
+    // [bar{x},bar{y},bar{z}]_G = R*[bar{x},bar{y},bar{z}]_B
+    //
+    // \dot{x}_G = (R^T*[dot{x}_B,dot{y}_B,dot{z}_B])\dot \hat{x}_G
+    // \dot{x}_G = (R^T*[dot{x}_B,dot{y}_B,dot{z}_B])\dot \hat{x}_G
+    //
+    // where \hat{} denotes a basis vector, \dot{} denotes a derivative and
+    // _G and _B refer to the global/body coordinate systems.
 
-  // Modification 1
-  //dx_g = R[0][0] * S[STATE_PX] + R[0][1] * S[STATE_PY] + R[0][2] * S[STATE_PZ];
-  //dy_g = R[1][0] * S[STATE_PX] + R[1][1] * S[STATE_PY] + R[1][2] * S[STATE_PZ];
+    // Modification 1
+    //dx_g = R[0][0] * S[STATE_PX] + R[0][1] * S[STATE_PY] + R[0][2] * S[STATE_PZ];
+    //dy_g = R[1][0] * S[STATE_PX] + R[1][1] * S[STATE_PY] + R[1][2] * S[STATE_PZ];
 
 
-  dx_g = S[STATE_PX];
-  dy_g = S[STATE_PY];
-  // Saturate elevation in prediction and correction to avoid singularities
-  if ( S[STATE_Z] < 0.1f ) {
-      z_g = 0.1;
-  } else {
-      z_g = S[STATE_Z];
-  }
+    dx_g = S[STATE_PX];
+    dy_g = S[STATE_PY];
+    // Saturate elevation in prediction and correction to avoid singularities
+    if ( S[STATE_Z] < 0.1f ) {
+        z_g = 0.1;
+    } else {
+        z_g = S[STATE_Z];
+    }
 
-  // ~~~ X velocity prediction and update ~~~
-  // predicts the number of accumulated pixels in the x-direction
-  float omegaFactor = 1.25f;
-  float hx[STATE_DIM] = {0};
-  arm_matrix_instance_f32 Hx = {1, STATE_DIM, hx};
-  predictedNX = (flow->dt * Npix / thetapix ) * ((dx_g * R[2][2] / z_g) - omegaFactor * omegay_b);
-  measuredNX = flow->dpixelx;
+    // ~~~ X velocity prediction and update ~~~
+    // predicts the number of accumulated pixels in the x-direction
+    float omegaFactor = 1.25f;
+    float hx[STATE_DIM] = {0};
+    arm_matrix_instance_f32 Hx = {1, STATE_DIM, hx};
+    predictedNX = (flow->dt * Npix / thetapix ) * ((dx_g * R[2][2] / z_g) - omegaFactor * omegay_b);
+    measuredNX = flow->dpixelx;
 
-  // derive measurement equation with respect to dx (and z?)
-  hx[STATE_Z] = (Npix * flow->dt / thetapix) * ((R[2][2] * dx_g) / (-z_g * z_g));
-  hx[STATE_PX] = (Npix * flow->dt / thetapix) * (R[2][2] / z_g);
+    // derive measurement equation with respect to dx (and z?)
+    hx[STATE_Z] = (Npix * flow->dt / thetapix) * ((R[2][2] * dx_g) / (-z_g * z_g));
+    hx[STATE_PX] = (Npix * flow->dt / thetapix) * (R[2][2] / z_g);
 
-  // X update
-//  if(S[STATE_Z] < UWB_MAX_HEIGHT){
-	  stateEstimatorScalarUpdate(&Hx, measuredNX-predictedNX, flow->stdDevX);
-//  }
-  // ~~~ Y velocity prediction and update ~~~
-  float hy[STATE_DIM] = {0};
-  arm_matrix_instance_f32 Hy = {1, STATE_DIM, hy};
-  predictedNY = (flow->dt * Npix / thetapix ) * ((dy_g * R[2][2] / z_g) + omegaFactor * omegax_b);
-  measuredNY = flow->dpixely;
+    stateEstimatorScalarUpdate(&Hx, measuredNX-predictedNX, flow->stdDevX);
 
-  // derive measurement equation with respect to dy (and z?)
-  hy[STATE_Z] = (Npix * flow->dt / thetapix) * ((R[2][2] * dy_g) / (-z_g * z_g));
-  hy[STATE_PY] = (Npix * flow->dt / thetapix) * (R[2][2] / z_g);
+    // ~~~ Y velocity prediction and update ~~~
+    float hy[STATE_DIM] = {0};
+    arm_matrix_instance_f32 Hy = {1, STATE_DIM, hy};
+    predictedNY = (flow->dt * Npix / thetapix ) * ((dy_g * R[2][2] / z_g) + omegaFactor * omegax_b);
+    measuredNY = flow->dpixely;
 
-//   Y update
-//  if(S[STATE_Z] < UWB_MAX_HEIGHT){
-  stateEstimatorScalarUpdate(&Hy, measuredNY-predictedNY, flow->stdDevY);
-//  }
+    // derive measurement equation with respect to dy (and z?)
+    hy[STATE_Z] = (Npix * flow->dt / thetapix) * ((R[2][2] * dy_g) / (-z_g * z_g));
+    hy[STATE_PY] = (Npix * flow->dt / thetapix) * (R[2][2] / z_g);
+
+    stateEstimatorScalarUpdate(&Hy, measuredNY-predictedNY, flow->stdDevY);
   }
 }
 
 static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
 {
   // Updates the filter with a measured distance in the z direction
- //  if(tof->distance<ZRANGE_MAX_HEIGHT) {               //modified here, but it does not work
 	float h[STATE_DIM] = {0};
 	arm_matrix_instance_f32 H = {1, STATE_DIM, h};
 
@@ -1880,7 +1875,7 @@ static void stateEstimatorUpdateWithTof(tofMeasurement_t *tof)
     	stateEstimatorScalarUpdate(&H, measuredDistance-predictedDistance, tof->stdDev);
      }
   }
-// }
+
 }
 
 static void stateEstimatorFinalize(sensorData_t *sensors, uint32_t tick)
