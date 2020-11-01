@@ -153,7 +153,8 @@ PROJ_OBJ += log.o worker.o trigger.o sitaw.o queuemonitor.o msp.o
 PROJ_OBJ += platformservice.o sound_cf2.o extrx.o sysload.o mem_cf2.o
 PROJ_OBJ += range.o
 # [change]
-PROJ_OBJ += dsl_dnn.o 
+# PROJ_OBJ += dsl_dnn.o 
+PROJ_OBJ += dnn_tan.o
 
 # Stabilizer modules
 PROJ_OBJ += commander.o crtp_commander.o crtp_commander_rpyt.o

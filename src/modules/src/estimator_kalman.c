@@ -75,17 +75,19 @@
 
 #include "debug.h"
 // [change] include the nn model
-#include "dsl_dnn.h"
+// #include "dsl_dnn.h"
+#include "dnn_tan.h"               // test the dnn trained by matlab
+
 
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
-static bool enable_flow = true;
-static bool enable_zrange = true;
+static bool enable_flow = false;
+static bool enable_zrange = false;
 static bool enable_UWB = true;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = false;             // Chi-square test
-static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
+static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
 static bool ROBUST = true;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
@@ -1501,10 +1503,12 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
 
             // ---------------------- DNN unit test --> feature vector {...} ---------------------- //
-            // feature_tdoa[0] = 3.0;    feature_tdoa[1] = 2.0; feature_tdoa[2] = 1.0;   feature_tdoa[3] = 2.0;
-            // feature_tdoa[4] = -2.0;    feature_tdoa[5] = 1.0; feature_tdoa[6] = 120.0; feature_tdoa[7] = 30.0;
-            // feature_tdoa[8] = 60.0;  feature_tdoa[9] = 45.0; feature_tdoa[10] = 75.0; feature_tdoa[11] = 28.0;
-            // feature_tdoa[12] = 30.0; feature_tdoa[13] = 48.0;
+            feature_tdoa[0] = 3.0;     feature_tdoa[1] = 2.0;    feature_tdoa[2] = 1.0;     feature_tdoa[3] = 2.0;
+            feature_tdoa[4] = -2.0;    feature_tdoa[5] = 0.5;    feature_tdoa[6] = 120.0;   feature_tdoa[7] = 25.0;
+            feature_tdoa[8] = 50.0;    feature_tdoa[9] = 40.0;   feature_tdoa[10] = 65.0;   feature_tdoa[11] = 28.0;
+            feature_tdoa[12] = 25.0;   feature_tdoa[13] = 45.0;
+            // ------------------------------------------------------------------------------------ //
+
             int feat_num = 14;
             // -------------- normal DNN -------------//
             float uwb_feature_max_tdoa[14]={0};    float uwb_feature_min_tdoa[14] ={0};
