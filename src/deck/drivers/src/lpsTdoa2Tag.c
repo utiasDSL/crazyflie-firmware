@@ -68,55 +68,36 @@ static lpsTdoa2AlgoOptions_t defaultOptions = {
    // following code:
 
 //DSL-2020-0824vicon
+//     .anchorPosition = {
+//             {timestamp: 1, x: -3.0933, y: -4.0651, z: 0.1549},   //0
+//             {timestamp: 1, x: -3.7058, y: 3.8305, z: 3.1872},   //1
+//             {timestamp: 1, x:  3.0488, y: 3.6443, z: 0.1768},   //2
+//             {timestamp: 1, x:  4.2329, y: -4.3812, z: 3.4116},   //3
+//             {timestamp: 1, x: -3.5236, y: -4.5195, z: 3.1245},   //4
+//             {timestamp: 1, x:  3.1501, y: -3.9946, z: 0.1587},   //5
+//             {timestamp: 1, x:  3.9850, y:  3.9757, z: 3.3841},   //6
+//             {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
+//    },
+
+
+// DSL-2020-1101_G1
     .anchorPosition = {
-            {timestamp: 1, x: -3.0933, y: -4.0651, z: 0.1549},   //0
-            {timestamp: 1, x: -3.7058, y: 3.8305, z: 3.1872},   //1
-            {timestamp: 1, x:  3.0488, y: 3.6443, z: 0.1768},   //2
-            {timestamp: 1, x:  4.2329, y: -4.3812, z: 3.4116},   //3
-            {timestamp: 1, x: -3.5236, y: -4.5195, z: 3.1245},   //4
-            {timestamp: 1, x:  3.1501, y: -3.9946, z: 0.1587},   //5
-            {timestamp: 1, x:  3.9850, y:  3.9757, z: 3.3841},   //6
-            {timestamp: 1, x: -3.2250, y:  3.3662, z: 0.1635},   //7
-   },
+        {timestamp: 1, x: -2.31, y: -4.16, z: 0.17},   
 
-// DSL-2020-0925_G1
-    // .anchorPosition = {
-    //     {timestamp: 1, x: -3.0,  y: -3.88, z: 0.16},   
+        {timestamp: 1, x: -3.3,  y: 3.59,  z: 2.83},   
 
-    //     {timestamp: 1, x: -3.11, y: 3.94,  z: 2.84},   
+        {timestamp: 1, x: 3.05,  y: 3.62,  z: 0.17},    
 
-    //     {timestamp: 1, x: 3.07,  y: 3.55,  z: 0.18},    
+        {timestamp: 1, x: 3.7,  y: -3.95, z: 2.83},   
 
-    //     {timestamp: 1, x: 3.55,  y: -4.14, z: 2.82},   
+        {timestamp: 1, x: -3.18, y: -4.31, z: 2.82},   
 
-    //     {timestamp: 1, x: -3.39, y: -4.35, z:  2.81},   
+        {timestamp: 1, x:  3.5,  y: -3.48, z: 0.17 },   
 
-    //     {timestamp: 1, x: 3.15,  y: -3.88, z: 0.16 },   
+        {timestamp: 1, x: 3.84 , y: 3.71,  z: 2.8},   
 
-    //     {timestamp: 1, x: 3.62 , y: 3.81,  z: 2.81},   
-
-    //     {timestamp: 1, x: -3.12, y: 3.38,  z: 0.17},   
-    // },
-
-// DSL-2020-1005_G1
-    // .anchorPosition = {
-    //     {timestamp: 1, x: -2.95,  y: -3.86, z: 0.16},   
-
-    //     {timestamp: 1, x: -3.25, y: 3.64,  z: 2.81},   
-
-    //     {timestamp: 1, x: 2.67,  y: 3.94,  z: 0.17},    
-
-    //     {timestamp: 1, x: 3.62,  y: -3.93, z: 2.83},   
-
-    //     {timestamp: 1, x: -3.08, y: -4.21, z: 2.82},   
-
-    //     {timestamp: 1, x:  3.2,  y: -3.7, z: 0.17 },   
-
-    //     {timestamp: 1, x: 3.74 , y: 3.75,  z: 2.81},   
-
-    //     {timestamp: 1, x: -3.02, y: 3.05,  z: 0.16},   
-    // },
-
+        {timestamp: 1, x: -3.00, y: 3.07,  z: 0.16},   
+    },
 
 };
 
@@ -368,7 +349,7 @@ static bool rxcallback(dwDevice_t *dev) {
         if (calcDistanceDiff(&tdoaDistDiff, previousAnchor, anchor, packet, &arrival)) {
           rangingOk = true;
           // [CHANGE]: drop the tdoa measurement 2 out of 3 to reduce the EKF burden
-          if (counter == 2){
+          if (counter == 5){
                 // update measurements
                 enqueueTDOA(previousAnchor, anchor, tdoaDistDiff);        
                 counter=0;   // reset counter

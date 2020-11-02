@@ -75,20 +75,20 @@
 
 #include "debug.h"
 // [change] include the nn model
-// #include "dsl_dnn.h"
-#include "dnn_tan.h"               // test the dnn trained by matlab
+#include "dsl_dnn.h"
+// #include "dnn_tan.h"               // test the dnn trained by matlab
 
 
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
-static bool enable_flow = false;
-static bool enable_zrange = false;
-static bool enable_UWB = true;
+static bool enable_flow = true;
+static bool enable_zrange = true;
+static bool enable_UWB = false;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
 static bool CHI_SQRUARE = false;             // Chi-square test
-static bool DNN_COM = true;                 // DNN bias compensation for TDoA measurements
-static bool ROBUST = true;                  // Use robust Kalman filter
+static bool DNN_COM = false;                 // DNN bias compensation for TDoA measurements
+static bool ROBUST = false;                  // Use robust Kalman filter
 // q_an = [q.w, q.x, q.y, q.z]
 // 0914_G1
 // static float q_an[8][4] ={{-0.39355243,  0.58765346,  0.37903556,  0.59675115},  // 0
@@ -120,21 +120,38 @@ static bool ROBUST = true;                  // Use robust Kalman filter
 //                                 };
 
 // 1005_G1
-static float q_an[8][4] ={{-0.216,  0.671,  0.206,  0.679},  // 0
+// static float q_an[8][4] ={{-0.216,  0.671,  0.206,  0.679},  // 0
 
-                          {0.589,  0.789,  0.162,  0.059},  // 1
+//                           {0.589,  0.789,  0.162,  0.059},  // 1
 
-                          {0.582,  0.403, -0.575,  0.409},   // 2
+//                           {0.582,  0.403, -0.575,  0.409},   // 2
 
-                          {-0.054, -0.099,  0.797,  0.594},  // 3
+//                           {-0.054, -0.099,  0.797,  0.594},  // 3
 
-                          {-0.64,  0.765,  -0.071 ,  0.021},  // 4
+//                           {-0.64,  0.765,  -0.071 ,  0.021},  // 4
 
-                          {0.629, -0.335, -0.618, -0.332},  // 5
+//                           {0.629, -0.335, -0.618, -0.332},  // 5
 
-                          {-0.066,  0.165,  0.806, -0.564},  // 6
+//                           {-0.066,  0.165,  0.806, -0.564},  // 6
 
-                          { 0.197,   0.674, -0.21,  0.68}   // 7
+//                           { 0.197,   0.674, -0.21,  0.68}   // 7
+//                                 };
+// 1101_G1
+static float q_an[8][4] ={{-0.454,  0.536,  0.446,  0.555},  // 0
+
+                          {0.59,   0.803,  0.077,  0.048},  // 1
+
+                          {0.556,  0.45,  -0.521,  0.465},   // 2
+
+                          {-0.071, -0.123,  0.794,  0.59},  // 3
+
+                          {-0.634,  0.764, -0.108,  0.05},  // 4
+
+                          { 0.671, -0.25,  -0.651, -0.251},  // 5
+
+                          {-0.08,   0.23,   0.79,  -0.562},  // 6
+
+                          { 0.198,  0.671, -0.228,  0.677}   // 7
                                 };
 
 /**
@@ -1503,10 +1520,10 @@ static void robustEstimatorUpdateWithTDOA(tdoaMeasurement_t *tdoa)
             //                            AzEl[0],  AzEl[1],  AzEl[2],  AzEl[3]};
 
             // ---------------------- DNN unit test --> feature vector {...} ---------------------- //
-            feature_tdoa[0] = 3.0;     feature_tdoa[1] = 2.0;    feature_tdoa[2] = 1.0;     feature_tdoa[3] = 2.0;
-            feature_tdoa[4] = -2.0;    feature_tdoa[5] = 0.5;    feature_tdoa[6] = 120.0;   feature_tdoa[7] = 25.0;
-            feature_tdoa[8] = 50.0;    feature_tdoa[9] = 40.0;   feature_tdoa[10] = 65.0;   feature_tdoa[11] = 28.0;
-            feature_tdoa[12] = 25.0;   feature_tdoa[13] = 45.0;
+            // feature_tdoa[0] = 3.0;     feature_tdoa[1] = 2.0;    feature_tdoa[2] = 1.0;     feature_tdoa[3] = 2.0;
+            // feature_tdoa[4] = -2.0;    feature_tdoa[5] = 0.5;    feature_tdoa[6] = 120.0;   feature_tdoa[7] = 25.0;
+            // feature_tdoa[8] = 50.0;    feature_tdoa[9] = 40.0;   feature_tdoa[10] = 65.0;   feature_tdoa[11] = 28.0;
+            // feature_tdoa[12] = 25.0;   feature_tdoa[13] = 45.0;
             // ------------------------------------------------------------------------------------ //
 
             int feat_num = 14;
