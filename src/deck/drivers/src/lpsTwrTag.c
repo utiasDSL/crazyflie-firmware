@@ -110,8 +110,8 @@ static struct {
   size_t ptr;
 } rangingStats[LOCODECK_NR_OF_TWR_ANCHORS];
 
-// Extra variable
-static bool validAnchors[LOCODECK_NR_OF_TWR_ANCHORS];
+// Extra variable (not used)
+// static bool validAnchors[LOCODECK_NR_OF_TWR_ANCHORS];
 // Ranging statistics
 static uint8_t rangingPerSec[LOCODECK_NR_OF_TWR_ANCHORS];
 static uint8_t rangingSuccessRate[LOCODECK_NR_OF_TWR_ANCHORS];
@@ -267,8 +267,8 @@ static uint32_t rxcallback(dwDevice_t *dev) {
         dist.z = options->anchorPosition[current_anchor].z;
         dist.stdDev = 0.25;
         dist.anchor_ID = current_anchor;
-        if (validAnchors[current_anchor])
-        	estimatorKalmanEnqueueDistance(&dist);
+
+        estimatorKalmanEnqueueDistance(&dist);
       }
 
       if (options->useTdma && current_anchor == 0) {
@@ -603,29 +603,31 @@ LOG_ADD(LOG_FLOAT, distance7, &state.distance[7])
 #endif
 LOG_GROUP_STOP(ranging)
 
-PARAM_GROUP_START(twr)
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 0)
-PARAM_ADD(PARAM_UINT8, useAnchor0, &validAnchors[0])
-#endif
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 1)
-PARAM_ADD(PARAM_UINT8, useAnchor1, &validAnchors[1])
-#endif
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 2)
-PARAM_ADD(PARAM_UINT8, useAnchor2, &validAnchors[2])
-#endif
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 3)
-PARAM_ADD(PARAM_UINT8, useAnchor3, &validAnchors[3])
-#endif
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 4)
-PARAM_ADD(PARAM_UINT8, useAnchor4, &validAnchors[4])
-#endif
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 5)
-PARAM_ADD(PARAM_UINT8, useAnchor5, &validAnchors[5])
-#endif
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 6)
-PARAM_ADD(PARAM_UINT8, useAnchor6, &validAnchors[6])
-#endif
-#if (LOCODECK_NR_OF_TWR_ANCHORS > 7)
-PARAM_ADD(PARAM_UINT8, useAnchor7, &validAnchors[7])
-#endif
-PARAM_GROUP_STOP(twr)
+
+// send from ground station, not used
+// PARAM_GROUP_START(twr)
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 0)
+// PARAM_ADD(PARAM_UINT8, useAnchor0, &validAnchors[0])
+// #endif
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 1)
+// PARAM_ADD(PARAM_UINT8, useAnchor1, &validAnchors[1])
+// #endif
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 2)
+// PARAM_ADD(PARAM_UINT8, useAnchor2, &validAnchors[2])
+// #endif
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 3)
+// PARAM_ADD(PARAM_UINT8, useAnchor3, &validAnchors[3])
+// #endif
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 4)
+// PARAM_ADD(PARAM_UINT8, useAnchor4, &validAnchors[4])
+// #endif
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 5)
+// PARAM_ADD(PARAM_UINT8, useAnchor5, &validAnchors[5])
+// #endif
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 6)
+// PARAM_ADD(PARAM_UINT8, useAnchor6, &validAnchors[6])
+// #endif
+// #if (LOCODECK_NR_OF_TWR_ANCHORS > 7)
+// PARAM_ADD(PARAM_UINT8, useAnchor7, &validAnchors[7])
+// #endif
+// PARAM_GROUP_STOP(twr)

@@ -19,8 +19,8 @@
 typedef struct{
   struct CrtpExtPosition currVal[2];
   bool activeSide;
-  uint32_t timestamp[2]; // FreeRTOS ticks
-  bool new_data;	  // new position data
+  uint32_t timestamp[2];   // FreeRTOS ticks
+  bool new_data;	       // new position data
 } ExtPositionCache;
 
 typedef struct{
@@ -288,7 +288,7 @@ static void bcCmdSrvCrtpCB(CRTPPacket* pk)
 			  commanderSetSetpoint(&setpoint, COMMANDER_PRIORITY_CRTP);
 			  broadcast_cmd.x = setpoint.attitude.roll;
 			  broadcast_cmd.y = setpoint.attitude.pitch;
-			  broadcast_cmd.z = setpoint.position.z; // setpoint.thrust;
+			  broadcast_cmd.z = setpoint.position.z;     // setpoint.thrust;
 			  broadcast_cmd.yaw = setpoint.attitude.yaw; // [CHANGE] yaw command
 
 			  if(cmdRxFreq.last_timestamp!=0){

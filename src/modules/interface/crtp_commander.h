@@ -35,5 +35,5 @@
 void crtpCommanderInit(void);
 void crtpCommanderRpytDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk, bool broadcast, struct CommanderCrtpLegacyValues* values);
 void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk);
-void bccrtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, crtp_setpoint_t* pk, uint8_t idx);
+void bccrtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, crtp_setpoint_t* pk, uint8_t idx);   // broadcast commander function
 #endif /* CRTP_COMMANDER_H_ */

@@ -254,7 +254,7 @@ typedef struct setpoint_s {
     stab_mode_t quat;
   } mode;
 
-  // Data from and for the new controller
+  // Data from and for the new controller (mario: motion_primitive)
   bool setEmergency;
   bool resetEmergency;
   uint8_t xmode, ymode, zmode;

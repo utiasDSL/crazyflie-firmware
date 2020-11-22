@@ -287,6 +287,7 @@ static void newControllerDecoder(setpoint_t *setpoint, uint8_t type, const void 
   } 
 }
 
+// Decoder function for position set cmd
 static void posSetDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, size_t datalen)
 {
 	crtp_setpoint_t* d = ((crtp_setpoint_t*) data);
@@ -316,10 +317,9 @@ static void posSetDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, s
 		setpoint->mode.z = modeDisable;
 		setpoint->thrust = 0.0f;
 	}
-
-
 }
 
+// Decoder function for altitude hold cmd
 static void altHoldDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, size_t datalen)
 {
 	crtp_setpoint_t* d = ((crtp_setpoint_t*) data);
@@ -342,7 +342,6 @@ static void altHoldDecoder(setpoint_t *setpoint, uint8_t idx, const void* data, 
     // z - upward
     setpoint->attitude.roll = position_fix24_to_float(d->pose[idx].x) / 3.1415926f * 180.0f;  //deg
     setpoint->attitude.pitch = -position_fix24_to_float(d->pose[idx].y) / 3.1415926f * 180.0f; //deg
-
 }
 
 
@@ -382,6 +381,7 @@ void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
   } 
 }
 
+// broadcast commander function
 void bccrtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, crtp_setpoint_t* data, uint8_t idx)
 {
 	  // The first ybte in pk->data is the CF's address (aka. broadcast id)

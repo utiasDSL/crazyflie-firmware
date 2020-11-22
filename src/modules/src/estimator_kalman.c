@@ -81,8 +81,8 @@
 
 //#define KALMAN_USE_BARO_UPDA
 //#define KALMAN_NAN_CHECK
-static bool enable_flow = true;
-static bool enable_zrange = true;
+static bool enable_flow = false;
+static bool enable_zrange = false;
 static bool enable_UWB = false;
 
 static bool OUTLIER_REJ = false;            // Model based outlier rejection
@@ -101,41 +101,6 @@ static bool ROBUST = false;                  // Use robust Kalman filter
 //                           { 0.27415173,  0.64046923, -0.30376936,  0.64989551}   // 7
 //                                 };
 
-// // 0925_G1
-// static float q_an[8][4] ={{-0.352,  0.615,  0.333,  0.622},  // 0
-
-//                           {0.587,  0.796,  0.125,  0.073},  // 1
-
-//                           {0.65,   0.289, -0.638,  0.296},   // 2
-
-//                           {-0.079, -0.133,  0.791,  0.592},  // 3
-
-//                           {-0.635,  0.751, -0.15 ,  0.099},  // 4
-
-//                           {0.607, -0.372, -0.596, -0.371},  // 5
-
-//                           {-0.053,  0.161,  0.811, -0.559},  // 6
-
-//                           { 0.262,  0.648, -0.273,  0.661}   // 7
-//                                 };
-
-// 1005_G1
-// static float q_an[8][4] ={{-0.216,  0.671,  0.206,  0.679},  // 0
-
-//                           {0.589,  0.789,  0.162,  0.059},  // 1
-
-//                           {0.582,  0.403, -0.575,  0.409},   // 2
-
-//                           {-0.054, -0.099,  0.797,  0.594},  // 3
-
-//                           {-0.64,  0.765,  -0.071 ,  0.021},  // 4
-
-//                           {0.629, -0.335, -0.618, -0.332},  // 5
-
-//                           {-0.066,  0.165,  0.806, -0.564},  // 6
-
-//                           { 0.197,   0.674, -0.21,  0.68}   // 7
-//                                 };
 // 1101_G1
 static float q_an[8][4] ={{-0.454,  0.536,  0.446,  0.555},  // 0
 
@@ -2342,6 +2307,8 @@ PARAM_GROUP_START(kalman)
   PARAM_ADD(PARAM_FLOAT, init_x, &initialX)
   PARAM_ADD(PARAM_FLOAT, init_y, &initialY)
   PARAM_ADD(PARAM_UINT8, resetEstimation, &resetEstimation)
+  PARAM_ADD(PARAM_UINT8, robust_KF ,&ROBUST)
+  PARAM_ADD(PARAM_UINT8, DNN_COM ,&DNN_COM)
 //  PARAM_ADD(PARAM_UINT8, quadIsFlying, &quadIsFlying)
 //  PARAM_ADD(PARAM_FLOAT, pNAcc_xy, &procNoiseAcc_xy)
 //  PARAM_ADD(PARAM_FLOAT, pNAcc_z, &procNoiseAcc_z)

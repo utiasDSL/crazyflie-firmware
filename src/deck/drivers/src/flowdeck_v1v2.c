@@ -70,7 +70,7 @@ static float dpixely;
 motionBurst_t currentMotion;
 
 // Disables pushing the flow measurement in the EKF
-static bool useFlowDisabled = false;
+// static bool useFlowDisabled = false;
 
 #define NCS_PIN DECK_GPIO_IO3
 
@@ -127,9 +127,9 @@ static void flowdeckTask(void *param)
       dpixely = flowData.dpixely;
 #endif
       // Push measurements into the Kalman filter
-      if (!useFlowDisabled) {
-        estimatorKalmanEnqueueFlow(&flowData);
-      }
+
+    estimatorKalmanEnqueueFlow(&flowData);
+
     } else {
       outlierCount++;
     }
@@ -239,9 +239,9 @@ LOG_ADD(LOG_FLOAT, dpixelx, &dpixelx)
 LOG_ADD(LOG_FLOAT, dpixely, &dpixely)
 LOG_GROUP_STOP(motion)
 
-PARAM_GROUP_START(motion)
-PARAM_ADD(PARAM_UINT8, disable, &useFlowDisabled)
-PARAM_GROUP_STOP(motion)
+// PARAM_GROUP_START(motion)
+// PARAM_ADD(PARAM_UINT8, disable, &useFlowDisabled)
+// PARAM_GROUP_STOP(motion)
 
 PARAM_GROUP_START(deck)
 PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, bcFlow, &isInit1)
